@@ -9,7 +9,8 @@ decisions: [DECISIONS.md](DECISIONS.md).
 - [V] Integration branch: `integration/replay-foundations-2026-10-28`, in the existing T3
   worktree `C:/Users/alex/.t3/worktrees/My-biggest-work/t3-24571f32`. Based on fetched
   `origin/main` `3e10517`, context commit `105d402`, Q3 cherry-pick `ee165ba`, then lead review fixes.
-  Nothing pushed; no PR, fork, release or remote branch modification.
+  Published after explicit user authorization as [PR #14](https://github.com/ArachnoMLK/My-biggest-work/pull/14),
+  from the same branch on `unfortunatelyalex/My-biggest-work` into upstream `main`. No merge or release.
 - [V] Original `main` remains at `06d1f3b`, one commit behind fetched upstream, with its original
   local changes: `.gitignore`, `AGENTS.md`, `.claude/`, `.mcp.json`, `.sharelane/`, `CLAUDE.md`.
   It was not pulled, reset, stashed or modified. Use the integration worktree for the new commands.
@@ -71,6 +72,7 @@ git diff --check
   unknown; UI `_-9D._-Y15` and `MessageTrigger.Tick` draw from the rules stream and need tracing.
 - **Next:** combine Q2's scheduler with Q3's rules/items consumers to establish draw order during
   replay playback, including those UI/trigger paths. Then continue Q2's #2977/#3138/KO-writer trace.
-- The maintainer requested publication of Q2's documents. This session's user forbids pushing
-  without explicit authorization, so all changes remain on local branches for review/publication.
-  Original task commits remain `105d402` and `5960f14` on their task branches.
+- The user explicitly authorized PR creation after local integration. [PR #14](https://github.com/ArachnoMLK/My-biggest-work/pull/14)
+  now publishes the reviewed Q2/Q3 integration and links both relays. Upstream push access was
+  unavailable, so publication uses a fork; original remotes and dirty main were preserved.
+  Original task commits remain `105d402` and `5960f14` on their task branches. Review and merge are pending.

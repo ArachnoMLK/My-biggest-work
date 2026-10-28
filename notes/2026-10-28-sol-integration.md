@@ -32,3 +32,6 @@ The verifier uses modeled AVM2 semantics, not a running-game oracle; full corpus
 
 **Questions for humans:** publication requires explicit authorization; local work is reviewable
 on the integration branch. No game content, extracted bytecode or replays were committed.
+
+**Publication follow-up:** the user subsequently authorized publication. [PR #14](https://github.com/ArachnoMLK/My-biggest-work/pull/14)
+publishes this integration from `unfortunatelyalex/My-biggest-work`; no merge was performed.
