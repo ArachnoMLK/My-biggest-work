@@ -105,8 +105,8 @@ Full background: [`docs/feasibility.md`](docs/feasibility.md). File formats: [`d
 
 | ID | Task | Starting point |
 |---|---|---|
-| Q1 | Map the replay reader: from method #3388 / #12889 to the class that holds the input timeline and to the code that feeds inputs to fighters. | `bht.py abc-disasm --method 12889`, `abc-find --member <name>` |
-| Q2 | Find the main tick loop (16 ms) and the order of updates per tick (input → state machine → physics → collision → hits → KO). | search `16`, `0.016`, `60` constants, callers of the input consumer |
+| Q1 | ✅ **Done** (Claude, 2026-10-28): see [`docs/code-map-11.00.md`](docs/code-map-11.00.md). Map the replay reader: from method #3388 / #12889 to the class that holds the input timeline and to the code that feeds inputs to fighters. | `bht.py abc-disasm --method 12889`, `abc-find --member <name>` |
+| Q2 | 🔄 **In progress** (Codex via @unfortunatelyalex, relay of 2026-10-28; PR pending). Find the main tick loop (16 ms) and the order of updates per tick (input → state machine → physics → collision → hits → KO). | search `16`, `0.016`, `60` constants, callers of the input consumer |
 | Q3 | Identify the PRNG and where `random_seed` enters (item spawns, random legend/map). | header parser, `abc-find` on multiplications/xor constants |
 | Q4 | Port the 10.09 movement evidence of brawlhalla-sim to 11.00 (same constants? same structure?). | their `docs/provenance.md` |
 | Q5 | Movement constants as functions of the 4 stats (`Strength`, `Dexterity`, `Weight` = Defense in game, `Speed`). | `HeroTypes.xml`, getters around `Speed`/`Weight` |
@@ -126,9 +126,11 @@ python -I tools/bht.py abc-classes --grep REGEX
 python -I tools/bht.py abc-disasm --method N | --class ID
 python -I tools/bht.py abc-find VALUE [--member]
 python -I tools/bht.py abc-strings REGEX
+python -I tools/bht.py abc-refs --method N  # members and constants one method touches
 python -I tools/bht.py swz-key && python -I tools/bht.py swz-dump --key K
 python -I tools/bht.py swf-info FILE.swf
 python -I tools/bht.py replay FILE.replay [--json]
+python -I tools/bht.py render-summary FILE.replay  # SVG: map geometry + input timeline + KOs
 python -I tools/bht.py corpus [--dir FOLDER]
 python -I tools/bht.py inventory             # rewrites ledger/game-files.csv, keeps status/notes
 python -I -m unittest discover -s tests

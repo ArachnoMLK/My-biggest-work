@@ -8,7 +8,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh import abc, replay, swf, swz  # noqa: E402
+from bh import abc, render, replay, swf, swz  # noqa: E402
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
 REPLAYS = os.environ.get("BRAWLHALLA_REPLAYS", os.path.join(os.path.expanduser("~"), "BrawlhallaReplays"))
@@ -24,6 +24,10 @@ class Pure(unittest.TestCase):
     def test_bitreader(self):
         r = replay.BitReader(bytes([0b10110000, 0xFF]))
         self.assertEqual((r.bit(), r.bits(3), r.bits(4), r.bits(8)), (1, 0b011, 0, 0xFF))
+
+    def test_presses_are_rising_edges(self):
+        recs = [(0, 0), (16, 1 << 4), (32, 1 << 4), (48, 0), (64, 1 << 4)]
+        self.assertEqual(render.presses(recs, (4,)), [16, 64])
 
     def test_decode_branches(self):
         code = bytes([0x10, 0x00, 0x00, 0x00, 0x47])  # jump +0 ; returnvoid

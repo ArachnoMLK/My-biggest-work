@@ -15,6 +15,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
+from bh import render as rendermod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
 from bh import swf as swfmod  # noqa: E402
 from bh import swz as swzmod  # noqa: E402
@@ -251,6 +252,25 @@ def cmd_replay(a):
             print(f"    {ts:7d} ms  {fl:014b}  {replaymod.describe_flags(fl)}")
 
 
+def cmd_render_summary(a):
+    """Draw a replay as SVG: real map geometry + per-player input timeline + KOs (needs work/swz)."""
+    rep = replaymod.parse(open(a.file, "rb").read())
+    levels = rendermod.read_text(os.path.join(WORK, "swz", "Init.swz", "LevelTypes.xml"))
+    name = None
+    for lname, body in re.findall(r'<LevelType LevelName="([^"]+)"[^>]*>(.*?)</LevelType>', levels, re.S):
+        if re.search(rf"<LevelID>{rep['level_id']}</LevelID>", body):
+            name = lname
+    desc = os.path.join(WORK, "swz", "Dynamic.swz", f"LevelDesc_{name}.xml")
+    if not name or not os.path.exists(desc):
+        sys.exit(f"no LevelDesc for level id {rep['level_id']} ({name}); run swz-dump first")
+    level = rendermod.parse_level(rendermod.read_text(desc))
+    legends = rendermod.legend_names(rendermod.read_text(os.path.join(WORK, "swz", "Game.swz", "HeroTypes.xml")))
+    svg = rendermod.render(rep, level, name, legends)
+    out = a.out or out_path("render", os.path.splitext(os.path.basename(a.file))[0] + ".svg")
+    open(out, "w", encoding="utf-8").write(svg)
+    print(f"{name}: {len(level['lines'])} collision lines, {len(level['respawns'])} respawns -> {out}")
+
+
 def cmd_corpus(a):
     """Parse every replay of a folder and correlate it with the game data (work/swz must exist)."""
     levels, heroes = {}, {}
@@ -334,6 +354,7 @@ def main():
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
+    add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
         (["--limit"], {"type": int, "default": 0}))
     a = ap.parse_args()
