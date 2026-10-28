@@ -44,6 +44,14 @@ class Game(unittest.TestCase):
         self.assertEqual(rep["errors"], [])
         self.assertEqual(rep["bad_branches"], 0)
 
+    def test_member_refs_agree_with_callers(self):
+        m = next(b["method"] for b in self.abc.bodies if len(b["code"]) > 40)
+        refs = abc.member_refs(self.abc, m)
+        self.assertTrue(refs["members"])
+        (_, full), _ = next(iter(refs["members"].items()))
+        short = full.rsplit("::", 1)[-1].rsplit(".", 1)[-1]
+        self.assertIn(m, abc.callers_of(self.abc, short))
+
     def test_swz_key_is_in_uint_pool(self):
         data = open(os.path.join(GAME, "Init.swz"), "rb").read()
         key = swz.find_key(data, candidates=self.abc.uints[1:])

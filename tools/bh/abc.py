@@ -399,3 +399,22 @@ def callers_of(abc, member_name):
         if any(name in MULTINAME_OPS and args and args[0] in targets for _, name, args in ins):
             hits.append(body["method"])
     return hits
+
+
+def member_refs(abc, method_id):
+    """Summary of one method body: {"members": {(op, name): count}, "constants": {(op, value): count}}.
+
+    Lets you see what a method reads, writes, calls and constructs without reading the whole listing.
+    """
+    bi = abc.body_of.get(method_id)
+    members, constants = {}, {}
+    if bi is None:
+        return {"members": members, "constants": constants}
+    for _, name, args in decode(abc.bodies[bi]["code"]):
+        if name in MULTINAME_OPS and args:
+            key = (name, abc.mn_name(args[0], full=True))
+            members[key] = members.get(key, 0) + 1
+        elif name in ("pushbyte", "pushshort", "pushint", "pushuint", "pushdouble", "pushstring"):
+            key = (name, operand_text(abc, name, args) if name not in ("pushbyte", "pushshort") else str(args[0]))
+            constants[key] = constants.get(key, 0) + 1
+    return {"members": members, "constants": constants}

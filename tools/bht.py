@@ -167,6 +167,17 @@ def cmd_abc_disasm(a):
         print()
 
 
+def cmd_abc_refs(a):
+    """Summarize what one method touches: members read/written/called/constructed and constants pushed."""
+    abc = open_abc(a)
+    refs = abcmod.member_refs(abc, a.method)
+    print(f"method #{a.method}  {abc.method_owner().get(a.method, '?')}")
+    for title, table in (("members", refs["members"]), ("constants", refs["constants"])):
+        print(f"{title}:")
+        for (op, value), n in sorted(table.items(), key=lambda kv: (kv[0][0], kv[0][1])):
+            print(f"  {n:3d}  {op:<16} {value}")
+
+
 def _parse_value(v):
     if re.fullmatch(r"-?\d+", v):
         return int(v)
@@ -317,6 +328,7 @@ def main():
     add("abc-classes", cmd_abc_classes, abc, (["--grep"], {"help": "regex on class and member names"}))
     add("abc-disasm", cmd_abc_disasm, abc, (["--method"], {"type": int}), (["--class"], {"dest": "cls"}))
     add("abc-find", cmd_abc_find, abc, (["value"], {}), (["--member"], {"action": "store_true", "help": "value is a member name"}))
+    add("abc-refs", cmd_abc_refs, abc, (["--method"], {"type": int, "required": True}))
     add("abc-strings", cmd_abc_strings, abc, (["pattern"], {}))
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
