@@ -1,52 +1,76 @@
 # HANDOFF — 2026-10-28
 
-State at the end of the Claude Opus 5.5 context/integration session. Overwrite this file at each
-handover; history lives in the relay thread and `notes/`.
+Lead review and local integration of two Claude Opus 5.5 implementation tasks (T3,
+`effort: ultrathink`). Project overview: [PROJECT.md](PROJECT.md); rules: [AGENTS.md](AGENTS.md);
+decisions: [DECISIONS.md](DECISIONS.md).
 
-## Repository state
+## Repository and access
 
-| Item | State |
-|---|---|
-| This branch | `t3/24571f32` (T3 worktree), fast-forwarded to `origin/main` `3e10517` (README image, `render-summary`) plus one local commit. Not pushed. |
-| Local root checkout (`main`) | At `06d1f3b`, 1 behind `origin/main`, so it lacks `render-summary` until synced. Dirty: modified `.gitignore`, `AGENTS.md`; untracked `.claude/`, `.mcp.json`, `.sharelane/`, `CLAUDE.md`. Left untouched. |
-| ShareLane | Unavailable: `.mcp.json` points to a missing `sharelane.mjs`. No claims or locks were recorded through it; file scope was kept by agreement instead. |
+- [V] Integration branch: `integration/replay-foundations-2026-10-28`, in the existing T3
+  worktree `C:/Users/alex/.t3/worktrees/My-biggest-work/t3-24571f32`. Based on fetched
+  `origin/main` `3e10517`, context commit `105d402`, Q3 cherry-pick `ee165ba`, then lead review fixes.
+  Nothing pushed; no PR, fork, release or remote branch modification.
+- [V] Original `main` remains at `06d1f3b`, one commit behind fetched upstream, with its original
+  local changes: `.gitignore`, `AGENTS.md`, `.claude/`, `.mcp.json`, `.sharelane/`, `CLAUDE.md`.
+  It was not pulled, reset, stashed or modified. Use the integration worktree for the new commands.
+- [V] ShareLane MCP is unavailable: its configured script belongs to the previous machine and
+  is missing here. No ShareLane claims, context updates or onboarding completion were fabricated.
+  Task scopes were separated in T3 worktrees. Restore ShareLane before relying on its context map.
+- [V] GitHub discussions including replies, all ten open issues, PR history and local task branches
+  were read. Q3 claim: [discussion comment](https://github.com/ArachnoMLK/My-biggest-work/discussions/1#discussioncomment-19247299).
 
-## Verified in this session ([V], patch 11.00, ABC `7d308423…6db9`, `BRAWLHALLA_DIR` set per command)
+## Implemented and independently reviewed
 
-- `abc-extract` reproduces the pinned SHA-256; `abc-validate`: 15,453 bodies, 0 errors, 0 bad branches.
-- Q2 anchors re-checked with `abc-disasm`: #3336 @417–493 (mod-16 rounding), @1838–1896
-  (`floor(max(T−S,0)/16)`), @1908–1922 (`t += 16`), @4073–4077 (loop test), @2560–2594
-  (`_-vs + 450` gate), @2725–2888 (passes `_-k5H` → `_-10` → `_-s4H`/`_-d3s` → `_-J2g`),
-  @1814–1821 (start := `_-717`); #3594 @126–231 (5 or 300-tick anchor); #2990 @548/@566;
-  #3138 @1147 `Respawn`; #2984 @6597 `OnHit`/17. No contradiction found. Only clarification
-  added: table receivers are `_-h3U` property names, method ids belong to `_-E1V`, `_-26u`, `_-99`.
-- Local replay folder: 9,079 files, formats 248–271; 2,373 are in the supported 261–271 range.
-  (Not the owner's 9,653-file corpus of AGENTS.md §3.)
-- `python -I -m unittest discover -s tests -v`: 12 tests, OK, 0 skipped (also with
-  `-W error::ResourceWarning`). Replay test parsed 20 format-271 files.
+- [V] Recovered the Q2 [tick-loop map](docs/tick-loop-11.00.md), Q1 map update and
+  [previous relay](notes/2026-10-28-codex-q2.md) from local commit `6d7c074`, without its
+  `.gitignore` or ShareLane files. Key scheduler, pass-order and checkpoint anchors were
+  checked against the pinned ABC. Q2 ring-out/score commit order is still open.
+- [V] Repaired replay test sampling: inspect the version first, select at most 20 supported
+  formats (261–271), explicitly skip if none exist, and preserve supported-file parse failures.
+  Synthetic mixed/unsupported/broken samples cover the behavior. Parser support was not broadened.
+- [V] Added Q3's [WELL512 reference and evidence](docs/prng-11.00.md), range/shuffle helpers,
+  `prng` and `prng-verify` commands, and independent/golden tests. Both identified match seed
+  paths reach `Random`: rules starts at draw 0; items consumes two draws in #4908 after seeding.
+- [V] Lead review found and fixed two defects: snapshot restore now rejects noninteger index/words
+  without changing existing state, and verification reports missing required methods rather than
+  silently skipping helpers. Regression tests cover both.
+- [V] Narrowed unsupported exhaustive PRNG claims; consumer totals from the uncommitted exploratory
+  classifier are provisional [H]. Individual sites retain method ids for manual verification.
 
-## Known failures and limits
+## Validation
 
-- Fixed: `test_some_replays_parse` failed on local format-257 replays (`assertIn(version, PATCHES)`).
-  The test now samples supported formats only; old formats are still not supported (D7, D8).
-- The parser accepts some pre-261 replays without error; whether its output is right for them is unknown.
-- `bht.py corpus` was not run on the local folder in this session.
+Pin: **11.00 / ABC SHA-256
+`7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`**.
+Local install is `F:/SteamLibrary/steamapps/common/Brawlhalla`; set `BRAWLHALLA_DIR` for commands
+on this host only. All game-derived bytes/listings stay in ignored `work/`.
 
-## Pending
+Run from the integration worktree:
 
-- **Q2 publication:** the Codex Q2 docs (from local ShareLane commit `6d7c074`, without its
-  `.gitignore`/`.sharelane` changes) are in this branch. The maintainer asked for a PR
-  ([reply](https://github.com/ArachnoMLK/My-biggest-work/discussions/1#discussioncomment-19245150));
-  no PR was opened in this session because remote changes were not authorized.
-- **Q3 (parallel):** another Claude worker on `t3/implement-replay-prng-q3` owns
-  `tools/bh/prng.py`, `tools/bht.py`, `tests/test_prng.py`, `docs/prng-11.00.md`,
-  `notes/2026-10-28-claude-q3.md`. No file overlap with this branch.
-- README progress row for Q2 still says "in progress"; update it with the Q2 PR.
+```powershell
+$env:BRAWLHALLA_DIR='F:/SteamLibrary/steamapps/common/Brawlhalla'
+python -I tools/bht.py abc-extract --game $env:BRAWLHALLA_DIR
+python -I -W error::ResourceWarning -m unittest discover -s tests -v
+python -I tools/bht.py prng-verify --draws 1000
+python -I tools/bht.py abc-validate
+git diff --check
+```
 
-## Next steps
+- [V] Full combined suite: **29 tests passed, zero skipped**, resource warnings treated as errors.
+- [V] PRNG verifier: **6 seeds × 1,000 draws plus range/shuffle cases passed**.
+- [V] ABC validation: **15,453 bodies decoded, zero errors, zero bad branch targets**.
+- [V] Signed-seed/skip/JSON CLI smoke passed; original main's dirty file list remains unchanged.
+- [V] Context worker counted 9,079 local replays (formats 248–271), including 2,373 supported files;
+  this differs from the owner's documented corpus. The integration test parsed 20 format-271 files.
+  Full local corpus validation was not run.
 
-1. Owner/lead: review this branch, open the Q2 PR linking the Codex relay, and post
-   [notes/2026-10-28-claude-context.md](notes/2026-10-28-claude-context.md) to the relay thread.
-2. Q2 follow-up: trace `Entity._-x1M` #2977 and `Entity._-eR` #3138 to their boundary/score
-   consumers and find the replay KO writer, to fix ring-out order relative to `_-26u._-d3s` #1665.
-3. Merge Q3 when its worker reports; then the seed path from #3348 can be cross-checked.
+## Limits and next step
+
+- No simulator, runtime equivalence or video. The bytecode interpreter models AVM2 semantics;
+  a running-game oracle has not confirmed its arithmetic or output. Snapshot byte order is unknown.
+- Consumer counts are provisional. Whether global-generator draws affect simulated state remains
+  unknown; UI `_-9D._-Y15` and `MessageTrigger.Tick` draw from the rules stream and need tracing.
+- **Next:** combine Q2's scheduler with Q3's rules/items consumers to establish draw order during
+  replay playback, including those UI/trigger paths. Then continue Q2's #2977/#3138/KO-writer trace.
+- The maintainer requested publication of Q2's documents. This session's user forbids pushing
+  without explicit authorization, so all changes remain on local branches for review/publication.
+  Original task commits remain `105d402` and `5960f14` on their task branches.

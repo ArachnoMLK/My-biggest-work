@@ -16,6 +16,7 @@ import os
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -141,9 +142,13 @@ class Well512(unittest.TestCase):
         b = prng.Well512(0)
         b.setstate(a.getstate())
         self.assertEqual([a.next_u32() for _ in range(40)], [b.next_u32() for _ in range(40)])
-        for bad in ((16, (0,) * 16), (0, (0,) * 15), (0, (1 << 32,) + (0,) * 15)):
+        before = b.getstate()
+        for bad in ((16, (0,) * 16), (0, (0,) * 15), (0, (1 << 32,) + (0,) * 15),
+                    (0.5, (0,) * 16), (True, (0,) * 16), (0, (1.5,) + (0,) * 15),
+                    (0, (False,) + (0,) * 15)):
             with self.assertRaises(ValueError):
                 b.setstate(bad)
+            self.assertEqual(b.getstate(), before)
 
     def test_seed_validation(self):
         for bad in (-1, 1 << 32, 1.5, None, True):
@@ -183,6 +188,13 @@ class Helpers(unittest.TestCase):
 
 
 class Cli(unittest.TestCase):
+    def test_verification_requires_all_methods(self):
+        roles = {role: 0 for role in ("seed", "next", "uniform", "range_u32", "range_i32", "shuffle")}
+        for missing in roles:
+            with self.subTest(missing=missing), patch.object(prng, "locate", return_value={
+                    k: v for k, v in roles.items() if k != missing}):
+                self.assertEqual(prng.verify(None, [0]), ["cannot verify missing methods: " + missing])
+
     def run_cli(self, *args):
         return subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "bht.py"), *args],
                               capture_output=True, text=True)

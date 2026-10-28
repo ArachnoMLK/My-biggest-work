@@ -93,7 +93,8 @@ class Well512:
 
     def setstate(self, state):
         index, words = state
-        if not 0 <= index < STATE_WORDS or len(words) != STATE_WORDS or any(not 0 <= w <= M32 for w in words):
+        if (type(index) is not int or not 0 <= index < STATE_WORDS or len(words) != STATE_WORDS
+                or any(type(w) is not int or not 0 <= w <= M32 for w in words)):
             raise ValueError("state must be (index 0..15, 16 uint32 words)")
         self.index, self.state = index, list(words)
 
@@ -290,7 +291,7 @@ def _binop(op, x, y):
 def locate(abc):
     """Find the generator class and helpers in any ABC by name/signature (names change per patch).
 
-    Returns {"class": id, "slots": {name: type}, "seed": m, "next": m, "save": m, "load": m,
+    Returns {"class": id, "slots": {name: type}, "seed": m, "next": m,
              "uniform": m, "range_u32": m, "range_i32": m, "shuffle": m} (missing keys = not found).
     """
     found = {}
@@ -332,6 +333,9 @@ def bytecode_random(abc, found, seed):
 def verify(abc, seeds, draws=64):
     """Compare this port with the emulated bytecode. Returns a list of mismatch strings (empty = ok)."""
     found = locate(abc)
+    missing = sorted({"seed", "next", "uniform", "range_u32", "range_i32", "shuffle"} - found.keys())
+    if missing:
+        return ["cannot verify missing methods: " + ", ".join(missing)]
     bad = []
     for seed in seeds:
         ref, port = bytecode_random(abc, found, seed), Well512(seed)

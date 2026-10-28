@@ -19,7 +19,7 @@ python -I tools/bht.py prng 123456789 --count 4                    # the stream 
 
 ## 1. Summary
 
-- [V] There is **one PRNG algorithm** in the game code: class `Random` (readable name, class #59),
+- [V] The **identified replay-seeded paths** use class `Random` (readable name, class #59),
   a **WELL512** generator (16 × uint32 state + index), the same algorithm as the `.swz` decryptor
   (`swz.SwzRandom`, from bhswz-rs) — checked by running both for 2,000 draws on 10 seeds
   (`tests/test_prng.py`, `test_independent_reference_and_swz`). The `.swz` decryption itself is
@@ -28,8 +28,9 @@ python -I tools/bht.py prng 123456789 --count 4                    # the stream 
 - [V] The replay `random_seed` seeds **two separate `Random` instances**, both with the same value:
   `RulesManager._-22` and `ItemManager._-22` (§3). They produce the same stream; the item one is
   2 draws ahead right after seeding.
-- [V] Three other `Random` instances exist and are **not** seeded from the replay (§4). The global one
-  (`_-A6B._-PW`, seeded from `Math.random()`) has 278 draw sites in 116 methods.
+- [V] Three other identified `Random` instances are **not** seeded from the replay (§4).
+  The global one is `_-A6B._-PW`, seeded from `Math.random()`. This is not proof that no other
+  generator algorithm exists elsewhere in the game.
 - [H] Everything replay-relevant should therefore come from the two match instances; whether some
   global-generator draws still influence simulated state is **not established** (§5).
 - No game/runtime equivalence is claimed: the port equals the *bytecode* under AVM2 semantics
@@ -96,7 +97,10 @@ Script: every `getproperty _-22/_-PW/_-kK/_-m` whose next call is `_-f4c` or one
 below; the receiver is resolved from the preceding instruction (`getproperty _-s3D` → R,
 `getproperty _-3z` → I, `findproperty` → the method's own class, `getlocal N` → the type of the
 last `coerce T; setlocal N`). [V] for the listed sites; dynamic receivers not of these shapes are not
-counted, so the lists may be incomplete.
+counted, so the lists may be incomplete. [H] Site totals below are provisional: the exploratory
+classifier was not committed, so its exact counts are not reproducible through the toolkit.
+Verify each listed method with `python -I tools/bht.py abc-disasm --method N`; the global
+name search is `python -I tools/bht.py abc-find _-f4c --member`.
 
 | Generator | Sites | Methods (id, draws) |
 |---|---|---|
@@ -108,7 +112,7 @@ counted, so the lists may be incomplete.
 
 | Instance | Seed | Users | Status |
 |---|---|---|---|
-| `_-A6B._-PW` (static, "global") | `new Random()` in `_-y2E.init` #15351 @12061–12065 → `Math.random()`; never passed to `_-24O` or `_-L3P` (all 5 `_-24O` sites; of the 5 `_-L3P` call sites, 2 are on R/I and 3 are same-named methods of other types: `_-X51`/`_-B3C` with 2 args in `_-h3U._-01I` #3336 @1369/@1623, `_-B1z` in `_-E1V._-v2w` #4895 @367) | 278 sites / 116 methods: bot AI `_-v5Q` (incl. `Think`, 13 methods), `_-y30` (14), `Entity` (#2887 `<init>`, #3002, #3115), `BombsketballState`/`SoccerState`/`VolleyBattleState._-c1u`, `HeroType._-r1l`, menus (`ScreenLevelSelect`…), helpers `_-A6B.Random()` #1148 etc. | [V] seeding and site count; [H] that none of them changes simulated state (they cannot be reproduced from a replay, so a replay-faithful engine must not depend on them) |
+| `_-A6B._-PW` (static, "global") | `new Random()` in `_-y2E.init` #15351 @12061–12065 → `Math.random()`; never passed to `_-24O` or `_-L3P` (all 5 `_-24O` sites; of the 5 `_-L3P` call sites, 2 are on R/I and 3 are same-named methods of other types: `_-X51`/`_-B3C` with 2 args in `_-h3U._-01I` #3336 @1369/@1623, `_-B1z` in `_-E1V._-v2w` #4895 @367) | Provisional classifier count: 278 sites / 116 methods. Examples: bot AI `_-v5Q` (`Think`), `_-y30`, `Entity` (#2887 `<init>`, #3002, #3115), `BombsketballState`/`SoccerState`/`VolleyBattleState._-c1u`, `HeroType._-r1l`, menus (`ScreenLevelSelect`…), helpers `_-A6B.Random()` #1148 etc. | [V] seeding and listed examples; [H] total site count and whether these draws affect simulated state. Their runtime relevance must be traced rather than inferred from replay determinism. |
 | `_-h3U._-kK` (static) | `new Random()` #15351 @30914–30918; reseeded in `_-h3U._-425` #3389 @100–138 with a draw of `_-PW` | only `_-425` (28 draws: random positions ±7000, written to a `ByteArray` with `writeDouble`; guarded by `_-22B`) | [V]; [H] a debug/determinism self-test |
 | `_-Mr._-m` (static) | `_-Mr.static._-n5z(_-h3U._-v4J)` #9974, called from `_-Mr._-r5q` #9902 @203–225; `_-v4J` is a uint time counter (`getTimer` / multiples of 16 in `_-h3U._-L5y` #3310) | one shuffle in `_-Mr._-r5q`; `_-Mr` is a screen class (`OnInitDisplay`, extends `_-E6N`) | [V] calls; [H] UI only |
 
@@ -130,10 +134,11 @@ values ([H] memory-scrambling against value editing). Not a second generator.
 ## 6. How the port is checked
 
 1. `prng.emulate` runs the **actual method bodies** of the pinned ABC (#1011, #1013, #1142–#1144,
-   #1068) with a ~100-line interpreter that knows only the opcodes those bodies use (unknown opcode →
+   #1068) with a small interpreter that knows only the opcodes those bodies use (unknown opcode →
    error) and applies AVM2 conversions (slot/param/return coercion, `Vector.<uint>` stores).
    `bht.py prng-verify` compares it with `prng.py` on 6 seeds × 256 draws, the 4 helpers on edge
-   ranges, and the stream position afterwards. [V] `prng-verify --draws 1000` → OK.
+   ranges, and the stream position afterwards. Verification fails if any required method is missing.
+   [V] `prng-verify --draws 1000` → OK.
 2. Mutation check (done once, not committed): changing the index step, the `range_u32` wrap, the
    `range_i32` path or using Fisher–Yates each made `verify` report mismatches. [V]
 3. Golden values in `tests/test_prng.py` were produced by the emulated bytecode (seeds 0, 1,

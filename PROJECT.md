@@ -20,6 +20,7 @@ inputs. Rules, task queue and relay protocol: [AGENTS.md](AGENTS.md). Decisions:
 | `tools/bh/swf.py`, `abc.py` | SWF container and AVM2 (ABC) parser, disassembler, constant/member search. |
 | `tools/bh/swz.py` | `.swz` decryption (key found among the ABC `uint` constants). |
 | `tools/bh/replay.py` | `.replay` reader, formats 261–271 (10.02–11.00), keeps every input record. |
+| `tools/bh/prng.py` | WELL512 reference, range/shuffle helpers and bytecode verifier (`prng`, `prng-verify`); [Q3 evidence](docs/prng-11.00.md). |
 | `tools/bh/render.py` | `render-summary`: SVG of map geometry and key presses for one replay (no positions). |
 | `tests/test_tools.py` | Pure tests always run; game- and replay-dependent tests skip without a local install. |
 | `docs/`, `notes/` | Findings pinned to a patch and ABC hash; relay drafts. |
@@ -33,6 +34,8 @@ Python 3.10+, standard library only.
 - Find the `.swz` key and dump game data to `work/swz/`.
 - Parse supported replays: header, settings, players, full input timelines, KO times, results.
 - Static maps of the replay reader (Q1) and the 16 ms fixed-step scheduler and pass order (Q2).
+- [V] Q3's identified replay seed paths reach two WELL512 instances; the reference port matches
+  the emulated pinned bytecode. Runtime equivalence and full consumer order remain unverified.
 - Draw one replay's stage geometry and input timeline (`render-summary`, on `origin/main` since `3e10517`).
 
 **Not available yet:** no simulator, no player positions, no video. Every replay picture so far
