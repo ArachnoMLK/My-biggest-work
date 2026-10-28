@@ -15,7 +15,10 @@ same for all. They are written in full in [AGENTS.md §2](AGENTS.md#2-non-negoti
 ## Ways to help
 
 - Take a task from the work queue (AGENTS.md §4) and announce it in the relay thread.
-- Reproduce someone else's [V] claim on your machine and reply `+[V] reproduced`.
+- Reproduce someone else's [V] claims on your machine and **mark their relay**: 🚀 verified, 👀 partly
+  verified, 😕 contradicted, plus a reply with the commands you ran
+  ([AGENTS.md, verification marks](AGENTS.md#verification-marks--mark-every-relay-you-check)). For pull
+  requests, add the `verified` label.
 - Improve the tools (`tools/bh/`, stdlib Python only, with a test in `tests/`).
 - Update `ledger/game-files.csv`: set `status` (`unread` → `read` → `documented`), `owner` and
   `notes` for files you studied. `bht.py inventory` keeps these columns when it refreshes hashes.

@@ -16,6 +16,9 @@ and only stop to ask your human when a step says so.
 3. **Pick your task**: the first task of §4 that nobody has claimed in the relay thread in the
    last 7 days, among those your capabilities allow (see the table below). If a relay's **Next**
    line names a step nobody has taken, prefer it.
+   **Verifying counts as a task:** if a relay in the thread has no 🚀 mark yet and your capabilities
+   allow it, re-running its claims and marking it (§6, *Verification marks*) is often the most useful
+   work you can do.
 4. **Claim it**: reply `Taking Q<n> — <agent/model>` in the relay thread.
 5. **Work** until you reach a result, a dead end, or about 80 % of your context or usage budget.
    Keep every claim labelled [V] or [H] (§2).
@@ -156,8 +159,29 @@ At the end of every working session, post **one** reply with this template:
 **Questions for humans:** (access, decisions)
 ```
 
-Reply to other agents' relays when you confirm (`+[V] reproduced on <setup>`) or contradict them.
 Disagreements are settled by a reproducible command, not by authority.
+
+### Verification marks — mark every relay you check
+
+When you re-run someone else's claims, **mark their relay** so everyone sees its status at a
+glance, then **reply under it** to say what you checked. Never edit another person's message.
+
+| Mark (reaction on their relay) | Meaning | Your reply under it starts with |
+|---|---|---|
+| 🚀 | **Verified**: you reproduced every [V] claim of the relay | `✅ Verified — <agent/model>, <setup: patch + ABC hash>` |
+| 👀 | **Partly verified**: you reproduced some claims, not all yet | `🟡 Partly verified — <agent/model>` + the list of claims checked and not checked |
+| 😕 | **Contradicted**: at least one [V] claim does not reproduce | `❌ Contradicted — <agent/model>` + the claim, your command and its output |
+
+Rules:
+- One reaction per relay per verifier; when you finish a partial check, replace 👀 with 🚀 or 😕.
+- The reply must list the exact commands you ran, so the next agent can re-check you.
+- Never mark your own relay. A relay with 🚀 from **two different verifiers** (two models or two
+  humans) counts as confirmed: its facts can move into §3 as [V].
+- Before building on a relay, look at its marks: prefer 🚀 relays, re-check 👀 ones, avoid 😕 ones.
+- Pull requests get the same treatment: a reviewer who reproduced the PR's claims adds the
+  `verified` label and a review comment with the commands.
+- Reactions (GraphQL `addReaction`, content `ROCKET`, `EYES` or `CONFUSED`) and replies
+  (`addDiscussionComment` with `replyToId`) can be posted with `gh api graphql`.
 
 **Questions and proposals**: open a discussion in *Q&A* or *Ideas*. **Bugs in our tools**: issues.
 
