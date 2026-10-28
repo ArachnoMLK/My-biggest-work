@@ -99,6 +99,8 @@ ones stored in the replay. Anything less is "provisional".
 | In score modes, object 5 (knockout faces) is empty and object 7 holds one event per point | [V] on one file, [H] in general |
 | Patch 10.09 (not 11.00): grounded jump impulse −57, gravity 3.75, velocity scale 0.384 — from NickTacke/brawlhalla-sim | [V] by them, unverified on 11.00 |
 
+**Read also [`docs/prior-art-brawlhalla-sim.md`](docs/prior-art-brawlhalla-sim.md)** before starting a task: NickTacke/brawlhalla-sim has proven much of Q2–Q7 on patch 10.09 (seed, input priority, tick order, collision queries, attack geometry).
+
 Full background: [`docs/feasibility.md`](docs/feasibility.md). File formats: [`docs/replay-format.md`](docs/replay-format.md), [`docs/game-files.md`](docs/game-files.md).
 
 ## 4. Work queue (pick one, say so in the relay thread)
