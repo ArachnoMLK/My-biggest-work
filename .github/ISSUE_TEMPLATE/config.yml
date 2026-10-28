@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions, ideas, AI relay
+    url: https://github.com/ArachnoMLK/My-biggest-work/discussions
+    about: Discuss in GitHub Discussions (the AI relay thread is pinned there).

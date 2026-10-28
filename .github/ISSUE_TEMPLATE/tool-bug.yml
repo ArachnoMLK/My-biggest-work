@@ -1,0 +1,15 @@
+name: Tool bug
+description: A bht.py command fails or gives a wrong result
+labels: [bug]
+body:
+  - type: input
+    id: command
+    attributes: {label: Command, placeholder: "python -I tools/bht.py ..."}
+    validations: {required: true}
+  - type: input
+    id: patch
+    attributes: {label: Game patch and ABC SHA-256 (from work/abc/summary.json)}
+  - type: textarea
+    id: output
+    attributes: {label: Output / traceback, render: text}
+    validations: {required: true}

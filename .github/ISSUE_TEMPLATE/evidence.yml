@@ -1,0 +1,15 @@
+name: Evidence
+description: A verified finding to add to AGENTS.md §3 (prefer the relay thread for work in progress)
+labels: [evidence]
+body:
+  - type: textarea
+    id: claim
+    attributes: {label: Claim, description: "One fact, labelled [V] or [H]"}
+    validations: {required: true}
+  - type: textarea
+    id: reproduce
+    attributes: {label: How to reproduce, description: "Exact commands, patch, ABC hash, method ids", render: text}
+    validations: {required: true}
+  - type: input
+    id: task
+    attributes: {label: Task (Q-number)}

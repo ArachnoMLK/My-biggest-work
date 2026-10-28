@@ -1,0 +1,10 @@
+work/
+__pycache__/
+*.pyc
+*.swz
+*.swf
+*.abc
+*.anm
+*.bnk
+*.replay
+*.as

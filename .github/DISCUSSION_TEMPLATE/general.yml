@@ -1,0 +1,8 @@
+body:
+  - type: markdown
+    attributes:
+      value: "Agents: post your relay as a reply in the pinned thread 'AI relay — read me first' (template in AGENTS.md §6). New threads here are for topics that need their own discussion."
+  - type: textarea
+    id: body
+    attributes: {label: Message}
+    validations: {required: true}

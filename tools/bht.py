@@ -1,0 +1,332 @@
+"""bht: Brawlhalla research toolkit (stdlib only, Python 3.10+).
+
+Run `python -I tools/bht.py <command> --help`. Every output goes to ./work (git-ignored):
+never commit game files, decrypted data, decompiled code or replays.
+"""
+import argparse
+import csv
+import hashlib
+import json
+import os
+import re
+import sys
+import time
+from collections import Counter
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from bh import abc as abcmod  # noqa: E402
+from bh import replay as replaymod  # noqa: E402
+from bh import swf as swfmod  # noqa: E402
+from bh import swz as swzmod  # noqa: E402
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORK = os.path.join(ROOT, "work")
+DEFAULT_GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
+DEFAULT_REPLAYS = os.environ.get("BRAWLHALLA_REPLAYS", os.path.join(os.path.expanduser("~"), "BrawlhallaReplays"))
+ARCHIVES = ["Engine.swz", "Init.swz", "Game.swz", "Dynamic.swz"]
+
+
+def out_path(*parts):
+    p = os.path.join(WORK, *parts)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    return p
+
+
+def save_json(obj, *parts):
+    p = out_path(*parts)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1, ensure_ascii=False, default=str)
+    return p
+
+
+def kind_of(rel):
+    name = os.path.basename(rel)
+    ext = os.path.splitext(name)[1].lower()
+    for prefix, kind in (("Gfx_", "gfx-swf"), ("SFX_", "sfx-swf"), ("UI_", "ui-swf"), ("Bones_", "bones-swf"),
+                         ("Animation_", "anm"), ("Splashart", "ui-swf")):
+        if name.startswith(prefix):
+            return kind
+    if name == "BrawlhallaAir.swf":
+        return "main-code"
+    return {".swz": "swz-archive", ".anm": "anm", ".bnk": "audio-bank", ".swf": "swf", ".png": "image",
+            ".jpg": "image", ".bin": "lang", ".xml": "xml", ".dll": "native", ".exe": "native",
+            ".ane": "native-extension"}.get(ext, ext.lstrip(".") or "other")
+
+
+# ---------------------------------------------------------------- commands
+def cmd_inventory(a):
+    """Hash and classify every file of the install; write work/inventory.json and the ledger CSV."""
+    rows, t0 = [], time.time()
+    ledger = os.path.join(ROOT, "ledger", "game-files.csv")
+    old = {}
+    if os.path.exists(ledger):
+        with open(ledger, encoding="utf-8") as f:
+            old = {r["path"]: r for r in csv.DictReader(f)}
+    for dirpath, dirs, files in os.walk(a.game):
+        if dirpath == a.game and "Adobe AIR" in dirs:
+            dirs.remove("Adobe AIR")  # the bundled AIR runtime, not game content
+        for fn in sorted(files):
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, a.game).replace("\\", "/")
+            h = hashlib.sha256()
+            with open(full, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+            prev = old.get(rel, {})
+            rows.append({"path": rel, "size": os.path.getsize(full), "sha256": h.hexdigest(), "kind": kind_of(rel),
+                         "status": prev.get("status", "unread"), "owner": prev.get("owner", ""),
+                         "notes": prev.get("notes", "")})
+    rows.sort(key=lambda r: (r["kind"], r["path"]))
+    with open(ledger, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+    kinds = Counter(r["kind"] for r in rows)
+    sizes = Counter()
+    for r in rows:
+        sizes[r["kind"]] += r["size"]
+    save_json({"game": a.game, "files": len(rows), "by_kind": {k: [kinds[k], sizes[k]] for k in kinds}}, "inventory.json")
+    print(f"{len(rows)} files in {time.time() - t0:.0f}s -> ledger/game-files.csv")
+    for k, n in kinds.most_common():
+        print(f"  {k:<18} {n:5d} files {sizes[k] / 1e6:9.1f} MB")
+
+
+def load_main_abc(game):
+    swf = swfmod.Swf(open(os.path.join(game, "BrawlhallaAir.swf"), "rb").read())
+    blocks = swf.abc_blocks()
+    name, data = max(blocks, key=lambda b: len(b[1]))
+    return swf, data
+
+
+def cmd_abc_extract(a):
+    """Extract the biggest DoABC block of BrawlhallaAir.swf to work/abc/main.abc and summarize it."""
+    swf, data = load_main_abc(a.game)
+    p = out_path("abc", "main.abc")
+    open(p, "wb").write(data)
+    abc = abcmod.Abc(data)
+    obf = sum(1 for s in abc.strings[1:] if s and re.fullmatch(r"_-[A-Za-z0-9]{2,4}", s))
+    hx = sorted({m.group(1) for s in abc.strings[1:] if s for m in re.finditer(r"\[(\w+)\.hx\]", s)})
+    summary = {"sha256": hashlib.sha256(data).hexdigest(), "abc_version": f"{abc.major}.{abc.minor}",
+               "swf_tags": swf.tag_counts(), "abc_blocks": [(n, len(d)) for n, d in swf.abc_blocks()],
+               "ints": len(abc.ints), "uints": len(abc.uints), "doubles": len(abc.doubles),
+               "strings": len(abc.strings), "multinames": len(abc.multinames), "methods": len(abc.methods),
+               "classes": len(abc.instances), "scripts": len(abc.scripts), "bodies": len(abc.bodies),
+               "obfuscated_strings": obf, "haxe_sources": hx}
+    save_json(summary, "abc", "summary.json")
+    print(json.dumps({k: v for k, v in summary.items() if k != "haxe_sources"}, indent=1))
+    print(f"-> {p}")
+
+
+def open_abc(a):
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    return abcmod.Abc(open(p, "rb").read())
+
+
+def cmd_abc_validate(a):
+    """Decode every method body and check branch targets (sanity check of the disassembler)."""
+    rep = abcmod.validate(open_abc(a))
+    print(f"bodies {rep['bodies']}  decoded {rep['decoded']}  errors {len(rep['errors'])}  bad branches {rep['bad_branches']}")
+    for m, e in rep["errors"][:20]:
+        print(f"  method {m}: {e}")
+
+
+def cmd_abc_classes(a):
+    """List classes (name, super, member counts) to work/abc/classes.json."""
+    abc = open_abc(a)
+    out = []
+    for ci, inst in enumerate(abc.instances):
+        out.append({"id": ci, "name": abc.class_name(ci), "super": abc.mn_name(inst["super"], full=True),
+                    "iinit": inst["iinit"], "cinit": abc.classes[ci]["cinit"],
+                    "instance_traits": [abc.mn_name(t["name"]) for t in inst["traits"]],
+                    "static_traits": [abc.mn_name(t["name"]) for t in abc.classes[ci]["traits"]]})
+    p = save_json(out, "abc", "classes.json")
+    named = [c for c in out if not c["name"].split("::")[-1].startswith("_-")]
+    print(f"{len(out)} classes ({len(named)} with readable names) -> {p}")
+    if a.grep:
+        for c in out:
+            if re.search(a.grep, c["name"] + " " + " ".join(c["instance_traits"] + c["static_traits"])):
+                print(f"  #{c['id']:5d} {c['name']}  extends {c['super']}  ({len(c['instance_traits'])}+{len(c['static_traits'])} traits)")
+
+
+def cmd_abc_disasm(a):
+    """Disassemble one method (--method N) or every method of a class (--class ID or name)."""
+    abc = open_abc(a)
+    owner = abc.method_owner()
+    ids = []
+    if a.method is not None:
+        ids = [a.method]
+    if a.cls is not None:
+        ci = int(a.cls) if a.cls.isdigit() else next(i for i in range(len(abc.instances)) if abc.class_name(i).endswith(a.cls))
+        inst = abc.instances[ci]
+        ids = [abc.classes[ci]["cinit"], inst["iinit"]] + [t["method"] for t in inst["traits"] + abc.classes[ci]["traits"] if "method" in t]
+    for m in ids:
+        print(f"method #{m}  {owner.get(m, '?')}")
+        print(abcmod.disassemble(abc, m))
+        print()
+
+
+def _parse_value(v):
+    if re.fullmatch(r"-?\d+", v):
+        return int(v)
+    try:
+        return float(v)
+    except ValueError:
+        return v
+
+
+def cmd_abc_find(a):
+    """Find methods that push a constant (number or string), or that reference a member name."""
+    abc = open_abc(a)
+    owner = abc.method_owner()
+    hits = abcmod.callers_of(abc, a.value) if a.member else abcmod.find_constant_uses(abc, _parse_value(a.value))
+    for m in hits:
+        print(f"  method #{m:6d}  {owner.get(m, '?')}")
+    print(f"{len(hits)} methods")
+
+
+def cmd_abc_strings(a):
+    """Search the constant pool strings with a regex."""
+    abc = open_abc(a)
+    rx = re.compile(a.pattern, re.I)
+    for i, s in enumerate(abc.strings):
+        if s and rx.search(s):
+            print(f"  #{i:6d} {s[:200]!r}")
+
+
+def cmd_swz_key(a):
+    """Find the .swz key: try every uint of the main ABC, else brute-force keys ending with --suffix."""
+    data = open(os.path.join(a.game, "Init.swz"), "rb").read()
+    _, abc_data = load_main_abc(a.game)
+    abc = abcmod.Abc(abc_data)
+    key = swzmod.find_key(data, candidates=abc.uints[1:], patch_suffix=a.suffix)
+    print(key if key is not None else "not found")
+
+
+def cmd_swz_dump(a):
+    """Decrypt Engine/Init/Game/Dynamic.swz to work/swz/<archive>/."""
+    for name in ARCHIVES:
+        names = swzmod.dump(os.path.join(a.game, name), a.key, os.path.join(WORK, "swz", name))
+        print(f"{name}: {len(names)} files")
+
+
+def cmd_swf_info(a):
+    """Tag counts, DoABC blocks and exported symbols of any .swf."""
+    swf = swfmod.Swf(open(a.file, "rb").read())
+    print(f"{swf.compression} v{swf.version} {swf.frame_count} frames @ {swf.frame_rate} fps")
+    print("tags:", swf.tag_counts())
+    print("abc:", [(n, len(d)) for n, d in swf.abc_blocks()])
+    syms = swf.symbols()
+    print(f"{len(syms)} symbols")
+    for cid, name in syms[: a.limit]:
+        print(f"  {cid:5d} {name}")
+
+
+def cmd_replay(a):
+    """Print one replay: header, settings, players, results, KOs and the first inputs."""
+    rep = replaymod.parse(open(a.file, "rb").read())
+    inputs = rep.pop("inputs")
+    if a.json:
+        rep["inputs"] = inputs
+        print(json.dumps(rep, indent=1, ensure_ascii=False, default=str))
+        return
+    print(json.dumps({k: v for k, v in rep.items() if k not in ("entities",)}, ensure_ascii=False, default=str))
+    for e in rep["entities"]:
+        print(f"  ent {e['id']} team {e['team']} bot={e['bot']} heroes={[h['hero_id'] for h in e['heroes']]} stance={e['heroes'][0]['stance']}")
+    for who, lst in inputs.items():
+        print(f"  inputs ent {who}: {len(lst)} records, last at {lst[-1][0] if lst else 0} ms")
+        for ts, fl in lst[: a.limit]:
+            print(f"    {ts:7d} ms  {fl:014b}  {replaymod.describe_flags(fl)}")
+
+
+def cmd_corpus(a):
+    """Parse every replay of a folder and correlate it with the game data (work/swz must exist)."""
+    levels, heroes = {}, {}
+    lt = os.path.join(WORK, "swz", "Init.swz", "LevelTypes.xml")  # named after the root tag by swz-dump
+    ht = os.path.join(WORK, "swz", "Game.swz", "HeroTypes.xml")
+    if os.path.exists(lt):
+        txt = open(lt, encoding="utf-8").read()
+        for name, body in re.findall(r'<LevelType LevelName="([^"]+)"[^>]*>(.*?)</LevelType>', txt, re.S):
+            m = re.search(r"<LevelID>(\d+)</LevelID>", body)
+            if m:
+                levels[int(m.group(1))] = name
+    if os.path.exists(ht):
+        txt = open(ht, encoding="utf-8").read()
+        for name, body in re.findall(r'<HeroType HeroName="([^"]+)"[^>]*>(.*?)</HeroType>', txt, re.S):
+            m = re.search(r"<HeroID>(\d+)</HeroID>", body)
+            if m:
+                heroes[int(m.group(1))] = name
+    files = sorted(f for f in os.listdir(a.dir) if f.endswith(".replay"))[: a.limit or None]
+    stats = {k: Counter() for k in ("version", "level", "hero", "playlist", "players", "objects", "error", "game_speed", "flags")}
+    input_records = 0
+    gaps = Counter()
+    off16 = Counter()
+    t0 = time.time()
+    for i, fn in enumerate(files):
+        try:
+            rep = replaymod.parse(open(os.path.join(a.dir, fn), "rb").read())
+        except Exception as e:  # noqa: BLE001 - corpus stats must survive bad files
+            stats["error"][type(e).__name__ + ": " + str(e)[:60]] += 1
+            continue
+        stats["version"][rep["version"]] += 1
+        stats["level"][levels.get(rep.get("level_id"), rep.get("level_id"))] += 1
+        stats["playlist"][rep.get("playlist") or "(none)"] += 1
+        stats["players"][len(rep["entities"])] += 1
+        stats["objects"]["-".join(map(str, rep["objects"]))] += 1
+        stats["game_speed"][rep["settings"]["game_speed"]] += 1
+        stats["flags"][hex(rep["settings"]["flags"])] += 1
+        for e in rep["entities"]:
+            for h in e["heroes"]:
+                stats["hero"][heroes.get(h["hero_id"], h["hero_id"])] += 1
+        for lst in rep["inputs"].values():
+            input_records += len(lst)
+            for (t1, _), (t2, _) in zip(lst, lst[1:]):
+                gaps[t2 - t1 if t2 - t1 <= 100 else ">100"] += 1
+            for ts, _ in lst:
+                off16[ts % 16] += 1
+        if (i + 1) % 500 == 0:
+            print(f"  {i + 1}/{len(files)} ({time.time() - t0:.0f}s)")
+    # timestamps: are they all on the 16 ms simulation tick?
+    result = {"files": len(files), "input_records": input_records,
+              "input_gap_ms_histogram": {str(k): v for k, v in gaps.most_common()},
+              "input_timestamp_mod_16ms": dict(off16.most_common()),
+              **{k: dict(v.most_common()) for k, v in stats.items()}}
+    p = save_json(result, "corpus.json")
+    print(f"{len(files)} replays, {input_records} input records, errors {sum(stats['error'].values())} -> {p}")
+    print("versions:", dict(sorted(stats["version"].items())))
+    print("input timestamp mod 16 ms:", result["input_timestamp_mod_16ms"])
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def add(name, fn, *args):
+        p = sub.add_parser(name, help=fn.__doc__)
+        p.set_defaults(fn=fn)
+        for spec in args:
+            p.add_argument(*spec[0], **spec[1])
+        return p
+
+    game = (["--game"], {"default": DEFAULT_GAME, "help": "Brawlhalla install folder (env BRAWLHALLA_DIR)"})
+    abc = (["--abc"], {"help": "ABC file (default work/abc/main.abc)"})
+    add("inventory", cmd_inventory, game)
+    add("abc-extract", cmd_abc_extract, game)
+    add("abc-validate", cmd_abc_validate, abc)
+    add("abc-classes", cmd_abc_classes, abc, (["--grep"], {"help": "regex on class and member names"}))
+    add("abc-disasm", cmd_abc_disasm, abc, (["--method"], {"type": int}), (["--class"], {"dest": "cls"}))
+    add("abc-find", cmd_abc_find, abc, (["value"], {}), (["--member"], {"action": "store_true", "help": "value is a member name"}))
+    add("abc-strings", cmd_abc_strings, abc, (["pattern"], {}))
+    add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
+    add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
+    add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
+    add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
+    add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
+        (["--limit"], {"type": int, "default": 0}))
+    a = ap.parse_args()
+    a.fn(a)
+
+
+if __name__ == "__main__":
+    main()
