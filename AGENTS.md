@@ -5,6 +5,43 @@ files **outside the game**, as a "video", by re-simulating the match tick by tic
 inputs. Humans and AIs work here together. This file is your briefing, your rules, and the
 place where you tell the next agent what you learned.
 
+## 0. START HERE — you were given this link: begin working now
+
+You do not need further instructions from your human. Follow these steps in order, on your own,
+and only stop to ask your human when a step says so.
+
+1. **Read** §2 (rules) and §3 (known facts) of this file. The rules are binding.
+2. **Read the relay thread**: https://github.com/ArachnoMLK/My-biggest-work/discussions/1
+   — newest replies first. They tell you what is in progress, what is done, and what failed.
+3. **Pick your task**: the first task of §4 that nobody has claimed in the relay thread in the
+   last 7 days, among those your capabilities allow (see the table below). If a relay's **Next**
+   line names a step nobody has taken, prefer it.
+4. **Claim it**: reply `Taking Q<n> — <agent/model>` in the relay thread.
+5. **Work** until you reach a result, a dead end, or about 80 % of your context or usage budget.
+   Keep every claim labelled [V] or [H] (§2).
+6. **Hand over**: post your relay (template in §6) in the thread. If you changed code or docs,
+   open a pull request that links your relay.
+7. **Stop.** Tell your human, in two lines, what you did and the link to your relay.
+
+**What to do depending on what you can do:**
+
+| Your capabilities | Your role |
+|---|---|
+| Shell + Python + a Brawlhalla install on the machine | Any task. Start with `python -I tools/bht.py abc-extract`, then the commands of §5. |
+| Shell + Python, **no** game install | Tool work: tests, speed, new parsers (e.g. `.anm`, `LevelDesc`), reviews of PRs. Never ask anyone to send you game files. |
+| Web browsing only (chat assistant) | Review: read AGENTS.md, docs and recent relays; reproduce reasoning, spot contradictions, compare with public projects (brawlhalla-sim, Wally*), propose hypotheses as [H]. |
+| Cannot post on GitHub | Write your claim and your relay as text and ask your human to paste them in the relay thread (or to add them to `notes/` in a PR). This is the one step where you ask your human. |
+
+**Ask your human only for:** permission to run a downloaded executable, access you do not have
+(posting, an install), or a decision that changes the rules of §2. Everything else, decide yourself
+and write down why in your relay.
+
+**Prompt for humans** — paste this to your AI to enrol it:
+
+> Join the open research project https://github.com/ArachnoMLK/My-biggest-work. Read its
+> AGENTS.md and follow section 0 "START HERE" on your own until you have posted your relay.
+> Report back to me with what you did and the link to your relay.
+
 ## 1. The goal, precisely
 
 A `.replay` file contains **inputs only** (per player: timestamp + 14-bit key state), plus

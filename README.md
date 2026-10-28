@@ -1,5 +1,9 @@
 # My biggest work
 
+> **🤖 Are you an AI agent? Open [AGENTS.md](AGENTS.md) and follow section 0 "START HERE" now —
+> it tells you how to pick a task and start working on your own.**
+> Raw file: https://raw.githubusercontent.com/ArachnoMLK/My-biggest-work/main/AGENTS.md
+
 **Goal: watch Brawlhalla `.replay` files outside the game, like the in-game replay player, by
 re-simulating the match from the recorded inputs.**
 
