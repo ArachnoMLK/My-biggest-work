@@ -76,7 +76,7 @@ each simulation step: _-h3U._-01I ──t += 16──> Entity._-k5H(t) → Entit
 
 | Class.method | id | Role | Status |
 |---|---|---|---|
-| `_-h3U._-01I` | 3336 | **Candidate main step (Q2).** Samples local inputs (`_-R5q._-a2I`, offset 705) and runs an inner loop whose time local increases by **16** per iteration (offsets 1908–1915: `t + 16`), calling `Entity._-k5H(t)` for each entity of `_-5r` (offset 2751). | [V] for the `+16` loop and the calls; [H] that this is *the* fixed-step loop |
+| `_-h3U._-01I` | 3336 | **Fixed-step scheduler (Q2).** Aligns target/start to 16 ms, computes `floor(max(target - start, 0) / 16)`, and advances tick time by 16 per iteration. Calls `Entity._-k5H(t)` for all entities, then a separate `Entity._-10(t)` pass, global processing, and `Entity._-J2g(t)`. Controller sampling remains outside the inner loop. See [tick-loop map](tick-loop-11.00.md) for gates, checkpoints and exact order. | [V] `abc-disasm --method 3336`, offsets 417–493, 1838–1922, 2725–2888, 4073–4077 |
 | `Entity._-k5H(t)` | 2991 | Per-entity step; calls `Entity._-1L(t)`. Only caller: `_-h3U._-01I`. | [V] `abc-find _-k5H --member` |
 | `Entity._-1L(t)` | 2986 | Calls `_-R5q._-51o(t)` (input decoding) before the rest of the entity update. Only caller: `_-k5H`. | [V] `abc-find _-1L --member` |
 | `_-i4Z._-51o(t)` | 6313 | **Input → action decoder.** Fills `_-O1I[i] = _-7z(t − 16·i)` for the last N ticks (N = 5, or 9/10/11/13 depending on mode), sets `_-66U`, detects key edges and triggers `Entity.Jump`, `Entity.Dodge`, attacks/throws (helpers #6331–#6335). Only caller: `Entity._-1L`. | [V] caller; [V] subagent for the 16·i loop; [H] for the exact action list |
@@ -93,7 +93,7 @@ each simulation step: _-h3U._-01I ──t += 16──> Entity._-k5H(t) → Entit
 
 ## Open points
 
-- [H] `_-h3U._-01I` is the fixed 16 ms step loop: confirm in Q2 (where its start time and step count come from, and which other updates run in the loop).
-- [H] `_-h3U._-k3g(t)` = rollback/resimulate from t (called by input confirmations).
+- [V] Q2 confirmed `_-h3U._-01I` as the fixed 16 ms scheduler and mapped its clock bounds and pass order; see [tick-loop map](tick-loop-11.00.md). Full physics, hit and KO semantics remain open.
+- [V] `_-h3U._-k3g` #3594 schedules restoration using a rounded checkpoint anchor and `_-Kt`; #3336 restores checkpoints before re-running forward ticks. [H] Snapshot state completeness and deterministic equivalence remain untested; see the tick-loop map for guards and offsets.
 - [H] Meaning of type 7 lists (`_-84R`/`_-f37`) and of `_-044`.
 - Not done: comparing `_-S45._-Ja` with the XOR key of `replay.py`, and `_-S45._-S4h` with the checksum formula (both cheap with a small script that reads the static initializer of `_-S45`).

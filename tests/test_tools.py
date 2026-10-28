@@ -5,6 +5,7 @@ Run: python -I -m unittest discover -s tests   (from the repository root)
 import os
 import sys
 import unittest
+import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -14,6 +15,50 @@ GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps
 REPLAYS = os.environ.get("BRAWLHALLA_REPLAYS", os.path.join(os.path.expanduser("~"), "BrawlhallaReplays"))
 HAVE_GAME = os.path.exists(os.path.join(GAME, "BrawlhallaAir.swf"))
 HAVE_REPLAYS = os.path.isdir(REPLAYS) and any(f.endswith(".replay") for f in os.listdir(REPLAYS))
+SAMPLE = 20  # supported replays parsed by the integration test
+
+
+def read(path):
+    with open(path, "rb") as fh:
+        return fh.read()
+
+
+def replay_version(raw):
+    """Format number of a .replay (first u32 of the decoded stream), inflating only 4 bytes."""
+    head = zlib.decompressobj().decompress(raw, 4)
+    if len(head) < 4:
+        raise replay.FormatError("replay shorter than its version field")
+    return int.from_bytes(bytes(b ^ k for b, k in zip(head, replay.KEY)), "big")
+
+
+def supported_sample(items, limit=SAMPLE):
+    """Take the first `limit` (name, raw) items whose format is in replay.PATCHES.
+
+    Returns (picked, skipped) where skipped counts the unsupported formats seen on the way.
+    Supported files are returned whatever their content: parse errors must still fail the test.
+    """
+    picked, skipped = [], {}
+    for name, raw in items:
+        if len(picked) >= limit:
+            break
+        v = replay_version(raw)
+        if v in replay.PATCHES:
+            picked.append((name, raw))
+        else:
+            skipped[v] = skipped.get(v, 0) + 1
+    return picked, skipped
+
+
+def replay_files(folder):
+    """(name, raw) of every .replay of a folder, last name first (lazy, one file open at a time)."""
+    for f in sorted((f for f in os.listdir(folder) if f.endswith(".replay")), reverse=True):
+        yield f, read(os.path.join(folder, f))
+
+
+def fake_replay(version, payload=b""):
+    """Synthetic encoded stream: version u32 + payload, XOR-keyed and zlib-compressed. No game content."""
+    plain = version.to_bytes(4, "big") + payload
+    return zlib.compress(bytes(b ^ replay.KEY[i & 63] for i, b in enumerate(plain)))
 
 
 class Pure(unittest.TestCase):
@@ -35,12 +80,33 @@ class Pure(unittest.TestCase):
         self.assertEqual([n for _, n, _ in ins], ["jump", "returnvoid"])
         self.assertEqual(abc.branch_targets(ins, len(code)), ([4], []))
 
+    def test_replay_version_matches_parser_reader(self):
+        raw = fake_replay(271, bytes(range(40)))
+        self.assertEqual(replay_version(raw), 271)
+        self.assertEqual(replay.BitReader(replay.decode_bytes(raw)).u32(), 271)
+
+    def test_sample_mixed_formats(self):
+        items = [(f"r{i}", fake_replay(v)) for i, v in enumerate([257, 271, 300, 265, 248, 271])]
+        picked, skipped = supported_sample(items, limit=2)
+        self.assertEqual([n for n, _ in picked], ["r1", "r3"])
+        self.assertEqual(skipped, {257: 1, 300: 1})  # stops once the sample is full
+
+    def test_sample_unsupported_only(self):
+        picked, skipped = supported_sample([("a", fake_replay(257)), ("b", fake_replay(257)), ("c", fake_replay(260))])
+        self.assertEqual((picked, skipped), ([], {257: 2, 260: 1}))
+
+    def test_sampled_supported_replay_still_fails_to_parse(self):
+        picked, _ = supported_sample([("broken", fake_replay(271))])
+        self.assertEqual(len(picked), 1)  # selection does not hide a broken supported file
+        with self.assertRaises((EOFError, replay.FormatError)):
+            replay.parse(picked[0][1])
+
 
 @unittest.skipUnless(HAVE_GAME, "Brawlhalla not installed")
 class Game(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        main = swf.Swf(open(os.path.join(GAME, "BrawlhallaAir.swf"), "rb").read())
+        main = swf.Swf(read(os.path.join(GAME, "BrawlhallaAir.swf")))
         cls.abc = abc.Abc(max(main.abc_blocks(), key=lambda b: len(b[1]))[1])
 
     def test_every_method_decodes(self):
@@ -57,7 +123,7 @@ class Game(unittest.TestCase):
         self.assertIn(m, abc.callers_of(self.abc, short))
 
     def test_swz_key_is_in_uint_pool(self):
-        data = open(os.path.join(GAME, "Init.swz"), "rb").read()
+        data = read(os.path.join(GAME, "Init.swz"))
         key = swz.find_key(data, candidates=self.abc.uints[1:])
         self.assertIsNotNone(key)
         self.assertGreater(len(list(swz.iter_entries(data, key))), 0)
@@ -66,12 +132,17 @@ class Game(unittest.TestCase):
 @unittest.skipUnless(HAVE_REPLAYS, "no replay folder")
 class Replays(unittest.TestCase):
     def test_some_replays_parse(self):
-        files = sorted(f for f in os.listdir(REPLAYS) if f.endswith(".replay"))[-20:]
-        for f in files:
-            rep = replay.parse(open(os.path.join(REPLAYS, f), "rb").read())
-            self.assertIn(rep["version"], replay.PATCHES)
-            for lst in rep["inputs"].values():
-                self.assertTrue(all(ts % 16 == 0 for ts, _ in lst))
+        # Only formats of replay.PATCHES are supported; older ones in the folder are not sampled.
+        picked, skipped = supported_sample(replay_files(REPLAYS))
+        if not picked:
+            self.skipTest(f"no replay in supported formats {min(replay.PATCHES)}-{max(replay.PATCHES)}; "
+                          f"unsupported formats seen: {dict(sorted(skipped.items()))}")
+        for i, (_, raw) in enumerate(picked):
+            with self.subTest(sample=i, version=replay_version(raw)):  # no file names: they hold player names
+                rep = replay.parse(raw)
+                self.assertIn(rep["version"], replay.PATCHES)
+                for lst in rep["inputs"].values():
+                    self.assertTrue(all(ts % 16 == 0 for ts, _ in lst))
 
 
 if __name__ == "__main__":
