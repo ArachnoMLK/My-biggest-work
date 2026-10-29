@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 65 anchors
+python -I tools/bht.py knockback-verify                 # 90 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -49,10 +49,21 @@ An index outside 0–22 reads `undefined` (NaN in AS3); the code does not clamp 
 | `fixed = power._-W1a[i]` (+ `power._-4r` when local 13) | @920–949 | [V] |
 | `variable = p10 × power._-w4x × p11 × 0.5`, or `power._-w4x × p11 × 0.5` when `power._-h5f` (p10, p11 = arguments of #1675) | @1035–1074 | [V]; [H] meaning of p10 / p11 |
 | Charged power (`_-w46` and `_-I6c ≠ 0`): `k = 1 + held / _-I6c × 0.25`; damage and `fixed` are multiplied by `k`; flag `0x400000` when `k ≥ 1.25` | @1076–1150 | [V]; [H] held = charge time |
-| `magnitude = _-u1x(power, attacker, victim, fixed + variable, damage)` | @1176–1198 | [V] |
+| `u = _-u1x(power, attacker, victim, fixed + variable, damage)` | @1176–1198 | [V] |
+| `c7 = power._-C7[i]`, × `(1 + 0.5 × held / _-I6c)` when `_-T4t`, capped by an argument when `_-Q1u` | @951–1033 | [V] |
 
-`power._-C7[i]` is read into local 36 (@951–1033: scaled by `1 + 0.5 × held / _-I6c` when `_-T4t`,
-capped by an argument when `_-Q1u`); it is not an input of `_-u1x` [V]; its role is not traced here.
+## 4. Knockback point
+
+| Step | Where | Status |
+|---|---|---|
+| `m = u + (c7 + variable)`: so `c7` and the variable part are added **outside** `_-u1x` too | @1198–1211 | [V] |
+| When `power._-A6P ≠ 0` and `fixed ≠ 0`, `m` is raised to at least `_-A6P`; a non-zero `m` clears the victim's `_-B2Q` | @1213–1274 | [V]; [H] minimum force |
+| Directional influence: when the victim lacks the flag `Entity._-a60` and (`fixed ≤ 0`, or `_-x1F` is set and …), `_-N6u` runs; then, when (`!_-M6J` or the victim has `Entity._-m1t`) and `t − victim._-R5q._-c3J ≥ 32`, a held direction (`victim._-R5q._-66U & 15 ≠ 0`) calls `_-e4x(point, keys, power)` | @1278–1480 | [V] shape; [H] "DI" |
+| `m *= 0.9` when the victim has `Entity._-B6B` and (`fixed == 0` or the DI case) | @1484–1532 | [V] |
+| Power-specific factors for one named power | @1534–1638 | [V]; not modelled |
+| `point.normalize(m)`: the direction `point` (argument 7 of #1675, after `_-e4x`) gets length `m`; this point is what `_-91G` writes into `_-84` / `_-A4A` | @1640–1644, @2170–2205 | [V] |
+
+`final_magnitude` in the module transcribes the first, second and fourth rows.
 
 ## 3. Magnitude: `_-26u._-u1x(power, attacker, victim, force, damage)` #1674
 
@@ -74,5 +85,5 @@ order `d * (d / 2)` matters for exact doubles.
 
 - The power fields (`_-W1a`, `_-w4x`, `_-538`, `_-C7`…) come from the game's power data, which this
   repository does not publish; a simulator reads them from the user's own install.
-- How the magnitude becomes the knockback point (angle, direction, the `normalize` @1644) is not traced.
+- The direction itself is an argument of #1675 (from the hit pass), and `_-e4x` (how a held direction bends it) is not read.
 - Which arguments the hit pass passes as p10 / p11 / held is not traced.

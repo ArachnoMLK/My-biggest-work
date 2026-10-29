@@ -75,6 +75,21 @@ def knockback_force(force, damage, victim_w22, victim_w3f, attacker_g4s, victim_
     return max(f - victim_p1r, 0)
 
 
+def final_magnitude(u1x_value, c7_part, variable, fixed, a6p=0.0, soft_flag=False, di_case=False):
+    """Length of the knockback point, `local 38` of #1675 @1198-1532.
+
+    m = u1x_value + (c7_part + variable); when `power._-A6P != 0` and fixed != 0, m is raised to at
+    least `_-A6P`; when the victim has the flag `Entity._-B6B` (`soft_flag`) and (fixed == 0 or the
+    DI case local 39 holds), m *= 0.9. The power-specific factors of @1569-1638 are not modelled.
+    """
+    m = u1x_value + (c7_part + variable)
+    if a6p != 0 and fixed != 0 and m < a6p:
+        m = float(a6p)
+    if soft_flag and (fixed == 0 or di_case):
+        m = m * 0.9
+    return m
+
+
 ANCHORS = {ABC_1100: {
     "_-u1x: z4f factor, d = (W22 + w3F + damage) / 100 (50 instead of W22 when _-U6g == 5)": [
         (1674, 85, "getproperty", "_-z4f"),
@@ -138,6 +153,35 @@ ANCHORS = {ABC_1100: {
         (1675, 1168, "pushdouble", "100.0"),
         (1675, 1188, "add", ""),
         (1675, 1192, "callproperty", "_-u1x, 5"),
+    ],
+    "magnitude = _-u1x(...) + (C7 part + variable), floor _-A6P, x 0.9 under _-B6B; the point local 7 is normalised to it": [
+        (1675, 1198, "setlocal", "38"),
+        (1675, 1202, "getlocal", "36"),
+        (1675, 1204, "getlocal", "37"),
+        (1675, 1206, "add", ""),
+        (1675, 1208, "add", ""),
+        (1675, 1216, "getproperty", "_-A6P"),
+        (1675, 1229, "getlocal", "35"),
+        (1675, 1255, "getproperty", "_-A6P"),
+        (1675, 1274, "initproperty", "_-B2Q"),
+        (1675, 1494, "getproperty", "_-B6B"),
+        (1675, 1527, "pushdouble", "0.9"),
+        (1675, 1640, "getlocal", "7"),
+        (1675, 1642, "getlocal", "38"),
+        (1675, 1644, "callpropvoid", "normalize, 1"),
+        (1675, 2179, "getlocal", "7"),
+    ],
+    "directional influence: when allowed and 32 ms after _-R5q._-c3J, a held direction (_-66U & 15) calls _-e4x on the point": [
+        (1675, 1288, "getproperty", "_-a60"),
+        (1675, 1313, "getproperty", "_-x1F"),
+        (1675, 1366, "callpropvoid", "_-N6u, 2"),
+        (1675, 1375, "getproperty", "_-M6J"),
+        (1675, 1393, "getproperty", "_-m1t"),
+        (1675, 1415, "getproperty", "_-c3J"),
+        (1675, 1420, "pushbyte", "32"),
+        (1675, 1435, "getproperty", "_-66U"),
+        (1675, 1439, "pushbyte", "15"),
+        (1675, 1480, "callpropvoid", "_-e4x, 3"),
     ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),

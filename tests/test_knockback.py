@@ -12,7 +12,8 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, knockback, swf  # noqa: E402
-from bh.knockback import STAT_TABLE, charged_scale, hit_damage, knockback_force, stat_multiplier  # noqa: E402
+from bh.knockback import (STAT_TABLE, charged_scale, final_magnitude, hit_damage, knockback_force,  # noqa: E402
+                          stat_multiplier)
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
 HAVE_GAME = os.path.exists(os.path.join(GAME, "BrawlhallaAir.swf"))
@@ -64,6 +65,14 @@ class Force(unittest.TestCase):
     def test_charge(self):
         self.assertEqual(charged_scale(0, 400), 1)
         self.assertEqual(charged_scale(400, 400), 1.25)
+
+
+class Magnitude(unittest.TestCase):
+    def test_sum_floor_and_soft(self):
+        self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 1.0), 37.0)
+        self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 1.0, a6p=50.0), 50.0)
+        self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 0.0, a6p=50.0), 37.0)   # no floor without fixed
+        self.assertEqual(final_magnitude(30.0, 5.0, 5.0, 0.0, soft_flag=True), 36.0)
 
 
 class Cli(unittest.TestCase):
