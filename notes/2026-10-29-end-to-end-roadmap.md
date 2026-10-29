@@ -27,8 +27,9 @@ bytecode arithmetic and a `*-verify` command pins it.
 ## Missing pieces, by priority
 
 1. **Fighter state transitions.** The dispatch on `_-65w` and the power start chain (`_-C5S` / `_-A3Q` /
-   `_-V5I` → `_-J5R` → `_-O5u` → new `_-l4X`) are mapped (#30). Still needed: the transitions between states
-   (KO → 3, respawn 9 → 0, entering 7 / 8 → 0) and the `_-l4X` constructor's initial fields.
+   `_-V5I` → `_-J5R` → `_-O5u` → new `_-l4X`) are mapped (#30). Transitions found: KO → 3, `_-U6W` → 7,
+   `Respawn` → 0, `_-85Y` → 9. Still needed: what moves a fighter from 7 to 0 in a normal match, and the
+   `_-l4X` constructor's initial fields.
 2. **Animation frame table `_-cA`** (`_-l4X._-54L` #86). It maps ticks since cast to animation frames, from
    CastAnim (`_-HT` / `_-6b`) and the animation's frame data (`_-y1v`: `_-T6`, `_-W1n`, `_-012`). It
    selects the target's hurtbox row (§4 of hit-detection-11.00.md). Needs the `.anm` parser of PR #19.
