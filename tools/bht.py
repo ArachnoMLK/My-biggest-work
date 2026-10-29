@@ -16,6 +16,7 @@ from collections import Counter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
+from bh import prng as prngmod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
 from bh import swf as swfmod  # noqa: E402
@@ -260,6 +261,54 @@ def cmd_swf_info(a):
         print(f"  {cid:5d} {name}")
 
 
+def _bounded_int(lo, hi):
+    def parse(text):
+        try:
+            v = int(text, 0)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"not an integer: {text!r}") from None
+        if not lo <= v <= hi:
+            raise argparse.ArgumentTypeError(f"{v} is outside [{lo}, {hi}]")
+        return v
+    return parse
+
+
+def cmd_prng(a):
+    """Print the match PRNG stream (WELL512 `Random`, see docs/prng-11.00.md) for a replay seed."""
+    seed = prngmod.seed_from_header(a.seed)
+    rng = prngmod.Well512(seed)
+    for _ in range(a.skip):
+        rng.next_u32()
+    if a.state:
+        index, words = rng.getstate()
+        print(json.dumps({"seed": seed, "after_draws": a.skip, "index": index, "state": list(words)}))
+        return
+    rows = []
+    for k in range(a.skip, a.skip + a.count):
+        u = rng.next_u32()
+        rows.append({"draw": k, "u32": u, "unit": u / 4294967295.0})
+    if a.json:
+        print(json.dumps({"seed": seed, "draws": rows}))
+        return
+    print(f"seed {seed} (0x{seed:08x})")
+    for r in rows:
+        print(f"  {r['draw']:7d}  {r['u32']:10d}  0x{r['u32']:08x}  {r['unit']:.17g}")
+
+
+def cmd_prng_verify(a):
+    """Check tools/bh/prng.py against the bytecode of class `Random` and its helpers (emulated)."""
+    abc = open_abc(a)
+    found = prngmod.locate(abc)
+    print("Random class #{}  seed #{}  next #{}  uniform #{}  range_u32 #{}  range_i32 #{}  shuffle #{}".format(
+        found["class"], *(found.get(k, "?") for k in ("seed", "next", "uniform", "range_u32", "range_i32", "shuffle"))))
+    bad = prngmod.verify(abc, a.seeds, a.draws)
+    for line in bad[:20]:
+        print("  MISMATCH", line)
+    print(f"{len(a.seeds)} seeds x {a.draws} draws + helpers: {'OK' if not bad else f'{len(bad)} mismatches'}")
+    if bad:
+        sys.exit(1)
+
+
 def cmd_replay(a):
     """Print one replay: header, settings, players, results, KOs and the first inputs."""
     rep = replaymod.parse(open(a.file, "rb").read())
@@ -379,6 +428,15 @@ def main():
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
+    seed = _bounded_int(-(1 << 31), (1 << 32) - 1)
+    add("prng", cmd_prng, (["seed"], {"type": seed, "help": "replay random_seed, signed i32 or uint32 (0x.. ok)"}),
+        (["--count"], {"type": _bounded_int(1, 100000), "default": 8}),
+        (["--skip"], {"type": _bounded_int(0, 10_000_000), "default": 0, "help": "draws to discard first"}),
+        (["--state"], {"action": "store_true", "help": "print (index, 16 words) after --skip draws"}),
+        (["--json"], {"action": "store_true"}))
+    seeds = (["--seeds"], {"type": lambda t: [_bounded_int(0, (1 << 32) - 1)(x) for x in t.split(",")],
+                           "default": [0, 1, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 123456789]})
+    add("prng-verify", cmd_prng_verify, abc, seeds, (["--draws"], {"type": _bounded_int(1, 100000), "default": 256}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),

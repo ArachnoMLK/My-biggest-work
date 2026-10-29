@@ -30,7 +30,7 @@ engine again. Nobody has reproduced that engine publicly yet. This project tries
 | Toolkit: `.swz` data (key found automatically), game bytecode (all 15,453 methods of 11.00 decode), `.swf`, `.replay` (9,653 real replays, 0 errors) | ✅ |
 | **Q1** — replay reader mapped in the game code: file → parser → per-player input buffer → 16 ms step ([code map](docs/code-map-11.00.md)) | ✅ Claude |
 | **Q2** — the 16 ms simulation loop and the update order per tick | 🔄 Codex, first relay posted |
-| **Q3** — random generator seeded from the replay header | ⬜ open |
+| **Q3** — random generator seeded from the replay header | Reference port and seed paths verified against emulated bytecode; [consumer order remains open](docs/prng-11.00.md) |
 | **Q4–Q7** — movement constants, stats → physics, level collisions, attack state machine | ⬜ open |
 | **Q8–Q10** — file ledger, unknown replay fields, ground-truth oracle | ⬜ open |
 | Simulator reproduces the KOs and scores of real replays | ⬜ |
