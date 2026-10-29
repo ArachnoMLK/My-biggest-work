@@ -24,7 +24,8 @@ and `knockback_force`; `tests/test_knockback.py` pins their behaviour.
 ## 0. Power columns
 
 The power fields come from the `powerTypes` table of the game data (read on the user's machine, never
-stored here). `PowerType.static._-A3R` #6483 reads them by column name [V]:
+stored here). `PowerType.static._-A3R` #6483 reads them by column name [V]. The full map of the 171
+columns is in power-columns-11.00.md (`bht.py power-columns`); the ones this doc uses:
 
 | Field | Column | Where |
 |---|---|---|
