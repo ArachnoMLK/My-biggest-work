@@ -111,6 +111,34 @@ with `t` = the power (local 3), `now` = parameter 2 and `prior` = the last hit t
 Same rule as brawlhalla-sim on 10.09 (`_-M5v._-D3h`). `IsMultihit` is `_-s5N` and `InheritAlreadyHit`
 `_-54E` (read in `_-l4X._-R63` #46 @3931).
 
+## Knockback formula
+
+**[V]** `_-26u._-u1x` #1674 `(PowerType, Entity attacker, Entity target, Number impulse, Number damage) → Number`
+(the only caller is `_-26u._-76s` #1675, the hit application of the same system):
+
+```
+f       = (base + target.HPOffset + damage) / 100          base = target._-W22, or 50 when ScoringType._-U6g == 5
+mult    = attacker.ImpulseMult (Strength), or 1.0          (1.0 when the power has _-Rc or _-d6x)
+impulse = impulse * 0.75                                    when attacker and target are on the same team (_-25G)
+                                                            and the power has no _-Rc (and attacker != target)
+result  = max(impulse * (f + f * f / 2) * attacker._-Kc._-G4s * mult / target._-Kc._-13t - target.ImpulseNegation, 0)
+```
+
+`HPOffset` is `_-w3F` and `ImpulseNegation` `_-P1r` (StatTypes fields, `docs/stats-11.00.md`); `ImpulseMult`
+is `_-z4f`. [H] `_-W22` is the target's **damage taken** (it is also the third tie-break of the clash
+arbitration above); `_-Kc._-G4s` / `_-Kc._-13t` are the handicap "damage dealt" / "damage taken" factors
+(brawlhalla-sim #26: handicap words); `_-U6g == 5` is a mode with fixed knockback.
+
+**[V] Caller #1675** builds the two inputs:
+- `damage` = the phase's damage `power._-L69[phase]` times several multipliers (@472–706), times the charge
+  factor `1 + charge / power._-I6c * 0.25` (@1100–1132; ≥ 1.25 sets flag `4194304`), times the match
+  setting `damage_multiplier / 100` (`_-I3W._-04o`, settings word 8) (@1152–1174);
+- `impulse` = `power._-W1a[phase] + power.ImpulseOnHeavy (_-4r)` (@920–949), plus a charge term
+  `0.5 * _-w4x * …` (@1038–1074), times the same charge factor (@1126–1132).
+
+[H] `_-L69` / `_-W1a` are the per-phase damage and impulse vectors built from `BaseDamage`,
+`VariableImpulse`, `FixedImpulse` (stored raw as `_-f5`, `_-c6N`, `_-A2b` by #6483 @10477–10560).
+
 ## Next
 
 - Phase vectors (`CastTime`, `AoERadiusX/Y`, `CenterOffsetX/Y`) and the active-power tick (10.09 #46
