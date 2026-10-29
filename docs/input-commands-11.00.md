@@ -90,5 +90,5 @@ logic and the order of eligibility still have to be read:
 | @3896 | 64 | HeavyAttack | `_-e3f()`, `_-q5E()`, `_-D67(…)` |
 | @510, @635, @2427, @2825, @3030 | 15 | Up \| Drop \| Left \| Right (any direction) | `IsMoveLocked`, `Dodge`, `_-I35`, `_-rU` |
 
-Neither bit 32 (Aim Up) nor the taunt bits are tested here: they are read elsewhere (attack direction
-selection on 10.09: method #6146).
+This scan (a mask pushed right before `bitand`) finds no test of bit 32 (Aim Up) or of the taunt bits in
+#6313; they may be tested in another form or elsewhere (attack direction selection on 10.09: #6146).
