@@ -31,9 +31,11 @@ In code: `bh.oracle.ko_ticks(parsed_replay)` gives `[(tick, victim)]`, oldest fi
 
 ## Limits
 
-- **Base.** In some modes the writer subtracts `_-N1k._-n4k − 16` (ko-11.00.md §6). Its meaning is not
-  traced. A simulator should first be checked on modes where the base is 0 [H: how to tell them apart
-  from the replay header is open].
+- **Base.** In some modes the writer subtracts `_-N1k._-n4k − 16` (ko-11.00.md §6). `_-n4k` is the match
+  start time: the clock of the first tick (`_-Px.StartTime`, set by the scheduler on its first tick). So
+  the recorded time is then 16 × (ticks since the first tick + 1), and otherwise the absolute tick time.
+  A simulator that counts ticks from the first one should compare against both readings until the
+  modes are told apart [H: which header fields select the base is open].
 - **Coverage.** Only KOs. Score modes keep list 5 empty and use object 7 instead (replay-format.md).
   Positions between KOs are not checked.
 - **Off-by-one risk.** The time is the tick of the phase 6 commit, which follows the phase 5 detection
