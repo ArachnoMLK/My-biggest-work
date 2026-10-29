@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(504 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(515 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -441,6 +441,16 @@ above.
 | 6 | anything else (floors) | pressure plates `_-U5a` | no |
 
 At the end, `_-O6z` = `_-96f`.
+
+**Entity flags used here.** Several of the fighter's booleans are camouflaged: `_-wn()`, `_-t46()`, `_-5q()`
+and `_-81n()` each read bit `(v >>> 24) & 31` of an int field. `Entity._-W2b` #3002 picks that bit index
+and the other bits with the global generator `_-A6B._-PW` (seeded from Math.random, not the replay
+PRNG), so only the decoded value matters (`packed_flag`) [V]. What they hold:
+- `_-wn()`: airborne after the previous move (`_-v2J(_-96f == null)`, #2984 @13169) [V];
+- `_-5q()`: set when a hit is applied (`_-26u._-L3f`), cleared when `_-Nj` runs out (`_-Re`). [H] in hitstun;
+- `_-t46()`: set and cleared by the running power (`_-l4X._-o4b` / `_-VY`) [H];
+- `_-81n()`: `_-O5C ≠ 0` in the input handler `_-1L` [H];
+- `_-e36()`: the ground line is lava (`type & 512`) [V].
 
 Bounce details (`bounce`, `Entity._-048` #3151) [V]:
 - **Elasticity e.** `_-7c` (0.8 for a fighter, set in `Entity.<init>`); 1.0 when `_-050()`; 0.9 on bouncy

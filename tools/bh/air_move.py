@@ -110,12 +110,31 @@ LEDGE_MIN_VY = -35.0  # `Entity._-w5U` (@1877)
 STICKY = 8            # `_-z2k._-h5W`
 
 
+def packed_flag(v):
+    """Decode an obfuscated Entity boolean (`Entity._-wn` #2949 and siblings): bit (v >>> 24) & 31 of v.
+
+    The encoder `Entity._-W2b` #3002 picks the bit index and the other bits with the global generator
+    `_-A6B._-PW` (seeded from Math.random, not the replay PRNG), so only the decoded value matters.
+    """
+    v &= 0xFFFFFFFF
+    return v & (1 << ((v >> 24) & 31)) != 0
+
+
+def pack_flag(value, bit=0, noise=0):
+    """`_-W2b(value)` with chosen `bit` (0..23) and `noise` instead of the two random draws."""
+    v = noise & (-520093697 & 0xFFFFFFFF)
+    v |= bit << 24
+    v |= 1 << bit
+    v &= (-1 - (0 if value else 1 << bit)) & 0xFFFFFFFF
+    return v
+
+
 @dataclass
 class WallState:
     """Fighter state read by the wall branch (@10776-12336); names are the obfuscated fields."""
     t: int                    # time (argument 1 of `_-8i`)
-    can_cling: bool           # `_-wn()` (and the line is not no-slide, checked here)
-    t46: bool                 # `_-t46()`
+    can_cling: bool           # `_-wn()`: airborne after the previous move (`_-96f == null`, #2984 @13154-13169)
+    t46: bool                 # `_-t46()`: set by the running power (`_-l4X._-o4b` true, `_-VY` false) [H]
     r51_before: int           # `_-r51` saved at @8869 (local 27)
     g1t: bool = False         # `_-G1T`
     y1l: int = 0              # `_-y1L`
@@ -410,6 +429,19 @@ ANCHORS = {ABC_1100: {
         (3151, 1275, "initproperty", "_-P39"),
         (15351, 30022, "pushdouble", "62500.0"),
         (2984, 9448, "callpropvoid", "_-048, 2"),
+    ],
+    "Packed Entity booleans: _-wn/_-t46/_-5q/_-81n read bit (v >>> 24) & 31; _-W2b encodes with _-PW draws; wn = airborne after the move": [
+        (2949, 8, "pushbyte", "24"),
+        (2949, 10, "urshift", ""),
+        (2949, 12, "pushbyte", "31"),
+        (2949, 26, "lshift", ""),
+        (3002, 4, "getproperty", "_-PW"),
+        (3002, 32, "pushint", "-520093697"),
+        (3002, 75, "subtract_i", ""),
+        (2984, 13169, "callpropvoid", "_-v2J, 1"),
+        (1670, 74, "callpropvoid", "_-q2W, 1"),
+        (2981, 114, "callpropvoid", "_-q2W, 1"),
+        (3085, 15, "getproperty", "_-s2O"),
     ],
 }}
 

@@ -8,7 +8,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.air_move import MoveResult, WallState, air_move, bounce, respond, steep, wall_contact  # noqa: E402
+from bh.air_move import (MoveResult, WallState, air_move, bounce, pack_flag, packed_flag, respond, steep,  # noqa: E402
+                         wall_contact)
 from bh.raycast import Line  # noqa: E402
 
 
@@ -130,6 +131,14 @@ class Bounce(unittest.TestCase):
         self.assertEqual(bounce(self.WALL, 100.0, 10.0, frozen=True)[:2], (0.0, 0.0))
         roof = Line(0, 0, 500, 0, type=17, normal=(0.0, 1.0))
         self.assertIsNone(bounce(roof, 0.0, -50.0, skip_ceiling=True))
+
+
+class Flags(unittest.TestCase):
+    def test_round_trip(self):
+        for bit in (0, 5, 23):
+            for noise in (0, 0x00FFFFFF, 0x123456):
+                self.assertTrue(packed_flag(pack_flag(True, bit, noise)))
+                self.assertFalse(packed_flag(pack_flag(False, bit, noise)))
 
 
 if __name__ == "__main__":
