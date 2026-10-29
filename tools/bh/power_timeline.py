@@ -42,6 +42,24 @@ def momentum(v1d, facing_left):
     return 1 if q > 1 else q
 
 
+# `_-l4X._-O5N(t, step, hits, deals_damage)` #56, the end reason read by `_-R63` @4061-4083 [V]:
+#   5  the power is not a ground pound / meteor (TargetMethod 6 / 9): nothing to end here
+#   1  EndOnHit (`_-a3G`) and at least one hit this step (only reached for TargetMethod 6 / 9)
+#   2  landed: the owner's ground line `_-96f` (or the `_-N20` look-ahead line) is a walkable line
+#   4  the owner's ground line is vertical (a wall)
+#   0  keep going
+# `_-R63` @4258-4339 ends the power (`_-m2j`) when the reason is neither 0 nor 5 and MinCancelTime `_-i2o` is 0
+# or already elapsed (ticks since start >= `_-i2o`).
+END_REASONS = {5: "not a ground pound or meteor", 1: "end on hit", 2: "landed", 4: "against a wall", 0: "continue"}
+
+
+def ends_now(reason, elapsed_ticks, min_cancel_time):
+    """`_-R63` @4268-4330: whether the power ends on this step."""
+    if reason in (0, 5):
+        return False
+    return min_cancel_time == 0 or elapsed_ticks >= min_cancel_time
+
+
 class Timeline:
     """Step state of one power: `_-X2G` (step), `_-82O` (tick of the next step), `_-d38` (step running).
 
@@ -121,6 +139,20 @@ ANCHORS = {ABC_1100: {
         (39, 729, "getproperty", "_-L2X"),
         (39, 853, "pushdouble", "60.0"),
         (39, 880, "initproperty", "_-qm"),
+    ],
+    "_-O5N end reason (5 / 1 / 2 / 4 / 0) and the end gate in _-R63 (not 0 or 5, MinCancelTime _-i2o)": [
+        (56, 37, "pushbyte", "6"),
+        (56, 58, "pushbyte", "9"),
+        (56, 68, "pushbyte", "5"),
+        (56, 81, "getproperty", "_-a3G"),
+        (56, 99, "pushbyte", "1"),
+        (56, 211, "getproperty", "_-96f"),
+        (56, 318, "callproperty", "_-N20, 2"),
+        (56, 551, "pushbyte", "4"),
+        (56, 559, "pushbyte", "2"),
+        (56, 596, "pushbyte", "0"),
+        (46, 4076, "callproperty", "_-O5N, 4"),
+        (46, 4270, "pushbyte", "5"),
     ],
 }}
 

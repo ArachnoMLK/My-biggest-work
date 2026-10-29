@@ -8,7 +8,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.power_timeline import Timeline, momentum, schedule, step_cap, tick_index  # noqa: E402
+from bh.power_timeline import Timeline, ends_now, momentum, schedule, step_cap, tick_index  # noqa: E402
 
 
 class Timing(unittest.TestCase):
@@ -45,6 +45,15 @@ class Constructor(unittest.TestCase):
         self.assertEqual(momentum(30.0, False), 0.5)
         self.assertEqual(momentum(-30.0, False), 0)
         self.assertEqual(momentum(-90.0, True), 1)
+
+
+class Ending(unittest.TestCase):
+    def test_gate(self):
+        self.assertFalse(ends_now(5, 100, 0))
+        self.assertFalse(ends_now(0, 100, 0))
+        self.assertTrue(ends_now(2, 3, 0))
+        self.assertFalse(ends_now(2, 3, 10))
+        self.assertTrue(ends_now(1, 10, 10))
 
 
 if __name__ == "__main__":

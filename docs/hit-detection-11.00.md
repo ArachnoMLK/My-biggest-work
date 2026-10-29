@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(551 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(563 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -50,8 +50,17 @@ per tick. Each call [V]:
 3. **Advance.** If there is a next step (and, when `_-t3b` is set, the step is below `_-Q1n`), then
    `_-X2G += 1`, `_-82O += max(CastTime[_-X2G], 1)` and `_-d38` is cleared. Otherwise the power stays on its
    last step.
-4. **Cancels.** A cancel path (`_-m2j`, gated by MinCancelTime `_-i2o`) can end the power instead. It is
-   not modelled.
+4. **End.** Each fired step asks `_-l4X._-O5N` #56 for an end reason (`ends_now`):
+
+   | Code | Meaning |
+   |---|---|
+   | 5 | not a ground pound or meteor (TargetMethod 6 / 9): nothing to end |
+   | 1 | EndOnHit (`_-a3G`) and at least one hit (only reached for TargetMethod 6 / 9, after the 5 test) |
+   | 2 | landed on a walkable line (the owner's ground line `_-96f`, or the `_-N20` look-ahead line) |
+   | 4 | the ground line is a wall |
+   | 0 | continue |
+
+   The power ends (`_-m2j`) on 1, 2 or 4, once MinCancelTime `_-i2o` is 0 or has elapsed [V].
 
 The cap `_-Q1n` comes from the power constructor `_-l4X.<init>` #39 (`step_cap`) [V]. For a charged power
 (`_-t3b`) it is `ceil(held / _-I6c × len(CastTime))`, at least `_-L2X`, where held is constructor argument
