@@ -25,8 +25,9 @@ Choice of the friction value `F` (last match wins):
    `Entity.Jump`, Q4): `3.534` in the air, `5.655` on the ground (@802–903) — the `Speed6` values;
 3. weapon/power overrides from `_-Kc._-o3I`: `4.013` (@938–960), or `5.655` / `Friction` (@966–1036);
 4. `_-5q()`: `4.0` (@1038–1055);
-5. surface flags `_-R5q._-66U` with the velocity sign: `9.0` (moving right on a surface with bit 4 and
-   not bit 8, @1065–1146; or moving left on bit 8 and not bit 4, @1150–1231), else `3.25` (@1235).
+5. otherwise, when `_-H6t()` is true (@1059), by the flags `_-R5q._-66U` and the velocity sign: `9.0` (`vx >= 0` with bit 4 and not bit 8, @1065–1146;
+   or `vx <= 0` with bit 8 and not bit 4, @1150–1231), else `3.25` (@1235). [H] meaning of `_-H6t` and of
+   the two bits (a directional surface such as a slope or conveyor).
 
 Application, once per tick (@1240–1340):
 ```
