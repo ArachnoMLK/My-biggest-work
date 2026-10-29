@@ -9,6 +9,7 @@ The functions transcribe the arithmetic in bytecode order (AS3 Numbers are IEEE 
 floats). Field names are the obfuscated ones; column names come from the power and hurtbox parsers.
 Anchors are (method id, offset, opname, operand text as printed by `abc-disasm`). Static evidence only.
 """
+from . import raycast
 from .movement import ABC_1100, check, listing
 
 # PowerType.static._-A3R #6483 @8709-9845: TargetMethod string -> `_-g4i`. A leading "SmashRelease" sets
@@ -285,6 +286,18 @@ def skips_line_of_sight(g4i):
     return g4i in (2, 3, 11)
 
 
+def map_ray(lines, team, item_ignore=False):
+    """The `ray` callback of line_of_sight_blocked over map lines, as `_-T5A` calls `_-CX._-X2e`: owner =
+    the attacker's team `_-25G`, mask = flags_a, options = flags_b, excluded = `_-z2k._-M4J` (item-ignore, 32)
+    when `_-l4X._-A3S` is set, else 0 (#1731 @1115-1270)."""
+    excluded = 32 if item_ignore else 0
+
+    def ray(x, y, dx, dy, flags_a, flags_b):
+        hit = raycast.ray_cast(lines, team, x, y, dx, dy, flags_a, flags_b, excluded)
+        return None if hit is None else hit.line
+    return ray
+
+
 def line_of_sight_blocked(sx, sy, tx, ty, q_x, q_y, ray, skip=False, around_corners=True):
     """`_-T5A` #1731 @1115-2710: whether map geometry blocks the hit from source (sx, sy) to the target centre.
 
@@ -516,6 +529,9 @@ ANCHORS = {ABC_1100: {
         (6483, 13321, "initproperty", "_-x28"),
     ],
 }}
+
+
+ANCHORS[ABC_1100].update(raycast.ANCHORS[ABC_1100])
 
 
 def verify(abc, sha):

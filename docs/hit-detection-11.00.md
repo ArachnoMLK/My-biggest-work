@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(168 anchors on ABC `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(205 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -228,12 +228,54 @@ blocked [V]:
 holds. A blocked non-Entity target is always skipped. Then `Entity._-AP(owner, _-f3B)` must hold;
 otherwise `_-W1G(power, target, true)` runs and the target is skipped [V].
 
-`line_of_sight_blocked` takes the ray cast as a callback. The map ray cast itself is the open piece; see
-collision-11.00.md (PR #20) for the collision flags.
+`line_of_sight_blocked` takes the ray cast as a callback. `map_ray(lines, team, item_ignore)` builds that
+callback over map lines with the ray cast of §7.1.
+
+### 7.1 The map ray cast (`_-CX._-X2e` #1581, [`tools/bh/raycast.py`](../tools/bh/raycast.py))
+
+Line flags and the candidate order (grid cells of 100, then dynamic lines) are in
+collision-11.00.md (PR #20). `ray_cast` takes the candidates already in that order.
+
+**Arguments as `_-T5A` uses them.**
+
+| Parameter | Value |
+|---|---|
+| 1 (owner) | the attacker's team `_-25G`, compared with the line owner `_-r1H` |
+| 9 (mask) | 1 \| 2 on the first ray (hard and soft lines), 1 on the others (hard only) |
+| 10 (options) | 1 \| 2 \| 8 on the first ray, 8 on the others |
+| 12 (excluded) | item-ignore (32) when `_-A3S` is set |
+
+The options [V]:
+- 1: soft lines block from both sides;
+- 2: skip lines that have an owner;
+- 8: two-sided;
+- 4: drops some results at the end.
+
+**Per candidate.** In order, a line is skipped when [V]:
+- it fails the mask;
+- it is disabled;
+- it belongs to the owner;
+- it has an excluded flag;
+- option 2 is set and the line has an owner;
+- it is the ignored line;
+- the hard-then-soft floor exception applies.
+
+With none of the options 8, 4 and 1, a line with a normal is passed through when the motion goes the way
+its normal points (it is left through its back). A soft line is skipped from its negative side (`_-PK`)
+when the mask includes soft and option 1 is clear.
+
+**Side and hit.** `_-PK` #1017 computes the unit normal `(−dy, dx) · (−1/|d|)` and the side
+`(p − s) · n`. `_-R5v` then tests the line against the ray, which is shortened to each hit point. So the
+result is the nearest line, and on equal distances the later candidate wins.
+
+So the first straight ray of the line of sight sees soft platforms from both sides. A soft line of type
+exactly 2 does not block, because only `type != 2` counts. Bouncy soft (66) and soft pressure plates (258)
+do block [V; the effect in game is H]. The detour and edge rays only see hard lines.
 
 ## 8. Still open
 
-- The map ray cast `_-CX._-X2e` #1581 used by §7.
+- Building the candidate list of §7.1 from a LevelDesc (grid traversal `_-A6B._-t2D`, moving platforms at
+  time t, see PR #20).
 - The other guards at the top of `_-T5A` (`_-i4o` HoldHitEnts with `Entity._-b2C`, `_-u3H` against
   Uninterruptable `_-C5G`, `_-hQ` / `_-72e`). The order of the list follows `_-5r` [H].
 - The meaning of `_-X2G`, `_-B5B`, `_-q24`, and the exact gate on `_-L5r` per frame (§1).
