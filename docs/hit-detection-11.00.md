@@ -414,7 +414,7 @@ Consequences:
   and curves inside a DynamicCollision block (offset of the anchor) [H].
 - The other guards at the top of `_-T5A` (`_-i4o` HoldHitEnts with `Entity._-b2C`, `_-u3H` against
   Uninterruptable `_-C5G`, `_-hQ` / `_-72e`). The order of the list follows `_-5r` [H].
-- The meaning of `_-X2G`, `_-B5B`, `_-q24`, and the exact gate on `_-L5r` per frame (§1).
+- `_-B5B`, the meaning of `_-q24`, and the exact gate on `_-L5r` per frame (§1); the cancel path of §1.1.
 - The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
 - Items: the per-target gates of §8 step 5, the item's own motion and map collision (`_-p5k._-8i` uses
   `_-X2e`), and the other spawners `_-F5N._-33h` (15 callers) and `_-p5k._-u1I`.
