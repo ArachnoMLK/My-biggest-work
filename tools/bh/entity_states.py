@@ -35,6 +35,13 @@ UNHANDLED = (1,)   # the switch sends 1 (and anything above 9) to the "Unaccount
 # the respawn reset `_-X6R._-U6W` (#6787, which also resets the damage `_-W22`) calls `Entity._-Y6o` (#3122),
 # which sets 7 (entering); `_-X6R.Respawn` (#6784) calls `Entity._-hq` (#2996), which sets 0; `_-d2C._-85Y`
 # calls `Entity._-220` (#3000), which sets 9. What moves a fighter from 7 to 0 in a normal match is open.
+# Match start, `_-X6R._-b3x` #6777 (tick step 4, `_-W1R._-b3x(t)`): on the first tick with t >= `_-n4k` + 256 ms
+# (flag `_-C3h`), eligible fighters get state 3 and are passed to `Respawn` (-> `_-U6W` -> 7), and the replay
+# generator R (`_-s3D._-22`) is drawn twice: `_-G5X[i] = R._-f4c() % n` for i = 0, 1, with n = the number of
+# `_-I1f._-o5y` entries, or 37 when there are none (@904-1002). These two draws are not in prng-order-11.00.md.
+MATCH_START_MS = 256
+MATCH_START_R_DRAWS = 2
+
 TRANSITIONS = {(None, 3): "Entity._-eR (KO commit)", (None, 7): "_-X6R._-U6W -> Entity._-Y6o",
                (None, 0): "_-X6R.Respawn -> Entity._-hq", (None, 9): "_-d2C._-85Y -> Entity._-220"}
 
@@ -100,6 +107,20 @@ ANCHORS = {ABC_1100: {
         (3015, 117, "getproperty", "_-a2O"),
         (3036, 59, "pushbyte", "6"),
         (3036, 73, "initproperty", "_-65w"),
+    ],
+    "Match start in _-X6R._-b3x: once at t >= n4k + 256 (_-C3h): state 3 + Respawn, two R draws % len(_-o5y) (or 37)": [
+        (6777, 63, "pushuint", "256"),
+        (6777, 72, "getproperty", "_-n4k"),
+        (6777, 149, "initproperty", "_-C3h"),
+        (6777, 408, "pushbyte", "3"),
+        (6777, 886, "callpropvoid", "Respawn, 2"),
+        (6777, 919, "getproperty", "_-o5y"),
+        (6777, 940, "pushbyte", "37"),
+        (6777, 981, "getproperty", "_-22"),
+        (6777, 984, "callproperty", "_-f4c, 0"),
+        (6777, 991, "modulo", ""),
+        (6777, 998, "pushbyte", "2"),
+        (6784, 255, "callpropvoid", "_-U6W, 3"),
     ],
 }}
 

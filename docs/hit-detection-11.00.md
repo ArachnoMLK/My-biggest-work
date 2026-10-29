@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(563 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(575 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -581,6 +581,12 @@ map collision only run in states 0 and 5**.
 - `_-d2C._-85Y` calls `Entity._-220`, which sets 9.
 
 - `Entity._-X1J` releases a grab (6 → 0).
+- **Match start** (`_-X6R._-b3x` #6777, tick step 4). On the first tick with t ≥ `_-n4k` + 256 ms (flag
+  `_-C3h`), the eligible fighters get state 3 and are passed to `_-X6R.Respawn` #6784. Respawn runs
+  `_-U6W`, which calls `_-Y6o` and gives state 7. A game-mode rule can instead call `_-hq`, which gives
+  state 0. In the same call, the replay generator R (`_-s3D._-22`) is **drawn twice**:
+  `_-G5X[i] = R._-f4c() % n` for i = 0, 1, where n is the number of `_-I1f._-o5y` entries, or 37 when there
+  are none (@904–1002) [V]. These two draws are not listed in prng-order-11.00.md.
 
 `Entity._-b6D` #3015 is true for 4000 ms after entering, from `_-164` in state 7 or `_-a2O` in state 8 (it
 first requires the `_-8` bit of `_-e3e`). [H] It is the post-spawn protection. What moves a fighter from 7
