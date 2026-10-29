@@ -1,0 +1,395 @@
+"""Hit detection on patch 11.00: which entities a power's hit area touches on one frame.
+
+See docs/hit-detection-11.00.md. Chain: `_-l4X._-R63` #46 (power update) -> `_-l4X._-L5r` #65 (hit area of
+one frame, per TargetMethod) -> `_-h3U._-R6C` #3538 -> `_-h3U._-G2C` #3539 (loop over entities) ->
+`Entity._-N2t` #3142 (hurtbox, `_-x3p._-bg` #4777) -> `_-n36._-h2Z` #1271 -> `_-Q3r` capsule geometry
+(#6295-#6299). The candidates end in `_-l4X._-U6i`, which `_-F5N._-T5A` #1731 copies to `_-F5N._-U5S`.
+
+The functions transcribe the arithmetic in bytecode order (AS3 Numbers are IEEE doubles, like Python
+floats). Field names are the obfuscated ones; column names come from the power and hurtbox parsers.
+Anchors are (method id, offset, opname, operand text as printed by `abc-disasm`). Static evidence only.
+"""
+from .movement import ABC_1100, check, listing
+
+# PowerType.static._-A3R #6483 @8709-9845: TargetMethod string -> `_-g4i`. A leading "SmashRelease" sets
+# `_-w46` and is stripped; "SmashRelease" alone gives 1. Unknown or missing values keep the default 0.
+TARGET_METHOD = {
+    "SmashRelease": 1, "PBAoE": 1, "PBAoEHB": 1, "Grab": 1,
+    "Ranged": 2, "GrabHit": 2, "GrabRelease": 2, "GroundCheckGrabHit": 2,
+    "Path": 3,
+    "Self": 4,
+    "RangedAoE": 5, "RangedGrab": 5, "PathExplosion": 5,
+    "GroundPound": 6, "GroundPoundHB": 6, "GroundCheck": 6,
+    "GroundPoundRecover": 7,
+    "Smash": 8, "SmashGrab": 8,
+    "MeteorGrab": 9, "MeteorPound": 9,
+    "MeteorPoundRelease": 10,
+    "ThrownItem": 11,
+    "Nobody": 12, "Taunt": 12, "TauntRelease": 12, "TeamTaunt": 12, "TeamTauntRelease": 12,
+    "AssistTaunt": 12, "AssistTauntRelease": 12, "UITauntOverride": 12,
+    "Collider": 13,
+    "Stance": 14,
+}
+SMASH_RELEASE = "SmashRelease"
+
+# `_-l4X._-L5r` #65 @283: lookupswitch on `_-g4i` (cases 0..14, default = clear)
+CLEAR, HELD_OBJECT, AREA_AT_POINT, SELF, AREA_AT_POINT_OFFSET, AREA_AT_OWNER, COLLIDER = (
+    "clear", "held object", "area at point", "self", "area at point + offset", "area at owner + offset",
+    "collider")
+QUERY_KIND = {0: CLEAR, 1: AREA_AT_OWNER, 2: HELD_OBJECT, 3: AREA_AT_POINT, 4: SELF, 5: AREA_AT_POINT_OFFSET,
+              6: AREA_AT_OWNER, 7: CLEAR, 8: AREA_AT_OWNER, 9: AREA_AT_OWNER, 10: AREA_AT_OWNER,
+              11: HELD_OBJECT, 12: CLEAR, 13: COLLIDER, 14: AREA_AT_OWNER}
+
+
+def target_method(text):
+    """(`_-g4i`, `_-w46`) for a TargetMethod cell (#6483 @8719-9841). Flags other than `_-w46` are not modelled."""
+    w46 = False
+    if text.startswith(SMASH_RELEASE):
+        w46 = True
+        text = text[len(SMASH_RELEASE):]
+        if text == "":
+            return 1, True
+    return TARGET_METHOD.get(text, 0), w46
+
+
+def query_kind(g4i):
+    """What `_-L5r` does for a `_-g4i` value (default branch: clear the list)."""
+    return QUERY_KIND.get(g4i, CLEAR)
+
+
+def area_center(g4i, owner_x, owner_y, frame, offset_x, offset_y, facing_left, point=None,
+                current_frame=None):
+    """Centre of the hit area for one frame index, or None when no area query is made (#65 @105-782).
+
+    offset_x / offset_y are the power's CenterOffsetX / CenterOffsetY lists (`_-T5q`, `_-j4n`), indexed by
+    `frame`; x is negated when `_-L0` (facing_left) is set. `point` is `_-H2U` (None -> the owner position).
+    For Collider (13), `current_frame` is `_-V6B._-51i(time)`; the area is made only when it differs from
+    `frame`, shifted back by the offset of `current_frame`.
+    """
+    kind = query_kind(g4i)
+    ox = -offset_x[frame] if facing_left else offset_x[frame]
+    oy = offset_y[frame]
+    px, py = (owner_x, owner_y) if point is None else point
+    if kind == AREA_AT_OWNER:
+        return owner_x + ox, owner_y + oy
+    if kind == AREA_AT_POINT:
+        return px, py
+    if kind == AREA_AT_POINT_OFFSET:
+        return px + ox, py + oy
+    if kind == COLLIDER:
+        if current_frame == frame:
+            return None
+        cx = -offset_x[current_frame] if facing_left else offset_x[current_frame]
+        return px + ox - cx, py + oy - offset_y[current_frame]
+    return None
+
+
+def frame_window(q24, time):
+    """(first frame index, count) that `_-R63` scans for one update: `_-51i(t)`, `_-R2x(t)` (#6478, #6477).
+
+    `q24` is the power's packed per-time table (low 16 bits = first index, high 16 bits = count); None means
+    one frame at index `time`.
+    """
+    if q24 is None:
+        return time, 1
+    v = q24[time]
+    return v & 0xFFFF, (v & 0xFFFF0000) >> 16
+
+
+def capsule_of_box(w, h):
+    """`_-Q3r._-KX(w, h, p, q)` #6299: a w x h box turned into a capsule. Returns (p, q, r): offset of the
+    segment start from the anchor, segment vector, radius (min(w, h) / 2). Placed at an anchor, the capsule
+    spans x in [-w/2, w/2] and y in [-h, 0]; hit_capsule adds h/2 to centre it, hurtbox_capsule does not.
+    """
+    if w < h:
+        r = w * 0.5
+        return (0, -r), (0, -h + w), r
+    r = h * 0.5
+    return (-(w * 0.5) + r, -(h * 0.5)), (w - h, 0), r
+
+
+def hit_capsule(cx, cy, rx, ry):
+    """Hit area capsule of `_-G2C` #3539 @401-495: box 2rx x 2ry centred on (cx, cy).
+
+    Returns (x, y, dx, dy, r) = segment start, segment vector, radius.
+    """
+    (px, py), (qx, qy), r = capsule_of_box(rx + rx, ry + ry)
+    return cx + px, cy + ry + py, qx, qy, r
+
+
+def hurtbox_capsule(ex, ey, width, height, offset_x, offset_y, facing_left):
+    """Hurtbox capsule of `_-x3p._-bg` #4777 @137-325 for one hurtbox row.
+
+    x = ex + p.x + OffsetX (negated when facing left), y = ey + p.y + OffsetY: the box spans
+    [ey + OffsetY - Height, ey + OffsetY] (no + h/2 term, unlike the hit area).
+    """
+    (px, py), (qx, qy), r = capsule_of_box(width, height)
+    off = -offset_x if facing_left else offset_x
+    return ex + px + off, ey + py + offset_y, qx, qy, r
+
+
+def segments_cross(x1, y1, x2, y2, x3, y3, x4, y4):
+    """`_-Q3r._-R5v` #6297: True when segments 1-2 and 3-4 intersect (parallel -> False)."""
+    d = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+    if d == 0:
+        return False
+    inv = 1.0 / d
+    ua = inv * ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3))
+    ub = inv * ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3))
+    return ua >= 0.0 and ua <= 1.0 and ub >= 0.0 and ub <= 1.0
+
+
+def point_segment_dist2(sx, sy, dx, dy, px, py):
+    """`_-Q3r._-w5n` #6295: squared distance from (px, py) to the segment (sx, sy) + t (dx, dy)."""
+    dot = dx * (px - sx) + dy * (py - sy)
+    if dot < 0:
+        cx, cy = sx, sy
+    else:
+        len2 = dx * dx + dy * dy
+        if len2 == 0:
+            cx, cy = sx, sy
+        elif dot > len2:
+            cx, cy = sx + dx, sy + dy
+        else:
+            t = dot / len2
+            cx, cy = sx + dx * t, sy + dy * t
+    ex, ey = px - cx, py - cy
+    return ex * ex + ey * ey
+
+
+def segment_dist2(ax, ay, adx, ady, bx, by, bdx, bdy):
+    """`_-Q3r._-rR` #6296: smallest of the four endpoint-to-segment squared distances."""
+    d1 = point_segment_dist2(ax, ay, adx, ady, bx, by)
+    d2 = point_segment_dist2(bx, by, bdx, bdy, ax, ay)
+    d3 = point_segment_dist2(ax, ay, adx, ady, bx + bdx, by + bdy)
+    d4 = point_segment_dist2(bx, by, bdx, bdy, ax + adx, ay + ady)
+    if d1 < d2:
+        d2 = d1
+    if d3 < d4:
+        d4 = d3
+    if d2 < d4:
+        d4 = d2
+    return d4
+
+
+def capsules_touch(a, b):
+    """`_-Q3r._-h2Z` #6298 for capsules (x, y, dx, dy, r): crossing segments, or distance <= ra + rb."""
+    ax, ay, adx, ady, ar = a
+    bx, by, bdx, bdy, br = b
+    if segments_cross(ax, ay, ax + adx, ay + ady, bx, by, bx + bdx, by + bdy):
+        return True
+    rr = ar + br
+    return segment_dist2(ax, ay, adx, ady, bx, by, bdx, bdy) <= rr * rr
+
+
+def hurtbox_frames(frames):
+    """`_-P6e` of a hurtbox type from its Frames list (#4780 @649-943), as a list indexed by frame.
+
+    Each entry "a" or "a-b" is 1-based (Flash frames): it covers indices a - 1 (0 stays 0, with a warning)
+    up to a (exclusive) or b. The value is the entry's row number (1-based); later entries overwrite
+    earlier ones. Indices never written are holes (None here, `undefined` in the game).
+    """
+    out = []
+    for row, item in enumerate(frames, start=1):
+        parts = item.split("-")
+        start = int(parts[0])
+        start = start - 1 if start != 0 else 0
+        end = start + 1
+        if len(parts) > 1:
+            end = int(parts[1])
+        for i in range(start, end):
+            while len(out) <= i:
+                out.append(None)
+            out[i] = row
+    return out
+
+
+def hurtbox_row(p6e, frame):
+    """Row of the hurtbox lists used by `_-x3p._-bg` (#4777 @17-135) for animation frame `frame` (`_-c2l`).
+
+    No Frames list (`_-P6e` null): row 0. Frame past the end of `_-P6e`, or entry 0: None, meaning the
+    DEFAULT hurtbox type is used instead. Else `_-P6e[frame] - 1`. The entry is read through `convert_u`
+    (@64), so a hole (undefined) counts as 0 and also gives the DEFAULT hurtbox.
+    """
+    if p6e is None:
+        return 0
+    if frame >= len(p6e) or not p6e[frame]:
+        return None
+    return p6e[frame] - 1
+
+
+def row_values(values, row):
+    """List entry `row`, or entry 0 when the list is shorter (#4780 @1250-1397)."""
+    return values[row] if row < len(values) else values[0]
+
+
+ANCHORS = {ABC_1100: {
+    "_-R63: candidates _-l4X._-U6i filled by _-L5r(power, time, frame, x, y, list) then passed to _-T5A": [
+        (46, 2112, "getlex", "_-l4X"),
+        (46, 2115, "getproperty", "_-U6i"),
+        (46, 2221, "getproperty", "_-Z2G"),
+        (46, 2226, "getproperty", "_-M43"),
+        (46, 2270, "getproperty", "_-E3d"),
+        (46, 2281, "callpropvoid", "_-L5r, 6"),
+        (46, 2422, "callproperty", "_-T5A, 17"),
+        (46, 2067, "callproperty", "_-51i, 1"),
+        (46, 2091, "callproperty", "_-R2x, 1"),
+    ],
+    "_-T5A: _-F5N._-U5S is a copy of argument 7 (the candidate list), which is then cleared": [
+        (1731, 107, "getlex", "_-F5N"),
+        (1731, 111, "getproperty", "_-U5S"),
+        (1731, 117, "initproperty", "length"),
+        (1731, 154, "getlocal", "7"),
+        (1731, 165, "setproperty", "[rt]"),
+        (1731, 181, "initproperty", "length"),
+    ],
+    "_-L5r: CenterOffsetX/Y _-T5q/_-j4n, AoERadiusX/Y _-a4C/_-W2S at the frame; x negated by _-L0": [
+        (65, 31, "getproperty", "_-T5q"),
+        (65, 51, "getproperty", "_-j4n"),
+        (65, 72, "getproperty", "_-a4C"),
+        (65, 92, "getproperty", "_-W2S"),
+        (65, 119, "getproperty", "_-L0"),
+        (65, 129, "negate_i", ""),
+        (65, 274, "getproperty", "_-g4i"),
+    ],
+    "_-L5r: mask I33 when _-D6M < 0 else p3C | V3W, 0 when CanDamageEveryone _-g14; point _-H2U or (x, y)": [
+        (65, 147, "getproperty", "_-D6M"),
+        (65, 159, "getproperty", "_-I33"),
+        (65, 170, "getproperty", "_-p3C"),
+        (65, 176, "getproperty", "_-V3W"),
+        (65, 180, "bitor", ""),
+        (65, 188, "getproperty", "_-H2U"),
+        (65, 253, "getproperty", "_-g14"),
+    ],
+    "_-L5r cases: held object _-x4I, area at point, self _-pr, point + offset, owner + offset, collider": [
+        (65, 382, "getproperty", "_-x4I"),
+        (65, 445, "callpropvoid", "_-R6C, 8"),
+        (65, 496, "getproperty", "_-pr"),
+        (65, 535, "add", ""),
+        (65, 555, "callpropvoid", "_-R6C, 8"),
+        (65, 582, "add", ""),
+        (65, 598, "callpropvoid", "_-R6C, 8"),
+        (65, 636, "callproperty", "_-51i, 1"),
+        (65, 760, "subtract", ""),
+        (65, 773, "subtract", ""),
+        (65, 782, "callpropvoid", "_-R6C, 8"),
+    ],
+    "_-R6C -> _-G2C over every entity _-5r: team _-25G, capsule _-KX(2rx, 2ry), _-N2t(cx + p.x, cy + ry + p.y, q, r)": [
+        (3538, 65, "callpropvoid", "_-G2C, 8"),
+        (3539, 173, "getproperty", "_-5r"),
+        (3539, 232, "getproperty", "_-25G"),
+        (3539, 409, "add", ""),
+        (3539, 415, "add", ""),
+        (3539, 430, "callproperty", "_-KX, 4"),
+        (3539, 456, "getlocal", "6"),
+        (3539, 458, "add", ""),
+        (3539, 495, "callproperty", "_-N2t, 5"),
+        (3539, 508, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+    ],
+    "_-KX: capsule of a w x h box, r = min(w, h) / 2": [
+        (6299, 10, "pushdouble", "0.5"),
+        (6299, 42, "getlocal_2", ""),
+        (6299, 43, "negate", ""),
+        (6299, 56, "pushdouble", "0.5"),
+        (6299, 65, "pushdouble", "0.5"),
+        (6299, 80, "pushdouble", "0.5"),
+        (6299, 93, "subtract", ""),
+        (6299, 108, "returnvalue", ""),
+    ],
+    "Entity._-N2t / _-x3p._-bg: hurtbox row P6e[frame] - 1, Width _-Q4m, Height _-X5S, OffsetX _-C1u (mirrored), OffsetY _-01R": [
+        (3142, 9, "getproperty", "_-T3L"),
+        (3142, 32, "callproperty", "_-h2Z, 5"),
+        (3099, 26, "getproperty", "_-o3I"),
+        (3099, 48, "getproperty", "_-c2l"),
+        (4777, 64, "convert_u", ""),
+        (4777, 77, "getproperty", "_-y2F"),
+        (4777, 123, "pushbyte", "1"),
+        (4777, 144, "getproperty", "_-Q4m"),
+        (4777, 158, "getproperty", "_-X5S"),
+        (4777, 182, "callproperty", "_-KX, 4"),
+        (4777, 200, "getproperty", "_-C1u"),
+        (4777, 211, "negate", ""),
+        (4777, 253, "initproperty", "_-J2c"),
+        (4777, 277, "getproperty", "_-01R"),
+        (4777, 290, "initproperty", "_-b3h"),
+        (4777, 305, "initproperty", "_-w2s"),
+        (4777, 319, "initproperty", "_-S2O"),
+        (4777, 325, "initproperty", "_-y15"),
+    ],
+    "_-h2Z: segments cross (_-R5v) or segment distance^2 (_-rR) <= (ra + rb)^2": [
+        (6298, 37, "callproperty", "_-R5v, 9"),
+        (6298, 53, "add", ""),
+        (6298, 75, "callproperty", "_-rR, 8"),
+        (6298, 90, "multiply", ""),
+        (6298, 91, "lessequals", ""),
+        (6297, 33, "pushdouble", "1.0"),
+        (6297, 98, "pushdouble", "0.0"),
+        (6297, 107, "pushdouble", "1.0"),
+        (6296, 13, "callproperty", "_-w5n, 6"),
+        (6296, 96, "callproperty", "_-w5n, 6"),
+        (6295, 29, "multiply", ""),
+        (6295, 124, "divide", ""),
+        (6295, 177, "returnvalue", ""),
+    ],
+    "Hurtbox pick (Entity._-p3N): power hurtbox _-24N, wall cling per weapon when _-r51, else DEFAULT": [
+        (3100, 66, "getproperty", "_-24N"),
+        (3100, 82, "getproperty", "_-r51"),
+        (3100, 114, "pushstring", "'UnarmedWallCling'"),
+        (3100, 591, "getproperty", "_-y2F"),
+        (4779, 186, "pushstring", "'DEFAULT'"),
+        (4779, 197, "initproperty", "_-y2F"),
+        (59, 146, "getproperty", "_-c5b"),
+        (59, 149, "callproperty", "_-i4h, 1"),
+        (59, 164, "initproperty", "_-24N"),
+    ],
+    "Hurtbox parser #4780: Frames 1-based, OffsetX/OffsetY/Width/Height lists, shorter lists repeat [0]": [
+        (4780, 340, "pushstring", "'Frames'"),
+        (4780, 379, "pushstring", "'OffsetX'"),
+        (4780, 412, "setlocal", "4"),
+        (4780, 420, "pushstring", "'OffsetY'"),
+        (4780, 453, "setlocal", "5"),
+        (4780, 461, "pushstring", "'Width'"),
+        (4780, 493, "setlocal", "6"),
+        (4780, 501, "pushstring", "'Height'"),
+        (4780, 534, "setlocal", "7"),
+        (4780, 663, "initproperty", "_-P6e"),
+        (4780, 803, "decrement", ""),
+        (4780, 1401, "getproperty", "_-C1u"),
+        (4780, 1415, "getproperty", "_-01R"),
+        (4780, 1429, "getproperty", "_-Q4m"),
+        (4780, 1442, "getproperty", "_-X5S"),
+    ],
+    "TargetMethod parser #6483: SmashRelease prefix sets _-w46; values of _-g4i": [
+        (6483, 8711, "pushstring", "'TargetMethod'"),
+        (6483, 8741, "pushstring", "'SmashRelease'"),
+        (6483, 8758, "initproperty", "_-w46"),
+        (6483, 8808, "pushstring", "'PBAoE'"),
+        (6483, 9001, "pushstring", "'Smash'"),
+        (6483, 9011, "pushbyte", "8"),
+        (6483, 8851, "pushstring", "'Collider'"),
+        (6483, 8860, "pushbyte", "13"),
+        (6483, 9529, "pushbyte", "14"),
+    ],
+}}
+
+
+def verify(abc, sha):
+    """Problems as text lines (empty = every pin holds). None if the ABC is not pinned."""
+    if sha not in ANCHORS:
+        return None
+    bad = []
+    lists = {}
+
+    def lister(m):
+        if m not in lists:
+            lists[m] = listing(abc, m)
+        return lists[m]
+    for group, anchors in ANCHORS[sha].items():
+        for (m, off, op, text), found in check(anchors, lister):
+            bad.append(f"anchor [{group}] #{m} @{off}: want {op} {text}".rstrip() + f", found {found}")
+    return bad
+
+
+def count(sha):
+    """Number of anchors pinned for an ABC."""
+    return sum(len(a) for a in ANCHORS[sha].values())
