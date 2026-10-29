@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 322 anchors
+python -I tools/bht.py input-buffer-verify            # 341 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -138,6 +138,8 @@ describes. [V] for this path; other readers of bit 32 are not checked here.
 | Each step of `_-8i`, when the fighter is on a line (`_-96f ≠ null`), not in hitstun (`!_-5q()`) and without the flag `Entity._-B6B`, `_-G1T = true` and `_-Kc._-C3x()` refreshes the counter, unless `_-r51 ≠ 0` and `_-x2C ≥ 9` | #2984 @290–467 | [V]; [H] landing refresh |
 | The KO reset `_-p1Y` sets the counter to 0 | #3034 @197–202 | [V] |
 | Each slot 9 power (recovery) without `_-UT` calls `_-31A`: `_-x2C += 1`; at `_-x2C == 9` the counter is set to 2 (no air jump left) and `_-UT = true`. `_-C5S` also tests `_-x2C ≥ 5` right after | #3082; #1700 @703–759 | [V]; [H] meaning of 5 and 9 |
+| `IsMoveLocked(t)` #3061 is true in any state `_-65w` other than 0 and 5; in those two it is true when (`_-65i()` and not `_-Kc._-H6I(t)`), `_-E6P()`, hitstun `_-5q()`, `_-Kc._-cr ≠ 0`, `_-u55`, `_-P4K` or `_-P50`; otherwise it returns `_-q2B(t)` | #3061 | [V]; [H] meanings |
+| `_-C54(t)` #3067 is true while `t < _-t4D + 64`, on the ground (`!_-wn()`) and not on a wall; `_-E6P()` and `_-u5E()` read stored booleans `_-y1o` / `_-l4c` (bit `(f >>> 24) & 31`) | #3067, #2941, #2942 | [V]; [H] "64 ms after landing" |
 | `IsDodgeLocked(t, a)` is true when `IsMoveLocked(t)`, `_-u5E()` (unless `a`), `_-E6P()`, a power runs (`_-Kc._-o3I ≠ null`), the fighter is on a wall (`_-r51 ≠ 0`), the zone test `_-I1f._-12J(1, …, _-25G)` holds, `_-Xb ≠ 0` or `_-C54(t)`; otherwise it is `_-x2C ≥ 9`. So a fighter whose `_-x2C` reached 9 can neither dodge nor air-jump until the refresh | #3075 | [V]; [H] "spent" state |
 | A hit `_-26u._-91G(t, attacker, victim, point, power, …)` #1677 with a non-zero knockback point sets the victim's `_-v1D = _-P5S = 0` and its one-tick impulses `_-84 = point.x`, `_-A4A = point.y` (so the next step folds them with the 250 cap, entity-step-11.00.md). With `point.length > 0` and all air jumps used (`_-P5Y() == _-56T()`), the victim gets one back (`_-P5Y() − 1`) | #1677 @864–961, @1171–1226 | [V] |
 | In the same hit, for a power that is not `_-Rc` and not `PowerType._-F4A`, with an Entity attacker: the attacker's `_-x2C` is reset to 0 if below 9, and the victim's too; a victim already at 9 instead stays without air jumps and with `_-UT`. Then `_-L3f` starts the hitstun. The knockback point itself is computed by the caller | #1677 @1324–1473 | [V]; [H] meaning |

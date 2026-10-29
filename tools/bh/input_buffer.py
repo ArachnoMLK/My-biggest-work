@@ -460,6 +460,29 @@ ANCHORS = {ABC_1100: {
         (1677, 1423, "initproperty", "_-UT"),
         (1677, 1473, "callpropvoid", "_-L3f, 7"),
     ],
+    "IsMoveLocked: states other than 0 / 5 lock; else _-65i without _-H6I, _-E6P, hitstun, _-cr, _-u55, _-P4K, _-P50 lock; else _-q2B(t)": [
+        (3061, 9, "getproperty", "_-65w"),
+        (3061, 27, "pushbyte", "5"),
+        (3061, 47, "callproperty", "_-65i, 0"),
+        (3061, 65, "callproperty", "_-H6I, 1"),
+        (3061, 82, "callproperty", "_-E6P, 0"),
+        (3061, 97, "callproperty", "_-5q, 0"),
+        (3061, 114, "getproperty", "_-cr"),
+        (3061, 132, "getproperty", "_-u55"),
+        (3061, 145, "getproperty", "_-P4K"),
+        (3061, 157, "getproperty", "_-P50"),
+        (3061, 170, "callproperty", "_-q2B, 1"),
+    ],
+    "_-C54(t): true when t < _-t4D + 64, on the ground and not on a wall; _-E6P / _-u5E are stored booleans": [
+        (3067, 8, "getproperty", "_-t4D"),
+        (3067, 12, "pushbyte", "64"),
+        (3067, 26, "callproperty", "_-wn, 0"),
+        (3067, 41, "getproperty", "_-r51"),
+        (2941, 5, "getproperty", "_-y1o"),
+        (2941, 8, "pushbyte", "24"),
+        (2941, 10, "urshift", ""),
+        (2942, 5, "getproperty", "_-l4c"),
+    ],
 }}
 
 
