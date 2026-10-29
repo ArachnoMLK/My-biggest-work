@@ -1,7 +1,7 @@
 # Level collision (Q6, patch 11.00) — flags and query candidates
 
 Pin: patch 11.00, abc `7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`.
-Check: `python -I tools/bht.py collision-verify` (68 pinned instructions, `tools/bh/collision.py`).
+Check: `python -I tools/bht.py collision-verify` (79 pinned instructions, `tools/bh/collision.py`).
 
 ## Result
 
@@ -46,8 +46,32 @@ It gathers candidates with **`_-CX._-936` #1582** (returns their count):
 No sort anywhere in #1582, as on 10.09. The segment test is `_-A6B._-PK` #1017 (7 Numbers + Point →
 Number) at @850, and `_-Q3r._-R5v` #6297 (8 Numbers + Point → Boolean) at @956.
 
+## Collision query: filters and acceptance
+
+**[V]** Per candidate, in order (#1581, loop @132–1123), a line is **skipped** when:
+- `type & mask == 0` (mask = parameter 9) (@166–180);
+- the line is disabled (`_-44f`) (@184–193);
+- it has an owner (`_-r1H != 0`) equal to parameter 1 (@197–224);
+- `type & excluded != 0` (parameter 12) (@228–245);
+- option bit 2 is set and the line has an owner (@249–280);
+- it is the line passed as parameter 6 (@284–292);
+- **hard-before-soft floor exception** (@296–480): the previous accepted line is hard (`type & 1`) with
+  normal `y == −1`, this one is soft (`type & 2`) with normal `y == −1`, same `startY`, no collection
+  vector, and `_-X1H == startX` on this line (meaning of `_-X1H` [H]);
+- with no option among `8 | 4 | 1` and a normal, one-sided tests by the sign of the motion against the
+  normal (@484–805).
+
+Then `_-A6B._-PK` (@850) gives a signed side value; the line is skipped when that value is negative,
+the mask includes soft (`mask & 2`), the line is soft (`type & 2`) and option 1 is clear (@858–915): soft
+lines only block from one side; `_-Q3r._-R5v` (@956) tests the segment against the line and writes the hit
+point. On a hit: the line becomes the result (@972), the outputs are copied (@974–1036), and **with no
+collection vector the query end is replaced by the hit point** (@1049–1089). So a later candidate hitting
+at the same point (the test is inclusive) replaces it, and farther ones fail: **the later equal-distance hit
+wins**. With a collection vector, every hit line is pushed once (`indexOf`, @1095–1114).
+
+The offsets of the exception (296–480) are the same as brawlhalla-sim's on 10.09: the method is very
+likely unchanged between the two patches.
+
 ## Next (from docs/prior-art-brawlhalla-sim.md)
 
-Re-prove on 11.00: level selection (`LevelType` → `LevelDesc` in `Dynamic.swz`), the acceptance rule in
-#1581 (10.09: query end shortened to each accepted hit, later equal-distance hit wins, one hard-before-soft
-exception) and moving platforms (`1000·(N/60)·SlowMult`, `floor(frame + 1e-7)`).
+Re-prove on 11.00: level selection (`LevelType` → `LevelDesc` in `Dynamic.swz`) and moving platforms (`1000·(N/60)·SlowMult`, `floor(frame + 1e-7)`).

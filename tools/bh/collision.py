@@ -17,6 +17,12 @@ ANCHORS = {ABC_1100: [
     # raster cells of 100, every bucket member in stored order, then every dynamic line _-82D
     (1581, 110, "callproperty", "_-936, 5"), (1581, 850, "callproperty", "_-PK, 7"),
     (1581, 956, "callproperty", "_-R5v, 9"),
+    # filters: type & mask, owner, excluded mask; hard-before-soft floor exception (@296-480)
+    (1581, 172, "bitand", ""), (1581, 236, "bitand", ""), (1581, 346, "pushbyte", "-1"), (1581, 361, "pushbyte", "1"),
+    (1581, 381, "pushbyte", "2"), (1581, 435, "getproperty", "startY"), (1581, 440, "getproperty", "startY"),
+    # accepted hit without a collection vector: the query end becomes the hit point (later equal hit wins)
+    (1581, 972, "setlocal", "18"), (1581, 1061, "setlocal", "19"), (1581, 1075, "setlocal", "20"),
+    (1581, 1099, "callproperty", "http://adobe.com/AS3/2006/builtin::indexOf, 1"),
     (1582, 64, "pushbyte", "100"), (1582, 66, "callproperty", "_-t2D, 7"), (1582, 131, "callproperty", "_-a2E, 2"),
     (1582, 143, "getproperty", "_-S4a"), (1582, 254, "getproperty", "_-82D"), (1582, 286, "getproperty", "_-82D"),
     (1582, 313, "returnvalue", ""),
