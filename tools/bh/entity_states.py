@@ -3,6 +3,8 @@
 See docs/hit-detection-11.00.md, section 10. Each state's handler is [V]; the state names are [H], inferred
 from the methods that set each value (`abc-find --member _-65w`). Static evidence only.
 """
+import math
+
 from .movement import ABC_1100, check, listing
 
 # value: (name [H], handler in #2991, setters)
@@ -41,6 +43,23 @@ UNHANDLED = (1,)   # the switch sends 1 (and anything above 9) to the "Unaccount
 # `_-I1f._-o5y` entries, or 37 when there are none (@904-1002). These two draws are not in prng-order-11.00.md.
 MATCH_START_MS = 256
 MATCH_START_R_DRAWS = 2
+
+
+
+def respawn_index(counters, team, n_points, team_mode):
+    """`_-X6R._-K5c` #6778 @315-499: index of the respawn point for a fighter, advancing the counters.
+
+    `counters` is `_-G5X` (two entries, seeded by the two match-start draws). In team mode (`_-O3P()`), teams
+    1 and 2 use counters 0 and 1 and the first / second half of the point list; otherwise counter 0 and the
+    whole list. Returns the index into the candidate list (from `_-x22`), mutating `counters`.
+    """
+    c = (team - 1) if team_mode and team <= 2 else 0
+    counters[c] += 1
+    k = counters[c]
+    if team_mode:
+        return k % (n_points >> 1) + (0 if c == 0 else math.ceil(n_points / 2))
+    return k % n_points
+
 
 TRANSITIONS = {(None, 3): "Entity._-eR (KO commit)", (None, 7): "_-X6R._-U6W -> Entity._-Y6o",
                (None, 0): "_-X6R.Respawn -> Entity._-hq", (None, 9): "_-d2C._-85Y -> Entity._-220"}
@@ -121,6 +140,18 @@ ANCHORS = {ABC_1100: {
         (6777, 991, "modulo", ""),
         (6777, 998, "pushbyte", "2"),
         (6784, 255, "callpropvoid", "_-U6W, 3"),
+    ],
+    "Respawn point choice _-K5c: counter _-G5X[team] += 1, index % n (team mode: % (n >> 1) + ceil(n / 2) for team 2)": [
+        (6778, 237, "callproperty", "_-x22, 3"),
+        (6778, 331, "callproperty", "_-O3P, 0"),
+        (6778, 355, "getproperty", "_-25G"),
+        (6778, 388, "getproperty", "_-G5X"),
+        (6778, 411, "increment", ""),
+        (6778, 435, "pushbyte", "1"),
+        (6778, 437, "urshift", ""),
+        (6778, 464, "callproperty", "ceil, 1"),
+        (6778, 482, "modulo", ""),
+        (6778, 499, "callpropvoid", "_-P3o, 2"),
     ],
 }}
 
