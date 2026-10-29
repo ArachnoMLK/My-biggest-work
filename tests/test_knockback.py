@@ -71,8 +71,8 @@ class Force(unittest.TestCase):
 class Magnitude(unittest.TestCase):
     def test_sum_floor_and_soft(self):
         self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 1.0), 37.0)
-        self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 1.0, a6p=50.0), 50.0)
-        self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 0.0, a6p=50.0), 37.0)   # no floor without fixed
+        self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 1.0, minimum=50.0), 50.0)
+        self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 0.0, minimum=50.0), 37.0)   # no floor without VariableImpulse
         self.assertEqual(final_magnitude(30.0, 5.0, 5.0, 0.0, soft_flag=True), 36.0)
 
 

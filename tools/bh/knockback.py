@@ -53,7 +53,7 @@ def hit_damage(base, charge, p538, n_r, l_a, o3t, attacker_45j=None, stat=1.0, v
 
 
 def charged_scale(held, i6c):
-    """`1 + held / _-I6c * 0.25` (#1675 @1100-1116), applied to damage and to the fixed force."""
+    """`1 + held / _-I6c * 0.25` (#1675 @1100-1116), applied to the damage and to the VariableImpulse part."""
     return 1 + held / i6c * 0.25
 
 
@@ -76,17 +76,19 @@ def knockback_force(force, damage, victim_w22, victim_w3f, attacker_g4s, victim_
     return max(f - victim_p1r, 0)
 
 
-def final_magnitude(u1x_value, c7_part, variable, fixed, a6p=0.0, soft_flag=False, di_case=False):
+def final_magnitude(u1x_value, fixed_impulse, item_part, variable_impulse, minimum=0.0, soft_flag=False,
+                    di_case=False):
     """Length of the knockback point, `local 38` of #1675 @1198-1532.
 
-    m = u1x_value + (c7_part + variable); when `power._-A6P != 0` and fixed != 0, m is raised to at
-    least `_-A6P`; when the victim has the flag `Entity._-B6B` (`soft_flag`) and (fixed == 0 or the
-    DI case local 39 holds), m *= 0.9. The power-specific factors of @1569-1638 are not modelled.
+    m = u1x_value + (FixedImpulse part `local 36` + item part `local 37`); when MinimumImpulse
+    (`_-A6P`) != 0 and the VariableImpulse part (`local 35`) != 0, m is raised to at least MinimumImpulse;
+    when the victim has the flag `Entity._-B6B` (`soft_flag`) and (VariableImpulse == 0 or the DI case
+    local 39 holds), m *= 0.9. The power-specific factors of @1569-1638 are not modelled.
     """
-    m = u1x_value + (c7_part + variable)
-    if a6p != 0 and fixed != 0 and m < a6p:
-        m = float(a6p)
-    if soft_flag and (fixed == 0 or di_case):
+    m = u1x_value + (fixed_impulse + item_part)
+    if minimum != 0 and variable_impulse != 0 and m < minimum:
+        m = float(minimum)
+    if soft_flag and (variable_impulse == 0 or di_case):
         m = m * 0.9
     return m
 
@@ -378,6 +380,25 @@ ANCHORS = {ABC_1100: {
         (3044, 375, "initproperty", "_-92e"),
         (2887, 347, "initproperty", "_-P3I"),
         (2887, 356, "initproperty", "_-92e"),
+    ],
+    "powerTypes columns: VariableImpulse -> _-W1a, FixedImpulse -> _-C7, ImpulseOffsetX/Y -> _-13F/_-x45, FixedStunTime -> _-T6p, BaseDamage -> _-L69": [
+        (6483, 11958, "getlocal", "7"),
+        (6483, 11967, "getproperty", "_-W1a"),
+        (6483, 12002, "getlocal", "8"),
+        (6483, 12011, "getproperty", "_-C7"),
+        (6483, 12214, "getproperty", "_-13F"),
+        (6483, 12265, "getproperty", "_-x45"),
+        (6483, 12290, "getproperty", "_-T6p"),
+        (6483, 12365, "getlocal", "16"),
+        (6483, 12369, "getproperty", "_-L69"),
+        (1675, 477, "getproperty", "_-L69"),
+    ],
+    "powerTypes scalar columns: MinimumImpulse _-A6P, DIMaxAngle _-x1F, ImpulseOnHeavy _-4r, ItemSpeedDamage _-538, ItemSpeedImpulse _-w4x": [
+        (6483, 7550, "pushstring", "'MinimumImpulse'"),
+        (6483, 4254, "pushstring", "'DIMaxAngle'"),
+        (6483, 6881, "pushstring", "'ImpulseOnHeavy'"),
+        (6483, 7365, "pushstring", "'ItemSpeedDamage'"),
+        (6483, 7391, "pushstring", "'ItemSpeedImpulse'"),
     ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
