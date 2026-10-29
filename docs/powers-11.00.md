@@ -80,6 +80,22 @@ handled by code paths that do not store them right away).
 | `FireGfxRotation` | `_-M2c` | `KeepGroundFriction` | `_-y25` | `WallCancel` | `_-Cb` |
 | `FireImpulseMaxX` | `_-l27` | `LockTo45Degrees` | `_-U3z` |  |  |
 
+## Clash arbitration
+
+**[V]** `Priority` (`_-p3s`) is read by **`_-26u._-d3s` #1665**, the global phase that Q2 places in the
+16 ms step after `_-E1V._-s4H` (see `docs/tick-loop-11.00.md`). For two hit records (`_-P6X`, locals 5 and
+14) whose powers are `_-K6M`:
+
+1. **different `Priority`**: the record with the lower priority gets `_-fP = true` (@1916–1953);
+2. **equal `Priority`**: compare `_-P3I` of two entities (locals 7 and 6, looked up from the records'
+   `_-82K` and `_-l18`) (@1810–1908): the higher one wins. `_-P3I` is the fighter's **Strength level**
+   (`Entity._-p1E` #3049 @522–527, `docs/stats-11.00.md`);
+3. **equal `_-P3I`**: compare `_-W22` (@1825–1869), the lower one wins; equal → no loser here.
+
+[H] `_-fP` marks the loser of the clash, and locals 6/7 are the owners of the two clashing powers
+(10.09: "Priority, then `_-F5f`, then `_-V6R`, then loser marking"); check the record fields
+`_-82K` / `_-l18` before relying on the roles.
+
 ## Next
 
 - Phase vectors (`CastTime`, `AoERadiusX/Y`, `CenterOffsetX/Y`) and the active-power tick (10.09 #46
