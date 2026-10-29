@@ -2,13 +2,14 @@
 
 Run: python -I -m unittest discover -s tests   (from the repository root)
 """
+import hashlib
 import os
 import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh import abc, render, replay, swf, swz  # noqa: E402
+from bh import abc, movement, render, replay, swf, swz  # noqa: E402
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
 REPLAYS = os.environ.get("BRAWLHALLA_REPLAYS", os.path.join(os.path.expanduser("~"), "BrawlhallaReplays"))
@@ -35,13 +36,20 @@ class Pure(unittest.TestCase):
         self.assertEqual([n for _, n, _ in ins], ["jump", "returnvoid"])
         self.assertEqual(abc.branch_targets(ins, len(code)), ([4], []))
 
+    def test_anchor_check_reports_mismatches(self):
+        lists = {1: {0: ("pushbyte", "16"), 2: ("add", "")}}
+        good, wrong = (1, 0, "pushbyte", "16"), (1, 2, "subtract", "")
+        self.assertEqual(movement.check([good, wrong, (9, 0, "add", "")], lambda m: lists.get(m, {})),
+                         [(wrong, ("add", "")), ((9, 0, "add", ""), None)])
+
 
 @unittest.skipUnless(HAVE_GAME, "Brawlhalla not installed")
 class Game(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         main = swf.Swf(open(os.path.join(GAME, "BrawlhallaAir.swf"), "rb").read())
-        cls.abc = abc.Abc(max(main.abc_blocks(), key=lambda b: len(b[1]))[1])
+        cls.abc_bytes = max(main.abc_blocks(), key=lambda b: len(b[1]))[1]
+        cls.abc = abc.Abc(cls.abc_bytes)
 
     def test_every_method_decodes(self):
         rep = abc.validate(self.abc)
@@ -55,6 +63,12 @@ class Game(unittest.TestCase):
         (_, full), _ = next(iter(refs["members"].items()))
         short = full.rsplit("::", 1)[-1].rsplit(".", 1)[-1]
         self.assertIn(m, abc.callers_of(self.abc, short))
+
+    def test_movement_anchors_hold(self):
+        anchors = movement.ANCHORS.get(hashlib.sha256(self.abc_bytes).hexdigest())
+        if anchors is None:
+            self.skipTest("no movement anchors for this patch")
+        self.assertEqual(movement.check(anchors, lambda m: movement.listing(self.abc, m)), [])
 
     def test_swz_key_is_in_uint_pool(self):
         data = open(os.path.join(GAME, "Init.swz"), "rb").read()
