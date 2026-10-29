@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 242 anchors
+python -I tools/bht.py input-buffer-verify            # 278 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -126,6 +126,18 @@ the ground pound [H]. `SLOT_NAMES` in the module uses these names.
 On the input bit names (replay-format.md "naming conflict"): in `_-rU`, bit 1 is not read, and bit 32
 turns a side attack into a neutral one. That is the behaviour the name `PrioritiseNeutralOverSide`
 describes. [V] for this path; other readers of bit 32 are not checked here.
+
+## 7. Jump and recovery counters
+
+| Claim | Where | Status |
+|---|---|---|
+| `Entity._-P5Y()` = `_-3j ^ _-ef` (the counter is stored xor a key; `_-k1j(n)` writes it) and `_-56T()` always returns **2** | #2962, #2920, #3095 | [V] |
+| `Jump` has three branches, tagged `'jump.Ground'`, `'jump.Wall'` and `'jump.Air'`. The ground branch calls `_-Kc._-C3x()`, which sets the counter to 0 (and `_-UT = false`); only the air branch adds 1; the wall branch leaves it | #3052 @968–1058, @2005, @2150–2176, @2414; #1712 @112–127 | [V] |
+| So a fighter has a ground jump plus `_-56T() = 2` air jumps: `_-H5F` refuses an air jump when `_-P5Y() ≥ _-56T()` and `_-r51 == 0` | §4, #3065 | [V] |
+| Each step of `_-8i`, when the fighter is on a line (`_-96f ≠ null`), not in hitstun (`!_-5q()`) and without the flag `Entity._-B6B`, `_-G1T = true` and `_-Kc._-C3x()` refreshes the counter, unless `_-r51 ≠ 0` and `_-x2C ≥ 9` | #2984 @290–467 | [V]; [H] landing refresh |
+| The KO reset `_-p1Y` sets the counter to 0 | #3034 @197–202 | [V] |
+| Each slot 9 power (recovery) without `_-UT` calls `_-31A`: `_-x2C += 1`; at `_-x2C == 9` the counter is set to 2 (no air jump left) and `_-UT = true`. `_-C5S` also tests `_-x2C ≥ 5` right after | #3082; #1700 @703–759 | [V]; [H] meaning of 5 and 9 |
+| With `_-UT` set, a slot 9 power is refused once `_-P5Y() ≥ 2`; when it starts (and its fifth argument is false) it also runs `Jump(t, true)` | #1700 @79–158, @399–423 | [V] |
 
 ## Limits
 

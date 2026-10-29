@@ -78,6 +78,9 @@ def attack_slot(keys, heavy=False, air=False):
     return ATTACK_SLOTS[cls + (HEAVY_OFFSET if heavy else 0) + (AIR_OFFSET if air else 0)]
 
 
+MAX_AIR_JUMPS = 2         # Entity._-56T() returns pushbyte 2
+
+
 def first_jump_allowed(t, last_move_start):
     """First jump site of #6313 (@2529-2556): `_-532 == 0` or t > `_-532` + 192."""
     return last_move_start == 0 or t > last_move_start + JUMP_LOCK_MS
@@ -364,6 +367,48 @@ ANCHORS = {ABC_1100: {
         (1726, 817, "getproperty", "mSpecialPower1_Down"),
         (1726, 868, "getproperty", "mSpecialPower2_Down"),
         (1726, 899, "callproperty", "_-p4G, 1"),
+    ],
+    "air jump counter: _-P5Y() = _-3j ^ _-ef, max _-56T() = 2; ground jump -> 0, air jump +1, wall jump unchanged": [
+        (2962, 5, "getproperty", "_-3j"),
+        (2962, 12, "getproperty", "_-ef"),
+        (2962, 16, "bitxor", ""),
+        (3095, 15, "pushbyte", "2"),
+        (3095, 18, "returnvalue", ""),
+        (2920, 14, "bitxor", ""),
+        (2920, 15, "initproperty", "_-3j"),
+        (3052, 968, "pushstring", "'jump.Ground'"),
+        (3052, 1058, "callpropvoid", "_-C3x, 0"),
+        (3052, 2005, "pushstring", "'jump.Wall'"),
+        (3052, 2159, "callproperty", "_-P5Y, 0"),
+        (3052, 2172, "pushbyte", "1"),
+        (3052, 2174, "add_i", ""),
+        (3052, 2176, "callpropvoid", "_-k1j, 1"),
+        (3052, 2414, "pushstring", "'jump.Air'"),
+        (1712, 116, "initproperty", "_-UT"),
+        (1712, 125, "pushbyte", "0"),
+        (1712, 127, "callpropvoid", "_-k1j, 1"),
+        (3034, 200, "pushbyte", "0"),
+        (3034, 202, "callpropvoid", "_-k1j, 1"),
+    ],
+    "refresh in _-8i: on a line, not in hitstun, no _-B6B -> _-G1T, then _-Kc._-C3x() unless _-r51 != 0 and _-x2C >= 9": [
+        (2984, 295, "getproperty", "_-96f"),
+        (2984, 311, "callproperty", "_-5q, 0"),
+        (2984, 333, "getproperty", "_-B6B"),
+        (2984, 408, "initproperty", "_-G1T"),
+        (2984, 414, "getproperty", "_-x2C"),
+        (2984, 428, "getproperty", "_-r51"),
+        (2984, 442, "pushbyte", "9"),
+        (2984, 467, "callpropvoid", "_-C3x, 0"),
+    ],
+    "recovery count: _-31A adds 1 to _-x2C; at 9 the air jumps are used up and _-UT is set": [
+        (3082, 11, "increment", ""),
+        (3082, 21, "pushbyte", "9"),
+        (3082, 35, "callproperty", "_-56T, 0"),
+        (3082, 40, "callpropvoid", "_-k1j, 1"),
+        (3082, 51, "initproperty", "_-UT"),
+        (1700, 728, "callpropvoid", "_-31A, 0"),
+        (1700, 738, "getproperty", "_-x2C"),
+        (1700, 741, "pushbyte", "5"),
     ],
 }}
 
