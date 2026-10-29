@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 101 anchors
+python -I tools/bht.py input-buffer-verify            # 143 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -60,8 +60,35 @@ press and the three ticks after it. A key held down is not a new press.
   - `Entity._-H5F` #3065 returns true while `t ≤ _-I5A + Entity._-Y35`, and `_-Y35 = 176` ms (11 ticks, `script157.<init>` #3173 @829). That is longer than the 4-tick buffer.
   - `_-H5F` also allows a jump only in states `_-65w` ∈ {0, 5} (`lookupswitch` @27), and blocks it when `IsMoveLocked(t)`, `_-u4F()`, `_-Xb ≠ 0`, `_-Kc._-cr ≠ 0` or `_-C54(t)` (unless its second argument is set), when `t < _-f6R`, and in the air (`_-wn()`) with `_-P5Y() ≥ _-56T()` and `_-r51 == 0` [H: no jump left].
 - Not read yet [H]:
-  - the eligibility order of the other actions, and their own re-trigger guards;
+  - the re-trigger guards of the attacks (`_-I35`, `_-rU`) and the meaning of `_-C51`, `_-z3C`;
   - the role of `_-B5 = t` @3383.
+
+## 5. Order of the action blocks
+
+After the window, #6313 tries the actions in this byte order. Local 14 ("an action was taken") and
+local 15 ("input handled") are set by most blocks and gate the later ones. [V] order and calls; the
+meaning of the helpers is [H].
+
+| # | Block | Trigger and guard (summary) | Call | Where |
+|---|---|---|---|---|
+| 1 | Mode hook | `_-s3D._-H1g._-m47._-365(t, id, keys, dodge-held time)`; if true: every flag set, `_-66U = 0` (input swallowed) | `_-365` | @1386–1488 |
+| 2 | Any press | when `_-e3e & Entity._-m1t` and any press is buffered | `_-A5q(t)` | @1491–1532 |
+| 3 | Dodge-related | (not read) | `_-U6t(…, 8 args)` | @1536–1916 |
+| 4 | **Dodge** | dodge press newer than `_-C51` (or `_-C51 == 0`) | `Dodge(t, keys & 15, …)` | @2376–2504 |
+| 5 | **Jump (first site)** | `!14`, jump press, and `local28 == 0 \|\| t > local28 + Entity._-z3C` | `Jump(t)` | @2507–2578 |
+| 6 | `_-LY` ×2 | uses the light press | `_-LY(…, 2)` | @2590–2709 |
+| 7 | **Light** | light press, `(!15 && !17) \|\| local32`; then `_-I35(t, dir, …, 2)` or `_-rU(…)` | `_-I35` / `_-rU` | @2709–2959 |
+| 8 | **Heavy** | same shape with the heavy press; `_-I35(…, 3)` or `_-rU(…)` | `_-I35` / `_-rU` | @2996–3135 |
+| 9 | **Pick-up** | pick-up press | `_-b1I(…, 4)` | @3154–3274 |
+| 10 | Throw | pick-up press **newer than** the light press | `_-L6S(t, …)` | @3310–3414 |
+| 11 | **Jump (second site)** | `!14` and a jump press | `Jump(t)` | @3418–3452 |
+| 12 | Movement | left / right | `_-01L()`, `_-B3G()` | @3491–3594 |
+| 13 | **Taunt** | taunt press | `_-Y1K(…, 4)` | @3626–3658 |
+| 14 | Hand-off | light / heavy presses | `HandleInput(…, 4)` | @3680–3723 |
+
+So a light or heavy press beats a pick-up only when the pick-up press is not newer. A jump press is
+tried before the attacks (block 5) and again after them (block 11). The 2 / 3 / 4 codes passed to
+`_-I35`, `_-LY`, `_-b1I` and `_-Y1K` look like action kinds [H].
 
 ## Limits
 
