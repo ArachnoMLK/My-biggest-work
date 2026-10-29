@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 278 anchors
+python -I tools/bht.py input-buffer-verify            # 291 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -137,6 +137,7 @@ describes. [V] for this path; other readers of bit 32 are not checked here.
 | Each step of `_-8i`, when the fighter is on a line (`_-96f ≠ null`), not in hitstun (`!_-5q()`) and without the flag `Entity._-B6B`, `_-G1T = true` and `_-Kc._-C3x()` refreshes the counter, unless `_-r51 ≠ 0` and `_-x2C ≥ 9` | #2984 @290–467 | [V]; [H] landing refresh |
 | The KO reset `_-p1Y` sets the counter to 0 | #3034 @197–202 | [V] |
 | Each slot 9 power (recovery) without `_-UT` calls `_-31A`: `_-x2C += 1`; at `_-x2C == 9` the counter is set to 2 (no air jump left) and `_-UT = true`. `_-C5S` also tests `_-x2C ≥ 5` right after | #3082; #1700 @703–759 | [V]; [H] meaning of 5 and 9 |
+| `IsDodgeLocked(t, a)` is true when `IsMoveLocked(t)`, `_-u5E()` (unless `a`), `_-E6P()`, a power runs (`_-Kc._-o3I ≠ null`), the fighter is on a wall (`_-r51 ≠ 0`), the zone test `_-I1f._-12J(1, …, _-25G)` holds, `_-Xb ≠ 0` or `_-C54(t)`; otherwise it is `_-x2C ≥ 9`. So a fighter whose `_-x2C` reached 9 can neither dodge nor air-jump until the refresh | #3075 | [V]; [H] "spent" state |
 | With `_-UT` set, a slot 9 power is refused once `_-P5Y() ≥ 2`; when it starts (and its fifth argument is false) it also runs `Jump(t, true)` | #1700 @79–158, @399–423 | [V] |
 
 ## Limits

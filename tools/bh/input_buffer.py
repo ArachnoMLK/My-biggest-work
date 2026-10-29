@@ -410,6 +410,21 @@ ANCHORS = {ABC_1100: {
         (1700, 738, "getproperty", "_-x2C"),
         (1700, 741, "pushbyte", "5"),
     ],
+    "IsDodgeLocked: move lock, _-u5E, _-E6P, a running power, a wall, a zone test, _-Xb, _-C54; else _-x2C >= 9": [
+        (3075, 14, "callproperty", "IsMoveLocked, 1"),
+        (3075, 30, "callproperty", "_-u5E, 0"),
+        (3075, 54, "callproperty", "_-E6P, 0"),
+        (3075, 72, "getproperty", "_-o3I"),
+        (3075, 92, "getproperty", "_-r51"),
+        (3075, 163, "callproperty", "_-12J, 4"),
+        (3075, 178, "getproperty", "_-Xb"),
+        (3075, 198, "callproperty", "_-C54, 1"),
+        (3075, 213, "getproperty", "_-x2C"),
+        (3075, 216, "pushbyte", "9"),
+        (3075, 219, "greaterequals", ""),
+        (3125, 156, "callproperty", "IsDodgeLocked, 1"),
+        (3125, 416, "callproperty", "Dash, 2"),
+    ],
 }}
 
 
