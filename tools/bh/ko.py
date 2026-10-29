@@ -46,6 +46,25 @@ def ko_mask(x, y, cam, kill, exact, top_allowed):
 
 
 # group -> anchors. Group names are the claims of docs/ko-11.00.md they support.
+REPLAY_BITS = 1024 | 2048 | 8192                # replay / spectate playback (code-map-11.00.md)
+NO_BASE_BITS = 2 | 4 | 0x400000 | REPLAY_BITS | 262144 | 524288
+
+
+def ko_time_base(w35, ce, e4h, n4k):
+    """Time base the replay writer `_-S45._-04F` #6711 @54-398 subtracts from KO face times.
+
+    0 when `_-w35` has a bit of NO_BASE_BITS, or 32768 (or 32 with 32768 in the saved `_-ce`), or when
+    `_-e4h == 2` and `_-w35` has 16 (or 32 with 16 in `_-ce`); otherwise `_-n4k - 16`.
+    """
+    if w35 & NO_BASE_BITS:
+        return 0
+    if w35 & 32768 or (w35 & 32 and ce & 32768):
+        return 0
+    if e4h == 2 and (w35 & 16 or (w35 & 32 and ce & 16)):
+        return 0
+    return (n4k - 16) % (1 << 32)
+
+
 ANCHORS = {ABC_1100: {
     "LevelType._-a5F parses the kill lines into uint/Boolean fields": [
         (5275, 528, "pushstring", "'LeftKill'"),
@@ -306,6 +325,29 @@ ANCHORS = {ABC_1100: {
         (6711, 634, "pushbyte", "1"),
         (6711, 636, "pushbyte", "0"),
         (6711, 638, "callpropvoid", "_-b5p, 2"),
+    ],
+    "base condition: 0 under 2|4|0x400000, replay bits, 32768 (or 32 + _-ce), e4h == 2 with 16; else _-n4k - 16": [
+        (6711, 63, "pushbyte", "4"),
+        (6711, 66, "pushbyte", "2"),
+        (6711, 70, "pushint", "4194304"),
+        (6711, 99, "pushint", "1024"),
+        (6711, 103, "pushint", "2048"),
+        (6711, 107, "pushint", "8192"),
+        (6711, 125, "pushint", "262144"),
+        (6711, 128, "pushint", "524288"),
+        (6711, 170, "pushint", "32768"),
+        (6711, 198, "pushbyte", "32"),
+        (6711, 212, "getproperty", "_-ce"),
+        (6711, 231, "getproperty", "_-e4h"),
+        (6711, 235, "pushbyte", "2"),
+        (6711, 243, "pushbyte", "16"),
+        (6711, 282, "getproperty", "_-ce"),
+        (6711, 339, "pushint", "1024"),
+        (6711, 377, "pushbyte", "0"),
+        (6711, 390, "getproperty", "_-n4k"),
+        (6711, 393, "pushbyte", "16"),
+        (6711, 395, "subtract_i", ""),
+        (6711, 398, "setlocal", "5"),
     ],
     "base: _-n4k is the match start (_-Px.StartTime), set to the clock of the first tick by #3336": [
         (10723, 8, "getproperty", "_-n4k"),

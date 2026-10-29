@@ -16,7 +16,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, ko, swf  # noqa: E402
-from bh.ko import BOTTOM, LEFT, RIGHT, TOP, ko_mask  # noqa: E402
+from bh.ko import BOTTOM, LEFT, RIGHT, TOP, ko_mask, ko_time_base  # noqa: E402
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
 HAVE_GAME = os.path.exists(os.path.join(GAME, "BrawlhallaAir.swf"))
@@ -100,6 +100,22 @@ class Game(unittest.TestCase):
             self.skipTest("KO anchors are pinned to patch 11.00")
         self.assertEqual(ko.verify(abc.Abc(data), sha), [])
 
+
+
+class TimeBase(unittest.TestCase):
+    def test_base_subtracted_by_default(self):
+        self.assertEqual(ko_time_base(0, 0, 0, 1600), 1584)
+
+    def test_no_base_in_playback_and_listed_modes(self):
+        for w in (2, 4, 0x400000, 1024, 2048, 8192, 262144, 524288, 32768):
+            self.assertEqual(ko_time_base(w, 0, 0, 1600), 0, w)
+
+    def test_saved_mode_and_e4h(self):
+        self.assertEqual(ko_time_base(32, 32768, 0, 1600), 0)
+        self.assertEqual(ko_time_base(32, 0, 0, 1600), 1584)
+        self.assertEqual(ko_time_base(16, 0, 2, 1600), 0)
+        self.assertEqual(ko_time_base(16, 0, 1, 1600), 1584)
+        self.assertEqual(ko_time_base(32, 16, 2, 1600), 0)
 
 if __name__ == "__main__":
     unittest.main()
