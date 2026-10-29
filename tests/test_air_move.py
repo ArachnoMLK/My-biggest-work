@@ -8,7 +8,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.air_move import MoveResult, WallState, air_move, respond, steep, wall_contact  # noqa: E402
+from bh.air_move import MoveResult, WallState, air_move, bounce, respond, steep, wall_contact  # noqa: E402
 from bh.raycast import Line  # noqa: E402
 
 
@@ -102,6 +102,34 @@ class Wall(unittest.TestCase):
         ws = WallState(t=1000, can_cling=False, t46=False, r51_before=2, g1t=True, y1l=3000)
         _, _, p5s, _, _, g1t, y1l, _ = wall_contact([sticky], 1, 48.99, 300.0, sticky, 40.0, 0.0, ws)
         self.assertEqual((p5s, g1t, y1l), (0, True, 3000))
+
+
+class Bounce(unittest.TestCase):
+    WALL = Line(50, 0, 50, 500, type=1, normal=(-1.0, 0.0))
+    FLOOR = Line(0, 100, 500, 100, type=1, normal=(0.0, -1.0))
+
+    def test_wall_and_floor(self):
+        self.assertEqual(bounce(self.WALL, 100.0, 10.0), (-80.0, 10.0, 0.0, 0.0))
+        self.assertEqual(bounce(self.WALL, 10.0, 10.0)[0], 0)          # slower than 25: stops
+        self.assertEqual(bounce(self.FLOOR, 0.0, 50.0)[1], -40.0)
+
+    def test_slanted_reflect(self):
+        s = 2 ** -0.5
+        ramp = Line(0, 100, 100, 0, type=1, normal=(-s, -s))
+        v1d, p5s, _, _ = bounce(ramp, 0.0, 100.0)
+        # normal part (50, 50) * 0.8 reflected, tangent (-50, 50) shortened by 2.5
+        t = (50 * 2 ** 0.5 - 2.5) / (50 * 2 ** 0.5)
+        self.assertAlmostEqual(v1d, -50 * t - 40)
+        self.assertAlmostEqual(p5s, 50 * t - 40)
+
+    def test_real_speed_kept(self):
+        v1d, p5s, j1m, d4x = bounce(self.WALL, 250.0, 0.0, j1m=400.0)
+        self.assertEqual((v1d, j1m), (-250.0, -320.0))
+
+    def test_frozen_and_skip(self):
+        self.assertEqual(bounce(self.WALL, 100.0, 10.0, frozen=True)[:2], (0.0, 0.0))
+        roof = Line(0, 0, 500, 0, type=17, normal=(0.0, 1.0))
+        self.assertIsNone(bounce(roof, 0.0, -50.0, skip_ceiling=True))
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(443 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(462 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -395,7 +395,7 @@ above.
 
 | # | Condition | Effect | Transcribed |
 |---|---|---|---|
-| 1 | bounce state (`_-e3e & _-B6B`, or `_-5q() && !_-e36()`) | `_-048` bounce; impact effect when the speed changed by > 50 | no |
+| 1 | bounce state (`_-e3e & _-B6B`, or `_-5q() && !_-e36()`) | `_-048` bounce; impact effect when the speed changed by > 50 | yes (`bounce`) |
 | 2 | head stop on a flat line, or on a down-facing no-slide line | **ceiling**: an upward `_-P5S` becomes 0; the power's `_-K3` is set when it has `_-4A` | yes |
 | 3 | head stop on a non-vertical line, or a steep line (`_-S1A`: ny < 0 and \|nx/ny\| ≥ 5/3) | **slope**: the missing y (move.y − wanted.y) is replayed along the line, the x speed `_-v1D` is pushed to at least 15 in that direction, with a hard-line sweep and a 1.01 back-off | yes |
 | 4 | game-mode line with `_-ao` | mode-specific | no |
@@ -403,6 +403,20 @@ above.
 | 6 | anything else (floors) | pressure plates `_-U5a` | no |
 
 At the end, `_-O6z` = `_-96f`.
+
+Bounce details (`bounce`, `Entity._-048` #3151) [V]:
+- **Elasticity e.** `_-7c` (0.8 for a fighter, set in `Entity.<init>`); 1.0 when `_-050()`; 0.9 on bouncy
+  lines (64); 1.2 in the `_-m1t` state. Game-mode lines use `_-h40`.
+- **Thresholds.** `_-OI` = `_-J4r` = 25, or 0.5 in the `_-m1t` state.
+- **Real speed.** When a real flight speed is kept (`_-J1m` / `_-d4x`, above 250, PR #29), the velocity is
+  first rescaled to its length.
+- **Vertical line.** x speed × −e. A horizontal line does the same on y. Below the threshold, the speed is
+  set to 0.
+- **Slanted line.** The velocity is reflected on the normal: the tangential part loses 2.5 (not below 0),
+  the normal part is scaled by e, and the result is kept only if it is at least 25.
+- **Afterwards.** For an axis whose real speed was kept, a speed above 250 (`_-y4Q` = 62500 = 250²) is
+  capped to ±250 again and the real one stored; otherwise it is cleared.
+- **Skips.** `_-83l` stops the fighter. `_-m5a` skips down-facing no-slide lines.
 
 Wall details (`wall_contact`) [V]:
 - **Ledge assist.** It runs when `_-wn()` holds and the wall is not no-slide:

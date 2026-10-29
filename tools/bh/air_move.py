@@ -186,6 +186,67 @@ def wall_contact(lines, team, x, y, wall, p5s, v1d, ws):
     return x, y, p5s, v1d, r51, g1t, y1l, mantled
 
 
+BOUNCY = 64           # `_-z2k._-B6P`
+FLIGHT_CAP = 250.0    # sqrt(`Entity._-y4Q` = 62500), `_-y2E.init` @30022
+
+
+def bounce(line, v1d, p5s, j1m=0.0, d4x=0.0, elasticity=0.8, threshold_x=25.0, threshold_y=25.0,
+           frozen=False, skip_ceiling=False):
+    """`Entity._-048` #3151: velocity after hitting `line` in the bounce state. Returns (v1d, p5s, j1m, d4x),
+    or None when the bounce is skipped.
+
+    `frozen` (`_-83l`) zeroes both speeds; `skip_ceiling` (`_-m5a`) skips a down-facing no-slide line.
+    elasticity: `_-7c` (0.8 for fighters), 1.0 when `_-050()`, 0.9 on bouncy lines (64), 1.2 in the `_-m1t`
+    state (whose thresholds `_-OI` / `_-J4r` = 25 become 0.5); the caller picks it (game-mode lines use `_-h40`).
+    The real flight speeds `_-J1m` / `_-d4x` (kept when above 250, PR #29) give the speed when non-zero.
+    Vertical line: x speed * -e, or 0 under the threshold; horizontal: y speed likewise; slanted: reflect on the
+    normal, the tangential part loses 2.5 (not below 0), the normal part is scaled by e, applied only when the
+    result is fast enough. When `_-J1m` (`_-d4x`) was set, a speed above 250 is capped to +-250 and the real one
+    kept there again, else it is cleared. `_-P39` is set and `_-B2Q` counts the bounces (not returned).
+    """
+    if frozen:
+        return 0.0, 0.0, j1m, d4x
+    if skip_ceiling and line.type & NO_SLIDE and line.normal[1] > 0:
+        return None
+    vx, vy = v1d, p5s
+    had_j, had_d = j1m != 0, d4x != 0
+    if had_j or had_d:
+        ux = j1m if j1m != 0 else v1d
+        uy = d4x if d4x != 0 else p5s
+        vx, vy = _normalize((vx, vy), _length((ux, uy)))
+        v1d, p5s = vx, vy
+    if line.sx == line.ex:
+        v1d = v1d * -elasticity if _length((vx, vy)) >= threshold_x else 0
+    elif line.sy == line.ey:
+        p5s = p5s * -elasticity if _length((vx, vy)) >= threshold_y else 0
+    else:
+        nx, ny = line.normal
+        d = vx * nx + vy * ny
+        ux, uy = d * nx, d * ny
+        wx, wy = v1d - ux, p5s - uy
+        wl = _length((wx, wy)) - 2.5
+        if wl < 0:
+            wl = 0
+        wx, wy = _normalize((wx, wy), wl)
+        ux, uy = ux * elasticity, uy * elasticity
+        vx, vy = wx - ux, wy - uy
+        if _length((vx, vy)) >= threshold_x:
+            v1d, p5s = vx, vy
+    if had_j:                                       # @1278-1408, only when `_-J1m` was set on entry
+        if v1d * v1d > FLIGHT_CAP * FLIGHT_CAP:
+            j1m = v1d
+            v1d = FLIGHT_CAP if j1m > 0 else -FLIGHT_CAP
+        else:
+            j1m = 0
+    if had_d:                                       # @1412-1537, same for `_-d4x` and the y speed
+        if p5s * p5s > FLIGHT_CAP * FLIGHT_CAP:
+            d4x = p5s
+            p5s = FLIGHT_CAP if d4x > 0 else -FLIGHT_CAP
+        else:
+            d4x = 0
+    return v1d, p5s, j1m, d4x
+
+
 @dataclass
 class Response:
     x: float
@@ -328,6 +389,27 @@ ANCHORS = {ABC_1100: {
         (2984, 12175, "getproperty", "_-Vj"),
         (2984, 12305, "pushdouble", "-10.0"),
         (2984, 12312, "pushdouble", "10.0"),
+    ],
+    "_-048 bounce: e = _-7c (0.8) / 1.0 / 0.9 bouncy / 1.2 m1t; thresholds 25; reflect, tangent - 2.5; cap 250 (y4Q = 62500)": [
+        (3151, 24, "getproperty", "_-83l"),
+        (3151, 83, "getproperty", "_-m5a"),
+        (3151, 135, "getproperty", "_-7c"),
+        (3151, 152, "pushdouble", "1.0"),
+        (3151, 213, "callproperty", "_-h40, 4"),
+        (3151, 246, "pushdouble", "0.9"),
+        (3151, 278, "pushdouble", "1.2"),
+        (3151, 286, "getproperty", "_-OI"),
+        (3151, 295, "getproperty", "_-J4r"),
+        (3151, 324, "pushdouble", "0.5"),
+        (3151, 589, "callpropvoid", "normalize, 1"),
+        (3151, 702, "negate", ""),
+        (3151, 1052, "pushdouble", "2.5"),
+        (3151, 1323, "getproperty", "_-y4Q"),
+        (3151, 1382, "pushdouble", "250.0"),
+        (3151, 1553, "initproperty", "_-B2Q"),
+        (3151, 1275, "initproperty", "_-P39"),
+        (15351, 30022, "pushdouble", "62500.0"),
+        (2984, 9448, "callpropvoid", "_-048, 2"),
     ],
 }}
 
