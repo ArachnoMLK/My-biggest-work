@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(226 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(278 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -272,6 +272,35 @@ So the first straight ray of the line of sight sees soft platforms from both sid
 exactly 2 does not block, because only `type != 2` counts. Bouncy soft (66) and soft pressure plates (258)
 do block [V; the effect in game is H]. The detour and edge rays only see hard lines.
 
+### 7.2 Map lines and the candidate grid ([`tools/bh/level_collision.py`](../tools/bh/level_collision.py))
+
+**One collision element.** `_-139._-J1j` #5295 turns one element into lines [V]:
+- `X` / `Y` set both ends. Otherwise `X1` and `X2` (`Y1` and `Y2`) are used only when both exist; a
+  missing pair stays 0.
+- The ends are swapped so that start.x ≤ end.x.
+- The element name gives the type flags (table of PR #20). `Flag` goes to `_-Z2Y` through `_-R15._-c1N`.
+  `Team` becomes the line owner `_-r1H`, which the ray cast compares with the attacker's team.
+- With `AnchorX` and `AnchorY`, `_-l49._-d1H` #1594 builds a quadratic curve. It has n straight lines,
+  n = round(Manhattan size / 125) clamped to 4..10, each oriented left to right, with no normal.
+- Otherwise there is one `_-R15(start, end, type, flag, team)`. It gets a normal only when `NormalX` or
+  `NormalY` is present (the missing one is 0), normalised by `_-q3q`. `_-q3q` also sets `_-S1A` when
+  `ny < 0` and `|nx / ny| ≥ 5/3`.
+
+**The grid.** Static lines go into a grid of 100-unit cells (`_-43i` → `_-CX._-u2z` #1585). Each line is
+appended to the bucket of every cell its segment crosses, in the cell order of `_-A6B._-t2D` #1028:
+- the segment is made shallow, oriented left to right, and mirrored when it goes down;
+- it is walked column by column, at most one step up per column.
+
+The bucket key is `_-a2E` #1587: `((⌊x+0.01⌋·0.01 + 16000) << 16) | (⌊y+0.01⌋·0.01 + 16000)`.
+
+Lines inside `DynamicCollision` and `MovingPlatform` blocks go to the dynamic list instead (`_-Z2B`).
+`_-936` #1582 gathers the candidates of a ray: the buckets of the cells the ray crosses, then every
+dynamic line. There is no de-duplication and no sort [V]. `map_ray` accepts a `Grid` and gathers the
+candidates per ray the same way.
+
+Local check (aggregate): the 122 LevelDescs parse with no error. They give 1,747 static lines, 61 of
+them with a normal. That file order is the game's insertion order is [H].
+
 ## 8. Thrown items and projectiles (`_-p5k`)
 
 Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not powers. Each update,
@@ -305,8 +334,7 @@ target the item touched. `_-A3S` makes the line of sight ignore item-ignore line
 
 ## 9. Still open
 
-- Building the candidate list of §7.1 from a LevelDesc (grid traversal `_-A6B._-t2D`, moving platforms at
-  time t, see PR #20).
+- Dynamic lines (moving platforms at time t, PR #20; `DynamicCollision` offsets) for §7.2.
 - The other guards at the top of `_-T5A` (`_-i4o` HoldHitEnts with `Entity._-b2C`, `_-u3H` against
   Uninterruptable `_-C5G`, `_-hQ` / `_-72e`). The order of the list follows `_-5r` [H].
 - The meaning of `_-X2G`, `_-B5B`, `_-q24`, and the exact gate on `_-L5r` per frame (§1).

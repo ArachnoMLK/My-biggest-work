@@ -9,7 +9,7 @@ The functions transcribe the arithmetic in bytecode order (AS3 Numbers are IEEE 
 floats). Field names are the obfuscated ones; column names come from the power and hurtbox parsers.
 Anchors are (method id, offset, opname, operand text as printed by `abc-disasm`). Static evidence only.
 """
-from . import raycast
+from . import level_collision, raycast
 from .movement import ABC_1100, check, listing
 
 # PowerType.static._-A3R #6483 @8709-9845: TargetMethod string -> `_-g4i`. A leading "SmashRelease" sets
@@ -311,13 +311,15 @@ def item_query_mask(l5):
 
 
 def map_ray(lines, team, item_ignore=False):
-    """The `ray` callback of line_of_sight_blocked over map lines, as `_-T5A` calls `_-CX._-X2e`: owner =
+    """The `ray` callback of line_of_sight_blocked over map lines (a list in candidate order, or a
+    level_collision.Grid whose candidates are gathered per ray as `_-936` does), as `_-T5A` calls `_-CX._-X2e`: owner =
     the attacker's team `_-25G`, mask = flags_a, options = flags_b, excluded = `_-z2k._-M4J` (item-ignore, 32)
     when `_-l4X._-A3S` is set, else 0 (#1731 @1115-1270)."""
     excluded = 32 if item_ignore else 0
 
     def ray(x, y, dx, dy, flags_a, flags_b):
-        hit = raycast.ray_cast(lines, team, x, y, dx, dy, flags_a, flags_b, excluded)
+        cands = lines.candidates(x, y, x + dx, y + dy) if hasattr(lines, "candidates") else lines
+        hit = raycast.ray_cast(cands, team, x, y, dx, dy, flags_a, flags_b, excluded)
         return None if hit is None else hit.line
     return ray
 
@@ -579,6 +581,7 @@ ANCHORS = {ABC_1100: {
 
 
 ANCHORS[ABC_1100].update(raycast.ANCHORS[ABC_1100])
+ANCHORS[ABC_1100].update(level_collision.ANCHORS[ABC_1100])
 
 
 def verify(abc, sha):
