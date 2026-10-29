@@ -10,7 +10,7 @@ import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh import abc, movement, render, replay, swf, swz  # noqa: E402
+from bh import abc, collision, movement, render, replay, swf, swz  # noqa: E402
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
 REPLAYS = os.environ.get("BRAWLHALLA_REPLAYS", os.path.join(os.path.expanduser("~"), "BrawlhallaReplays"))
@@ -135,6 +135,12 @@ class Game(unittest.TestCase):
         if anchors is None:
             self.skipTest("no movement anchors for this patch")
         self.assertEqual(movement.check(anchors, lambda m: movement.listing(self.abc, m)), [])
+
+    def test_collision_anchors_hold(self):
+        anchors = collision.ANCHORS.get(hashlib.sha256(self.abc_bytes).hexdigest())
+        if anchors is None:
+            self.skipTest("no collision anchors for this patch")
+        self.assertEqual(collision.check(anchors, lambda m: collision.listing(self.abc, m)), [])
 
     def test_swz_key_is_in_uint_pool(self):
         data = read(os.path.join(GAME, "Init.swz"))
