@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 138 anchors
+python -I tools/bht.py knockback-verify                 # 148 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -114,6 +114,6 @@ keys). [V]
 
 - The power fields (`_-W1a`, `_-w4x`, `_-538`, `_-C7`…) come from the game's power data, which this
   repository does not publish; a simulator reads them from the user's own install.
-- The direction comes from the hit pass `_-26u._-d3s` #1665 @2038–2269: for each queued hit `_-P6X` of the list `_-T4G` whose `_-fP` is false, the shared point `_-26u._-ba` gets `(_-X5n, _-d4V)` and `_-76s` is called with it as argument 7 [V]. They are filled by `Entity.OnHit` #3042, which builds the `_-P6X` record and normalises the direction to length 1 (@2–65); the power hit routine `_-F5N._-T5A` #1731 gets that direction from `_-F5N._-JQ(…)` (11 arguments, @889–936) and passes it at @3443–3530 [V]. `_-JQ` (the angle from the power data and facing) is not read yet. A second writer, `_-P6X._-L3D` #1660, sets `(b.x − a.x, b.y − a.y − 0.25 |b.x − a.x|)` for a special conversion of the hit [V shape].
+- The direction comes from the hit pass `_-26u._-d3s` #1665 @2038–2269: for each queued hit `_-P6X` of the list `_-T4G` whose `_-fP` is false, the shared point `_-26u._-ba` gets `(_-X5n, _-d4V)` and `_-76s` is called with it as argument 7 [V]. They are filled by `Entity.OnHit` #3042, which builds the `_-P6X` record and normalises the direction to length 1 (@2–65); the power hit routine `_-F5N._-T5A` #1731 gets that direction from `_-F5N._-JQ(…)` (11 arguments, @889–936) and passes it at @3443–3530 [V]. `_-JQ` #1728 starts from the power's integer pair `(_-13F[i], _-x45[i])`; when a key word (argument 9) and the array `_-i2e` are present, `_-i2e[4]` (Left) or `_-i2e[8]` (Right) is added to x, negated when argument 7 is set, and `_-i2e[1]` (Up) or `_-i2e[2]` (Drop) to y (@182–409) [V]; [H] the attacker's aim changes the angle. The rest of `_-JQ` (@409–1700, with collision sweeps) is not read. A second writer, `_-P6X._-L3D` #1660, sets `(b.x − a.x, b.y − a.y − 0.25 |b.x − a.x|)` for a special conversion of the hit [V shape].
 - `Math.atan2`, `cos`, `sin`, `sqrt` of the Flash runtime are assumed to match IEEE / libm closely enough that the 1/1000 rounding hides any difference [H]; values that land on a rounding edge could still differ.
 - Which arguments the hit pass passes as p10 / p11 / held is not traced.

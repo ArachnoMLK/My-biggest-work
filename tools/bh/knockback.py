@@ -318,6 +318,18 @@ ANCHORS = {ABC_1100: {
         (3042, 53, "initproperty", "_-X5n"),
         (3042, 65, "initproperty", "_-d4V"),
     ],
+    "_-JQ start: (x, y) = power._-13F[i], power._-x45[i]; the attacker's keys add _-i2e[4|8] (sign by facing) and _-i2e[1|2]": [
+        (1728, 194, "getproperty", "_-13F"),
+        (1728, 210, "getproperty", "_-x45"),
+        (1728, 225, "getproperty", "_-i2e"),
+        (1728, 267, "pushbyte", "4"),
+        (1728, 298, "pushbyte", "8"),
+        (1728, 331, "pushbyte", "-1"),
+        (1728, 341, "add_i", ""),
+        (1728, 347, "pushbyte", "1"),
+        (1728, 381, "pushbyte", "2"),
+        (1728, 405, "add_i", ""),
+    ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
         (1679, 91, "pushdouble", "0.9699"),
