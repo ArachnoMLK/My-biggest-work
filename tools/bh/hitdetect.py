@@ -223,6 +223,62 @@ def row_values(values, row):
     return values[row] if row < len(values) else values[0]
 
 
+class HitRecord:
+    """`_-v57` (#93-#103): ids `_-x3r` and times `_-E5Y` of the entities a power already hit."""
+
+    def __init__(self):
+        self.ids, self.times = [], []
+
+    def set(self, ent_id, time, overwrite):
+        """`Set` #95: append a new id; for a known id, replace the time only when `overwrite`."""
+        if ent_id in self.ids:
+            if overwrite:
+                self.times[self.ids.index(ent_id)] = time
+        else:
+            self.ids.append(ent_id)
+            self.times.append(time)
+
+    def last(self, ent_id):
+        """`_-168` #101: time stored for an id, 0 when absent."""
+        for i, e in enumerate(self.ids):
+            if e == ent_id:
+                return self.times[i]
+        return 0
+
+
+def rehit_blocked(record, ent_id, min_time_between_hits, now):
+    """`_-T5A` #1731 @321-413 (Entity) and @652-744 (other targets): skip a target the power already hit,
+    unless MinTimeBetweenHits (`_-ue`) is non-zero and `last + _-ue > now` is false. No record: not blocked.
+    """
+    if record is None or ent_id not in record.ids:
+        return False
+    if min_time_between_hits == 0:
+        return True
+    return record.last(ent_id) + min_time_between_hits > now
+
+
+def deals_damage(p538, w4x, base_damage, index, d6m):
+    """`_-l4X._-T49` #83: whether this power step can record hits. True when `_-538` or `_-w4x` is non-zero;
+    else, with a BaseDamage list (`_-L69`), its entry at `index` (`_-X2G`) is non-zero, or past its end
+    `_-D6M != 0`; with no list, False.
+    """
+    if p538 != 0 or w4x != 0:
+        return True
+    if base_damage is None:
+        return False
+    if index < len(base_damage):
+        return base_damage[index] != 0
+    return d6m != 0
+
+
+def records_after_pass(hits, is_multihit, min_time_between_hits, damage_step):
+    """`_-R63` #46 @2433-2547: after `_-T5A` returned `hits` > 0, every target left in the list is stored in
+    the power's record `_-G6N` at the current time (overwrite) when (not IsMultihit `_-s5N` or
+    MinTimeBetweenHits != 0) and deals_damage.
+    """
+    return hits != 0 and (not is_multihit or min_time_between_hits != 0) and damage_step
+
+
 ANCHORS = {ABC_1100: {
     "_-R63: candidates _-l4X._-U6i filled by _-L5r(power, time, frame, x, y, list) then passed to _-T5A": [
         (46, 2112, "getlex", "_-l4X"),
@@ -369,6 +425,34 @@ ANCHORS = {ABC_1100: {
         (6483, 8851, "pushstring", "'Collider'"),
         (6483, 8860, "pushbyte", "13"),
         (6483, 9529, "pushbyte", "14"),
+    ],
+    "Re-hit: _-T5A skips ids already in the record _-G6N (_-v57._-x3r) unless _-ue != 0 and last + _-ue <= now": [
+        (1731, 344, "getproperty", "_-x3r"),
+        (1731, 349, "callproperty", "http://adobe.com/AS3/2006/builtin::indexOf, 1"),
+        (1731, 377, "getproperty", "_-ue"),
+        (1731, 398, "callproperty", "_-168, 1"),
+        (1731, 405, "getproperty", "_-ue"),
+        (1731, 408, "add_i", ""),
+        (1731, 410, "getlocal_2", ""),
+        (1731, 411, "greaterthan", ""),
+        (1731, 675, "getproperty", "_-x3r"),
+        (1731, 736, "getproperty", "_-ue"),
+        (1731, 2861, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+        (95, 32, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+        (95, 71, "setproperty", "[rt]"),
+        (101, 77, "returnvalue", ""),
+    ],
+    "_-R63 after _-T5A: hits != 0 and (not IsMultihit _-s5N or _-ue != 0) and _-T49 -> Set(id, now, true)": [
+        (46, 2455, "getproperty", "_-s5N"),
+        (46, 2473, "getproperty", "_-ue"),
+        (46, 2487, "getlocal", "5"),
+        (46, 2540, "callproperty", "_-5a::_-03K, 0"),
+        (46, 2547, "callpropvoid", "Set, 3"),
+        (83, 15, "getproperty", "_-538"),
+        (83, 33, "getproperty", "_-w4x"),
+        (83, 60, "getproperty", "_-L69"),
+        (83, 122, "getproperty", "[rt]"),
+        (83, 145, "getproperty", "_-D6M"),
     ],
 }}
 

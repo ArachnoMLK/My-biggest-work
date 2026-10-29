@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(122 anchors on ABC `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(146 anchors on ABC `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -169,10 +169,44 @@ Local data check (aggregate):
 
 The Python keeps the bytecode's order of operations.
 
-## 6. Still open
+## 6. Re-hit rule (`_-T5A` #1731, `_-R63` #46, `_-v57`)
 
-- How the candidates are filtered and ordered after `_-U5S` (`_-T5A` @200–3541: already-hit lists,
-  `_-fP`, multihit `_-s5N`).
+Each power keeps a hit record `_-G6N`, a `_-v57` with entity ids `_-x3r` and times `_-E5Y` [V]:
+- `Set(id, t, overwrite)` appends a new id, and replaces the time of a known id only when `overwrite`;
+- `_-168(id)` returns the stored time, or 0.
+
+**Skip.** Before a candidate is processed, `_-T5A` skips it when its id (`_-03K()`) is in the record and
+either [V]:
+- MinTimeBetweenHits (`_-ue`) is 0: one hit per target per cast;
+- or `last + _-ue > now` (argument 2): the target can be hit again `_-ue` after the last hit.
+
+The test is @321–413 for Entity targets and @652–744 for the others.
+
+**Accept.** Accepted targets are pushed back into the list (argument 7), which `_-T5A` cleared at the
+start. Its return value counts them; grabs (`_-K2s`) on some targets are written straight into the record
+instead [V].
+
+**Record.** After the pass, `_-R63` @2433–2547 stores every target left in the list with
+`Set(id, now, true)`, when all of these hold [V]:
+- the count is not 0;
+- IsMultihit (`_-s5N`) is false, or `_-ue != 0`;
+- `_-l4X._-T49()` is true.
+
+`_-T49` is true when:
+- `_-538` or `_-w4x` is non-zero;
+- or else the BaseDamage list `_-L69` has a non-zero entry at `_-X2G`;
+- or else `_-X2G` is past the end of `_-L69` and `_-D6M != 0`.
+
+With no list it is false [V]. Since `_-T49` indexes BaseDamage with `_-X2G`, `_-X2G` is a step index of
+the power, not a time [H]. The unit of `now` (argument 2 of `_-R63`) is open [H: ms].
+
+So a non-multihit power with no MinTimeBetweenHits hits each target at most once per cast. A multihit power
+without `_-ue` records nothing here, and hits again on every frame where its area touches.
+
+## 7. Still open
+
+- The rest of `_-T5A` (@756–3541): the other guards (`_-i4o` HoldHitEnts, `_-u3H` against Uninterruptable
+  `_-C5G`, `_-Z3E`) and the order of the list (the order of `_-5r`, [H]).
 - The meaning of `_-X2G`, `_-B5B`, `_-q24`, and the exact gate on `_-L5r` per frame (§1).
 - The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
 - The Ranged / ThrownItem object `_-x4I` and the projectile path.

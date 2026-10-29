@@ -10,7 +10,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, hitdetect, swf  # noqa: E402
-from bh.hitdetect import (AREA_AT_OWNER, CLEAR, COLLIDER, area_center, capsule_of_box, capsules_touch,  # noqa: E402
+from bh.hitdetect import (AREA_AT_OWNER, HitRecord, deals_damage, records_after_pass, rehit_blocked, CLEAR, COLLIDER, area_center, capsule_of_box, capsules_touch,  # noqa: E402
                           frame_window, hit_capsule, hurtbox_capsule, hurtbox_frames, hurtbox_row,
                           point_segment_dist2, query_kind, row_values, segment_dist2, segments_cross,
                           target_method)
@@ -108,6 +108,40 @@ class Hurtbox(unittest.TestCase):
     def test_short_lists_repeat_first(self):
         self.assertEqual(row_values([10, 20], 1), 20)
         self.assertEqual(row_values([10], 3), 10)
+
+
+class Rehit(unittest.TestCase):
+    def test_record(self):
+        r = HitRecord()
+        r.set(7, 100, False)
+        r.set(7, 200, False)
+        self.assertEqual(r.last(7), 100)
+        r.set(7, 300, True)
+        self.assertEqual(r.last(7), 300)
+        self.assertEqual(r.last(8), 0)
+
+    def test_blocked(self):
+        r = HitRecord()
+        r.set(7, 100, True)
+        self.assertFalse(rehit_blocked(None, 7, 0, 500))
+        self.assertFalse(rehit_blocked(r, 8, 0, 500))
+        self.assertTrue(rehit_blocked(r, 7, 0, 5000))       # once per cast
+        self.assertTrue(rehit_blocked(r, 7, 200, 299))
+        self.assertFalse(rehit_blocked(r, 7, 200, 300))
+
+    def test_records(self):
+        self.assertTrue(records_after_pass(1, False, 0, True))
+        self.assertFalse(records_after_pass(1, True, 0, True))
+        self.assertTrue(records_after_pass(1, True, 100, True))
+        self.assertFalse(records_after_pass(0, False, 0, True))
+        self.assertFalse(records_after_pass(1, False, 0, False))
+
+    def test_deals_damage(self):
+        self.assertTrue(deals_damage(1, 0, None, 0, 0))
+        self.assertFalse(deals_damage(0, 0, None, 0, 1))
+        self.assertTrue(deals_damage(0, 0, [0, 5], 1, 0))
+        self.assertFalse(deals_damage(0, 0, [0, 5], 0, 1))
+        self.assertTrue(deals_damage(0, 0, [0, 5], 2, 1))
 
 
 @unittest.skipUnless(HAVE_GAME, "Brawlhalla not installed")
