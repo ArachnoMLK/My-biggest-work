@@ -331,6 +331,18 @@ ANCHORS = {ABC_1100: {
         (6711, 636, "pushbyte", "0"),
         (6711, 638, "callpropvoid", "_-b5p, 2"),
     ],
+    "respawn: _-X6R.Respawn -> _-U6W: _-lV = t, state 2/9 -> 3, _-W22 = 350 / _-Yk / 0, spawn _-F2G, reset _-p1Y": [
+        (6784, 255, "callpropvoid", "_-U6W, 3"),
+        (6787, 23, "initproperty", "_-lV"),
+        (6787, 70, "pushbyte", "3"),
+        (6787, 73, "initproperty", "_-65w"),
+        (6787, 86, "getproperty", "_-F3O"),
+        (6787, 93, "pushuint", "350"),
+        (6787, 102, "getproperty", "_-Yk"),
+        (6787, 126, "initproperty", "_-W22"),
+        (6787, 460, "callpropvoid", "_-F2G, 2"),
+        (6787, 494, "callpropvoid", "_-p1Y, 0"),
+    ],
     "base condition: 0 under 2|4|0x400000, replay bits, 32768 (or 32 + _-ce), e4h == 2 with 16; else _-n4k - 16": [
         (6711, 63, "pushbyte", "4"),
         (6711, 66, "pushbyte", "2"),
