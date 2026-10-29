@@ -16,9 +16,8 @@ STAT_CENTER = 11
 
 
 def stat_multiplier(attacker_p3i, victim_92e):
-    """`_-26u._-M3e[11 + attacker._-P3I - victim._-92e]` (#1675 @592-640). Out of range raises.
-
-    In AS3 an index outside the array reads `undefined`, which becomes NaN; no clamp is in the code.
+    """`_-26u._-M3e[11 + attacker._-P3I - victim._-92e]` (#1675 @592-640): attacker Strength level
+    against victim Weight (Defense) level, both 0..11, so the index stays in 0..22. Out of range raises.
     """
     i = STAT_CENTER + attacker_p3i - victim_92e
     if not 0 <= i < len(STAT_TABLE):
@@ -362,6 +361,23 @@ ANCHORS = {ABC_1100: {
         (3876, 110, "initproperty", "_-04o"),
         (3861, 6, "pushbyte", "100"),
         (3861, 9, "initproperty", "_-04o"),
+    ],
+    "_-P3I / _-92e are the Strength / Weight stat levels (families 0 / 2 of _-C5c._-q2w), 5 by default; levels are 0..11": [
+        (3049, 383, "pushbyte", "0"),
+        (3049, 386, "getlocal", "5"),
+        (3049, 388, "callproperty", "_-q2w, 2"),
+        (3049, 425, "pushbyte", "2"),
+        (3049, 428, "getlocal", "7"),
+        (3049, 430, "callproperty", "_-q2w, 2"),
+        (3049, 525, "getlocal", "5"),
+        (3049, 527, "initproperty", "_-P3I"),
+        (3049, 612, "getlocal", "7"),
+        (3049, 614, "initproperty", "_-92e"),
+        (3044, 63, "pushbyte", "11"),
+        (3044, 298, "initproperty", "_-P3I"),
+        (3044, 375, "initproperty", "_-92e"),
+        (2887, 347, "initproperty", "_-P3I"),
+        (2887, 356, "initproperty", "_-92e"),
     ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),

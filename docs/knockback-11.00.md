@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 167 anchors
+python -I tools/bht.py knockback-verify                 # 182 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -29,7 +29,7 @@ and `knockback_force`; `tests/test_knockback.py` pins their behaviour.
 | `e = charge × _-538`; when `e ≠ 0`: `e = e − 50 × _-538`, and `e = 1` when below 1; `d += e` | @490–543 | [V]; [H] charge bonus |
 | `d = d × (weapon _-nR × victim _-lA / _-o3t)` | @545–567 | [V] |
 | `d *= attacker._-45J` when the attacker is an Entity | @569–590 | [V] |
-| `d *= _-26u._-M3e[11 + attacker._-P3I − victim._-92e]` (attacker term 0 when not an Entity), skipped when the entry is 0 | @592–662 | [V]; [H] strength vs defence |
+| `d *= _-26u._-M3e[11 + attacker._-P3I − victim._-92e]` (attacker term 0 when not an Entity), skipped when the entry is 0. `_-P3I` is the fighter's **Strength** level and `_-92e` its **Weight** (Defense) level: `Entity._-p1E` #3049 stores the levels it passes to `_-C5c._-q2w(0, …)` and `_-q2w(2, …)` (families Strength, Dexterity, Weight, Speed, stats-11.00.md, PR #17); `Entity._-V3J` #3044 clamps them to 0–11; both default to 5 | @592–662; #3049 @383–614; #3044 | [V] |
 | A negative `d` (a heal) is kept above `−victim._-W22` (the `int` of it) | @664–704 | [V]; [H] `_-W22` = damage taken |
 | Later: `d *= _-N1k._-d3Y._-04o / 100`. `_-04o` is the replay header's 9th settings word, `damage_multiplier` (replay-format.md): the settings reader `_-I3W._-b2L` #3876 stores the 9th `_-a16()` read in `_-04o` (@105–110), and `_-I3W.<init>` sets it to 100. All 756 patch 11.00 replays of the local corpus have 100 (and `game_speed` 100) | @1152–1174; #3876; #3861 | [V]; corpus [V] |
 
@@ -40,7 +40,7 @@ and `knockback_force`; `tests/test_knockback.py` pins their behaviour.
 1.031  1.0594 1.0852 1.1084 1.129  1.1469 1.1623 1.1751 1.1853 1.1928 1.1978
 ```
 
-An index outside 0–22 reads `undefined` (NaN in AS3); the code does not clamp it. [V]
+Levels are 0–11, so the index is always in 0–22 [V]. So a Strength 11 attacker against a Weight 0 victim deals 1.1978 × the damage, and the reverse 0.8349 ×.
 
 ## 2. Force
 
@@ -66,6 +66,9 @@ An index outside 0–22 reads `undefined` (NaN in AS3); the code does not clamp 
 `final_magnitude` in the module transcribes the first, second and fourth rows.
 
 ## 3. Magnitude: `_-26u._-u1x(power, attacker, victim, force, damage)` #1674
+
+Field names from stats-11.00.md (PR #17): `_-z4f` = `ImpulseMult` (Strength family), `_-w3F` =
+`HPOffset`, `_-P1r` = `ImpulseNegation`; `_-W22` is the damage taken (ko-11.00.md §7, PR #25).
 
 ```
 z = attacker._-z4f   if attacker is an Entity and power and not power._-Rc and not power._-d6x
