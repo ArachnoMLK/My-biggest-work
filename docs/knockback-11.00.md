@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 197 anchors
+python -I tools/bht.py knockback-verify                 # 208 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -145,6 +145,23 @@ keys). [V]
 
 `hitstun_ms` transcribes the first two rows. Earlier in the same block the damage is doubled when
 `_-Z3E(victim)` holds and then applied with `_-B6t` (@1733–1781) [V]; [H] meaning of `_-Z3E`.
+
+## 7. When the victim reacts: `_-91G` #1677 gates
+
+In byte order (local 13 = the knockback point's length, local 12 = the victim's `_-Kc`):
+
+| Step | Where | Status |
+|---|---|---|
+| No point → return false | @34–46 | [V] |
+| The victim runs a power whose type is **Uninterruptable** (`_-C5G`) → return false: no impulse, no hitstun | @827–863 | [V] |
+| Otherwise the victim's `_-v1D = _-P5S = 0` (when the point is non-zero) and the impulses `_-84 / _-A4A` = the point are written | @864–961 | [V] |
+| A power with stun 0 → return false ("Power … has no stun" is built as a message) | @1230–1267 | [V] |
+| The victim runs a power without **HoldHitEnts** (`_-i4o`) and the length is below the victim's **InterruptThreshold** (`_-ro`, a stats field, stats-11.00.md) → return false | @1268–1310 | [V] |
+| The length is below the attacking power's **InterruptThreshold** (`_-ro` column) → return false | @1311–1323 | [V] |
+| The air-jump refund runs just before the stun check (@1171–1226); after the gates come the recovery counts (@1324–1426) and `_-L3f` (hitstun) (input-buffer-11.00.md §7) | @1171–1473 | [V] |
+
+So a hit below the threshold still pushes the victim (the impulses are already written) but gives no
+hitstun [V for the order; H for how it looks in game].
 
 ## Limits
 
