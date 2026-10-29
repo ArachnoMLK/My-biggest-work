@@ -32,8 +32,10 @@ bytecode arithmetic and a `*-verify` command pins it.
 2. **Animation frame table `_-cA`** (`_-l4X._-54L` #86). It maps ticks since cast to animation frames, from
    CastAnim (`_-HT` / `_-6b`) and the animation's frame data (`_-y1v`: `_-T6`, `_-W1n`, `_-012`). It
    selects the target's hurtbox row (§4 of hit-detection-11.00.md). Needs the `.anm` parser of PR #19.
-3. **Flags passed in today**: `_-wn()`, `_-t46()`, `_-5q()`, `_-e36()`, `_-81n()`, `IsMoveLocked`. Each is a
-   short method; reading them removes the parameters of `air_move.respond`.
+3. **Flags passed in today**: decoded (#30). `_-wn()` is "airborne after the previous move", `_-5q()` "in
+   hitstun" [H], `_-e36()` "on lava"; `_-t46()` / `_-81n()` come from the power and the input handler. A
+   simulator keeps them as plain booleans (the camouflage draws from the global generator, not the replay
+   one).
 4. **Items**: motion of `_-p5k`, pick-up and catch gates (`_-Io` / `_-x5G`), other spawners (`_-33h`).
 5. **An integration branch** that merges #16–#30 so that one harness can import every module, then a
    first smoke test: one fighter, no attacks, falling onto a map's spawn platform. Check the landing
