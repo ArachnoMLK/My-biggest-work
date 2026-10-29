@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 208 anchors
+python -I tools/bht.py knockback-verify                 # 231 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -162,6 +162,25 @@ In byte order (local 13 = the knockback point's length, local 12 = the victim's 
 
 So a hit below the threshold still pushes the victim (the impulses are already written) but gives no
 hitstun [V for the order; H for how it looks in game].
+
+## 8. Flight: the 250 cap and the decay `Entity._-V12` #3001
+
+The impulses are folded into the velocity by the movement step (entity-step-11.00.md, PR #26): per
+axis, `s = velocity + impulse`; when `s² > 62500` the velocity becomes ±250 and the **full** `s` is kept
+in `_-J1m` (x) or `_-d4x` (y) (#2984 @2876–2901 for x). So a strong hit flies at 250 units/s per axis
+while `_-J1m` / `_-d4x` hold the real speed. [V]
+
+| Step | Where | Status |
+|---|---|---|
+| In `_-8i`, while in hitstun (`_-5q()`), with `v1D² + P5S² ≥ Entity._-i4P` (= 2500, `_-y2E.init` @30066) and not `_-83l`, the step calls `_-V12` and jumps past the normal friction code (to @1344) | #2984 @236–278, @711–760 | [V] |
+| `big` = `_-J1m² > 62500` or `_-d4x² > 62500` | #3001 @2–57 | [V] |
+| `decay` = 0 when `_-050()`, else **Recovery** (`_-z2p`, Weight family, stats-11.00.md); 8.5548 when the flag `Entity._-B6B` is set and `_-D3h` is not | @58–127 | [V]; [H] meaning of `_-050` |
+| The vector is `(_-J1m, _-d4x)` when `big`, else `(_-v1D, _-P5S)`; its length becomes `length − decay × 0.384` (`Point.normalize`) | @128–262 | [V] |
+| When `big` the vector goes back to `(_-J1m, _-d4x)` (the capped velocity is left as is); otherwise it becomes the velocity and `_-J1m = _-d4x = 0` | @266–380 | [V] |
+
+`knockback_decay` transcribes `_-V12`. So the real speed loses `Recovery × 0.384` units/s per tick;
+the fighter moves at the capped 250 per axis until the stored speed falls back under the cap [H for
+how the stored speed reaches the velocity again when only one axis was capped].
 
 ## Limits
 

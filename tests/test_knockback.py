@@ -13,7 +13,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, knockback, swf  # noqa: E402
 from bh.knockback import (STAT_TABLE, as3_round, atan2_netsafe, charged_scale, directional_influence,  # noqa: E402
-                          final_magnitude, hit_damage, hitstun_ms, key_vector, knockback_force, octant_angle,
+                          final_magnitude, hit_damage, hitstun_ms, key_vector, knockback_decay, knockback_force,
+                          octant_angle,
                           stat_multiplier)
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
@@ -106,6 +107,23 @@ class Hitstun(unittest.TestCase):
         self.assertEqual(hitstun_ms(12), 192.0)
         self.assertEqual(hitstun_ms(12, minus5=True), 187.0)
         self.assertEqual(hitstun_ms(0, minus5=True), 0.0)
+
+
+class Decay(unittest.TestCase):
+    def test_velocity_decays_when_not_big(self):
+        v1d, p5s, j, d = knockback_decay(100.0, 0.0, 0.0, 0.0, recovery=50.0)
+        self.assertAlmostEqual(v1d, 100.0 - 50.0 * 0.384)
+        self.assertEqual((p5s, j, d), (0.0, 0.0, 0.0))
+
+    def test_overshoot_decays_when_big(self):
+        out = knockback_decay(250.0, 0.0, 400.0, 0.0, recovery=50.0)
+        self.assertEqual(out[:2], (250.0, 0.0))
+        self.assertAlmostEqual(out[2], 400.0 - 19.2)
+
+    def test_soft_and_frozen(self):
+        self.assertEqual(knockback_decay(100.0, 0.0, 0.0, 0.0, 50.0, frozen=True)[0], 100.0)
+        self.assertAlmostEqual(knockback_decay(100.0, 0.0, 0.0, 0.0, 50.0, frozen=True, soft=True)[0],
+                               100.0 - 8.5548 * 0.384)
 
 
 class Cli(unittest.TestCase):

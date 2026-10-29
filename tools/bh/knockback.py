@@ -180,6 +180,34 @@ def hitstun_ms(frames, minus5=False):
     return stun
 
 
+CAP_SQ = 62500.0        # Entity._-y4Q (250^2), the impulse cap of the step fold
+TICK_FACTOR = 0.384     # _-z2k._-Vj (movement-11.00.md)
+SOFT_DECAY = 8.5548     # #3001 @123, under Entity._-B6B without _-D3h
+
+
+def knockback_decay(v1d, p5s, j1m, d4x, recovery, frozen=False, soft=False):
+    """`Entity._-V12` #3001: one tick of knockback decay, run by `_-8i` in hitstun while v^2 >= 2500.
+
+    When an overshoot component is past the cap (`_-J1m`^2 or `_-d4x`^2 > 62500) the overshoot vector
+    decays, else the velocity does: its length drops by `decay * 0.384`, with decay = 0 when `_-050()`
+    (`frozen`), 8.5548 under `_-B6B` without `_-D3h` (`soft`), else the Weight-family stat Recovery
+    (`_-z2p`). Returns (v1d, p5s, j1m, d4x). AS3 Point.normalize keeps the direction (a negative length
+    flips it, as here).
+    """
+    big = j1m * j1m > CAP_SQ or d4x * d4x > CAP_SQ
+    decay = 0.0 if frozen else recovery
+    if soft:
+        decay = SOFT_DECAY
+    x, y = (j1m, d4x) if big else (v1d, p5s)
+    n = math.sqrt(x * x + y * y)
+    length = n - decay * TICK_FACTOR
+    if n > 0:
+        x, y = x * length / n, y * length / n
+    if big:
+        return v1d, p5s, x, y
+    return x, y, 0.0, 0.0
+
+
 ANCHORS = {ABC_1100: {
     "_-u1x: z4f factor, d = (W22 + w3F + damage) / 100 (50 instead of W22 when _-U6g == 5)": [
         (1674, 85, "getproperty", "_-z4f"),
@@ -412,6 +440,31 @@ ANCHORS = {ABC_1100: {
         (1677, 1303, "lessthan", ""),
         (1677, 1315, "getproperty", "_-ro"),
         (1677, 1323, "returnvalue", ""),
+    ],
+    "decay _-V12: big = overshoot^2 > _-y4Q; decay 0 / Recovery _-z2p / 8.5548; length - decay * 0.384; write back": [
+        (3001, 24, "getproperty", "_-y4Q"),
+        (3001, 61, "callproperty", "_-050, 0"),
+        (3001, 81, "getproperty", "_-z2p"),
+        (3001, 98, "getproperty", "_-B6B"),
+        (3001, 114, "getproperty", "_-D3h"),
+        (3001, 123, "pushdouble", "8.5548"),
+        (3001, 231, "getproperty", "length"),
+        (3001, 244, "getproperty", "_-Vj"),
+        (3001, 249, "subtract", ""),
+        (3001, 262, "callpropvoid", "normalize, 1"),
+        (3001, 286, "initproperty", "_-J1m"),
+        (3001, 304, "initproperty", "_-d4x"),
+        (3001, 334, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (3001, 371, "initproperty", "_-J1m"),
+        (3001, 380, "initproperty", "_-d4x"),
+        (2984, 278, "setlocal_2", ""),
+        (2984, 716, "callproperty", "_-5q, 0"),
+        (2984, 731, "getproperty", "_-i4P"),
+        (2984, 744, "getproperty", "_-83l"),
+        (2984, 756, "callpropvoid", "_-V12, 0"),
+        (15351, 30066, "pushdouble", "2500.0"),
+        (15351, 30070, "initproperty", "_-i4P"),
+        (2984, 2901, "initproperty", "_-J1m"),
     ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
