@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 245 anchors
+python -I tools/bht.py knockback-verify                 # 253 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -205,7 +205,11 @@ runs on the velocity [V entity-step-11.00.md].
   if d == (0, 0): d.y = -1                          # straight up
   ```
 
-  [V] shape; which argument is the attacker and which the victim follows the call in `_-T5A`
-  (@889–936) and is [H] here. A second writer, `_-P6X._-L3D` #1660, sets `(b.x − a.x, b.y − a.y − 0.25 |b.x − a.x|)` for a special conversion of the hit [V shape].
+  [V] shape. In the call from `_-T5A` (@200–936): arg1 is each target of the candidate list
+  `_-F5N._-U5S` (local 23); arg3 is that target's centre, `(_-p5a() + _-a1E._-u3T, _-d5F() + _-a1E._-J1L)`
+  after `_-53T(_-a1E)`; arg2 is argument 5 of `_-T5A` (the source point); arg6 is a point (local 13)
+  passed only when the power lacks `_-L4a` or the target is `arg4._-x4I`. So without a given point the
+  base direction runs **from the source point to the target's centre** [V]; [H] that the source is the
+  hit position. A second writer, `_-P6X._-L3D` #1660, sets `(b.x − a.x, b.y − a.y − 0.25 |b.x − a.x|)` for a special conversion of the hit [V shape].
 - `Math.atan2`, `cos`, `sin`, `sqrt` of the Flash runtime are assumed to match IEEE / libm closely enough that the 1/1000 rounding hides any difference [H]; values that land on a rounding edge could still differ.
 - Which arguments the hit pass passes as p10 / p11 / held is not traced.
