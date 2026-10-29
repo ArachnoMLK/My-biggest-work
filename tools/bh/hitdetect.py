@@ -279,6 +279,43 @@ def records_after_pass(hits, is_multihit, min_time_between_hits, damage_step):
     return hits != 0 and (not is_multihit or min_time_between_hits != 0) and damage_step
 
 
+def skips_line_of_sight(g4i):
+    """`_-x28` (#6483 @13278-13321): True for TargetMethod 2, 3, 11 (Ranged, Path, ThrownItem). The parser
+    later overrides it for some powers by name (not modelled)."""
+    return g4i in (2, 3, 11)
+
+
+def line_of_sight_blocked(sx, sy, tx, ty, q_x, q_y, ray, skip=False, around_corners=True):
+    """`_-T5A` #1731 @1115-2710: whether map geometry blocks the hit from source (sx, sy) to the target centre.
+
+    `ray(x, y, dx, dy, flags_a, flags_b)` stands for `_-N1k._-b1x._-X2e` (map ray cast, not transcribed);
+    it returns None when clear, else an object with `.type`. `q_x`, `q_y` are the target hurtbox segment
+    vector (`_-a1E._-w2s`, `_-S2O`). Order of tries, each only while still blocked:
+    1. S -> T with flags (1|2, 1|2|8); blocked when not `skip` (`_-x28`), the ray hits and the hit's type != 2;
+    2. (not for CannotAttackAroundCorners `_-y2`, i.e. around_corners False) detour through (sx, sy +- 100) (sign of ty - sy), both legs with flags (1, 8);
+    3. (same condition) detour through (sx +- 100, sy) (sign of tx - sx);
+    4. straight rays to (tx, ty - q_y/2), (tx, ty + q_y/2), (tx - q_x/2, ty), (tx + q_x/2, ty).
+    """
+    r = ray(sx, sy, tx - sx, ty - sy, 1 | 2, 1 | 2 | 8)
+    blocked = (not skip) and r is not None and r.type != 2
+
+    def two_legs(vx, vy):
+        if ray(sx, sy, vx - sx, vy - sy, 1, 8) is not None:
+            return True
+        return ray(vx, vy, tx - vx, ty - vy, 1, 8) is not None
+
+    if blocked and around_corners:
+        blocked = two_legs(sx, sy + (100 if ty > sy else -100))
+        if blocked:
+            blocked = two_legs(sx + (100 if tx > sx else -100), sy)
+    hw, hh = q_x * 0.5, q_y * 0.5
+    for px, py in ((tx, ty - hh), (tx, ty + hh), (tx - hw, ty), (tx + hw, ty)):
+        if not blocked:
+            break
+        blocked = ray(sx, sy, px - sx, py - sy, 1, 8) is not None
+    return blocked
+
+
 ANCHORS = {ABC_1100: {
     "_-R63: candidates _-l4X._-U6i filled by _-L5r(power, time, frame, x, y, list) then passed to _-T5A": [
         (46, 2112, "getlex", "_-l4X"),
@@ -453,6 +490,30 @@ ANCHORS = {ABC_1100: {
         (83, 60, "getproperty", "_-L69"),
         (83, 122, "getproperty", "[rt]"),
         (83, 145, "getproperty", "_-D6M"),
+    ],
+    "Line of sight in _-T5A: ray S -> T (1|2, 1|2|8), +-100 detours (1, 8), hurtbox edges q/2; _-x28, _-y2": [
+        (1731, 1117, "getproperty", "_-A3S"),
+        (1731, 1128, "getproperty", "_-M4J"),
+        (1731, 1270, "callproperty", "_-X2e, 12"),
+        (1731, 1287, "getproperty", "_-x28"),
+        (1731, 1314, "getproperty", "type"),
+        (1731, 1318, "pushbyte", "2"),
+        (1731, 1336, "getproperty", "_-y2"),
+        (1731, 1363, "pushbyte", "100"),
+        (1731, 1370, "pushbyte", "-100"),
+        (1731, 1593, "callproperty", "_-X2e, 12"),
+        (1731, 1742, "pushbyte", "100"),
+        (1731, 2106, "getproperty", "_-w2s"),
+        (1731, 2109, "pushdouble", "0.5"),
+        (1731, 2124, "getproperty", "_-S2O"),
+        (1731, 2260, "callproperty", "_-X2e, 12"),
+        (1731, 2694, "callproperty", "_-X2e, 12"),
+        (1731, 2749, "getproperty", "VOLLEYBALL"),
+        (1731, 2834, "callpropvoid", "_-W1G, 3"),
+        (6483, 13287, "pushbyte", "3"),
+        (6483, 13301, "pushbyte", "11"),
+        (6483, 13316, "pushbyte", "2"),
+        (6483, 13321, "initproperty", "_-x28"),
     ],
 }}
 

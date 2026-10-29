@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(146 anchors on ABC `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(168 anchors on ABC `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -203,12 +203,42 @@ the power, not a time [H]. The unit of `now` (argument 2 of `_-R63`) is open [H:
 So a non-multihit power with no MinTimeBetweenHits hits each target at most once per cast. A multihit power
 without `_-ue` records nothing here, and hits again on every frame where its area touches.
 
-## 7. Still open
+## 7. Line of sight (`_-T5A` @1115–2710)
 
-- The rest of `_-T5A` (@756–3541): the other guards (`_-i4o` HoldHitEnts, `_-u3H` against Uninterruptable
-  `_-C5G`, `_-Z3E`) and the order of the list (the order of `_-5r`, [H]).
+A target inside the area is still skipped when map geometry blocks it. The source S is argument 5 of
+`_-T5A`, or argument 6 for Collider. The target centre T is `_-W3o`. Each ray goes through
+`_-N1k._-b1x._-X2e`, the map ray cast, which is not transcribed here. Its mask is `_-z2k._-M4J` when
+`_-l4X._-A3S` is set, otherwise 0. The tries run in this order, each one only while the target is still
+blocked [V]:
+
+1. **S → T.** Flags (1|2, 1|2|8). The target is blocked when all of these hold:
+   - the power does not skip the test (`_-x28`);
+   - the ray hits something;
+   - the hit's `type` is not 2.
+
+   The parser sets `_-x28` for TargetMethod 2, 3 and 11 (Ranged, Path, ThrownItem), and later overrides it
+   for some powers by name.
+2. **Detour through (Sx, Sy ± 100).** The sign follows `Ty − Sy`. Both legs use flags (1, 8). This try is
+   skipped for CannotAttackAroundCorners (`_-y2`).
+3. **Detour through (Sx ± 100, Sy).** Same condition as step 2.
+4. **Rays to the hurtbox edges.** Straight rays to `(Tx, Ty − q.y/2)`, `(Tx, Ty + q.y/2)`,
+   `(Tx − q.x/2, Ty)` and `(Tx + q.x/2, Ty)`, where q is the target hurtbox segment vector (`_-w2s`, `_-S2O`).
+
+**Result.** A blocked Entity target is skipped, except in Volleyball when `_-s3D._-H1g._-06A._-Z3E(_-11)`
+holds. A blocked non-Entity target is always skipped. Then `Entity._-AP(owner, _-f3B)` must hold;
+otherwise `_-W1G(power, target, true)` runs and the target is skipped [V].
+
+`line_of_sight_blocked` takes the ray cast as a callback. The map ray cast itself is the open piece; see
+collision-11.00.md (PR #20) for the collision flags.
+
+## 8. Still open
+
+- The map ray cast `_-CX._-X2e` #1581 used by §7.
+- The other guards at the top of `_-T5A` (`_-i4o` HoldHitEnts with `Entity._-b2C`, `_-u3H` against
+  Uninterruptable `_-C5G`, `_-hQ` / `_-72e`). The order of the list follows `_-5r` [H].
 - The meaning of `_-X2G`, `_-B5B`, `_-q24`, and the exact gate on `_-L5r` per frame (§1).
 - The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
-- The Ranged / ThrownItem object `_-x4I` and the projectile path.
+- Projectiles: the Ranged / ThrownItem object `_-x4I` is used by 16 methods (`_-l4X._-V5R`, `_-RW`,
+  `_-F5N._-q5`, `_-33h`, `_-F16`, `Entity._-j4e`, …); not read yet.
 - Nothing has been checked against a running game. The next step towards the KO oracle
   (oracle-ko.md) is one scripted exchange: a hit, its knockback, then a ring-out.

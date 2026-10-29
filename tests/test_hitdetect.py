@@ -10,7 +10,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, hitdetect, swf  # noqa: E402
-from bh.hitdetect import (AREA_AT_OWNER, HitRecord, deals_damage, records_after_pass, rehit_blocked, CLEAR, COLLIDER, area_center, capsule_of_box, capsules_touch,  # noqa: E402
+from bh.hitdetect import (AREA_AT_OWNER, line_of_sight_blocked, skips_line_of_sight, HitRecord, deals_damage, records_after_pass, rehit_blocked, CLEAR, COLLIDER, area_center, capsule_of_box, capsules_touch,  # noqa: E402
                           frame_window, hit_capsule, hurtbox_capsule, hurtbox_frames, hurtbox_row,
                           point_segment_dist2, query_kind, row_values, segment_dist2, segments_cross,
                           target_method)
@@ -108,6 +108,46 @@ class Hurtbox(unittest.TestCase):
     def test_short_lists_repeat_first(self):
         self.assertEqual(row_values([10, 20], 1), 20)
         self.assertEqual(row_values([10], 3), 10)
+
+
+class Hit:
+    type = 1
+
+
+class Wall:
+    """Ray caster for a vertical wall segment x = 50, y in [lo, hi]."""
+
+    def __init__(self, lo, hi):
+        self.lo, self.hi, self.calls = lo, hi, []
+
+    def __call__(self, x, y, dx, dy, fa, fb):
+        self.calls.append((x, y, dx, dy, fa, fb))
+        if dx == 0 or not min(x, x + dx) <= 50 <= max(x, x + dx):
+            return None
+        t = (50 - x) / dx
+        yy = y + t * dy
+        return Hit() if self.lo <= yy <= self.hi else None
+
+
+class LineOfSight(unittest.TestCase):
+    def test_clear(self):
+        w = Wall(-10, 10)
+        self.assertFalse(line_of_sight_blocked(0, 50, 100, 50, 0, 0, w))
+        self.assertEqual(w.calls[0][4:], (3, 11))
+
+    def test_detour_over_a_short_wall(self):
+        self.assertFalse(line_of_sight_blocked(0, 0, 100, 0, 0, 0, Wall(-10, 10)))
+
+    def test_tall_wall_blocks(self):
+        self.assertTrue(line_of_sight_blocked(0, 0, 100, 0, 0, 40, Wall(-1000, 1000)))
+
+    def test_skip_and_corners(self):
+        self.assertFalse(line_of_sight_blocked(0, 0, 100, 0, 0, 0, Wall(-1000, 1000), skip=True))
+        self.assertTrue(line_of_sight_blocked(0, 0, 100, 0, 0, 0, Wall(-10, 10), around_corners=False))
+        self.assertFalse(line_of_sight_blocked(0, 0, 100, 0, 0, 60, Wall(-10, 10), around_corners=False))
+
+    def test_x28(self):
+        self.assertEqual([g for g in range(15) if skips_line_of_sight(g)], [2, 3, 11])
 
 
 class Rehit(unittest.TestCase):
