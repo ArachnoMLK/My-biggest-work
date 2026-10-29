@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(380 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(410 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -370,6 +370,29 @@ else 1. `_-I4v` #6018 blends point k and point k + 1, modulo n [V].
 
 Local check (aggregate): all 122 LevelDescs give 173 platforms and 0 errors. One file lacks a space between
 two attributes, which the game's reader accepts; the parser accepts it too.
+
+### 7.4 Free move against the map ([`tools/bh/air_move.py`](../tools/bh/air_move.py))
+
+The fighter's own movement uses the same ray cast. `Entity._-8i` #2984 @6620–8865 (step 6 of
+entity-step-11.00.md, PR #26) moves the feet point (`_-11W`, `_-75K`) by U = (x step, `_-P5S` × 0.384),
+plus 2.02 on y while a ground line `_-96f` is set [V]. Every sweep is a 10-argument `_-X2e(team, x, y, d,
+out, null, null, null, mask, 0)`: one-sided lines count only when moved into, and soft lines only from
+above.
+
+1. **Feet sweep.** Mask hard | soft, or hard only when dropping through a soft platform (local 3 = 1,
+   @1780–1791).
+2. **Head sweep.** From 120 above the feet, hard lines only. When it stops sooner, it takes over. Its line
+   becomes the stop line only if that line's normal points down or sideways (ny ≥ 0).
+3. **Attack sweep.** During some attacks (`_-wn()` with the power's `_-V67 ≠ 0`), a sweep from
+   120 + `_-V67` above, on no-slide lines (16), takes over when its line faces down and it stops sooner.
+4. **Ceiling check.** At the provisional stop, backed off 1.01, a sweep of (0, −120) on hard lines looks for
+   a ceiling. If one is found, it is kept in `_-u3j` and steps 1–2 are redone with the x part set to 0.
+5. **Placement.** The feet move by the chosen vector. The stop line becomes `_-96f`. The fighter is backed
+   off by 1.01: along −normal when the line is hard and the move was tiny (|x|, |y| ≤ `_-u4H` = 1.02),
+   otherwise straight back along the move.
+
+What the step then does with `_-96f` (walls `_-r51`, landing, @8869–) is in PR #26 for walls and is not
+transcribed here.
 
 ## 8. Thrown items and projectiles (`_-p5k`)
 
