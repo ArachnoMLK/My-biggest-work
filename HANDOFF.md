@@ -78,4 +78,5 @@ then scoreboard `_-y4L` screen-stack pushes (L2). Audit remaining `_-w35` writer
 unconditional lesson exclusion (L1). Q2 KO/score-writer ordering and Q10's oracle remain open.
 
 [Session relay and reproduction commands](notes/2026-10-29-claude-prng-order.md).
-Publication uses the existing fork under the user's PR authorization; no upstream merge or release.
+[PR #24](https://github.com/ArachnoMLK/My-biggest-work/pull/24) publishes this work through the existing
+fork under the user's PR authorization. It awaits upstream review; no merge or release was performed.

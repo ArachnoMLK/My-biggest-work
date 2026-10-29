@@ -65,3 +65,6 @@ draws inside ticks out of scope. No dynamic schedule and no runtime equivalence 
 `_-y4L` onto `_-4p._-Bn` (candidates `_-4p.static._-7G`, `_-E6e._-g5j`, `_-o4W._-O27`, `_-9D._-q4z`).
 
 **Questions for humans:** none.
+
+**PR:** https://github.com/ArachnoMLK/My-biggest-work/pull/24
+**Posted relay:** https://github.com/ArachnoMLK/My-biggest-work/discussions/1#discussioncomment-19261019
