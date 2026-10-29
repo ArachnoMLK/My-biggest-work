@@ -111,14 +111,14 @@ Full background: [`docs/feasibility.md`](docs/feasibility.md). File formats: [`d
 | ID | Task | Starting point |
 |---|---|---|
 | Q1 | ✅ **Done** (Claude, 2026-10-28): see [`docs/code-map-11.00.md`](docs/code-map-11.00.md). Map the replay reader: from method #3388 / #12889 to the class that holds the input timeline and to the code that feeds inputs to fighters. | `bht.py abc-disasm --method 12889`, `abc-find --member <name>` |
-| Q2 | 🔄 **In progress** (Codex via @unfortunatelyalex, relay of 2026-10-28; PR pending). Find the main tick loop (16 ms) and the order of updates per tick (input → state machine → physics → collision → hits → KO). | search `16`, `0.016`, `60` constants, callers of the input consumer |
+| Q2 | ✅ **Verified** (Codex via @unfortunatelyalex, merged in #14; see [`docs/tick-loop-11.00.md`](docs/tick-loop-11.00.md)). Find the main tick loop (16 ms) and the order of updates per tick (input → state machine → physics → collision → hits → KO). | search `16`, `0.016`, `60` constants, callers of the input consumer |
 | Q3 | ✅ **Verified** (2026-10-29): [V] WELL512 reference port and both replay seed paths mapped ([evidence](docs/prng-11.00.md)); [H] complete consumer inventory and tick draw order remain open. | `bht.py prng-verify`; combine consumers with Q2 |
 | Q4 | ✅ **Done, verified** (Claude, 2026-10-29): see [`docs/movement-11.00.md`](docs/movement-11.00.md) and `bht.py movement-verify`. Port the 10.09 movement evidence of brawlhalla-sim to 11.00 (same constants? same structure?). | their `docs/provenance.md` |
-| Q5 | Movement constants as functions of the 4 stats (`Strength`, `Dexterity`, `Weight` = Defense in game, `Speed`). | `HeroTypes.xml`, getters around `Speed`/`Weight` |
-| Q6 | Level collision model: how `HardCollision`, `SoftCollision`, `Bouncy*`, `NoSlide*` lines are tested each tick. | `LevelDesc_*.xml`, `CollisionObject.hx` strings |
-| Q7 | Power (attack) state machine: how `powerTypes` columns drive cast, active frames, recover, combos, hitboxes. | `PowerType.hx` strings, `powerTypes.csv` |
-| Q8 | Ledger: classify each file kind in `ledger/game-files.csv` by role in the replay pipeline (status `unread` → `read` → `documented`). | `bht.py inventory`, `swf-info` |
-| Q9 | Meaning of replay object 7 and of the `settings.flags` bits. | `work/corpus.json`, the replay reader (Q1) |
+| Q5 | 🔄 **PR #17** (Claude): table lookups RuneTypes → StatTypes (`stats-verify`, `legend-stats`); horizontal movement in **PR #23**. Movement constants as functions of the 4 stats (`Strength`, `Dexterity`, `Weight` = Defense in game, `Speed`). | `HeroTypes.xml`, getters around `Speed`/`Weight` |
+| Q6 | 🔄 **PR #20** (Claude): flags, query `_-CX._-X2e` #1581, candidate order, acceptance rule (`collision-verify`); level selection via the data registry (PR #18). Open: moving platforms. Level collision model: how `HardCollision`, `SoftCollision`, `Bouncy*`, `NoSlide*` lines are tested each tick. | `LevelDesc_*.xml`, `CollisionObject.hx` strings |
+| Q7 | 🔄 **PR #22** (Claude): parser #6483, clash arbitration, repeated hits, **knockback formula** #1674, stun. Open: phase vectors, active-power tick, target modes. Power (attack) state machine: how `powerTypes` columns drive cast, active frames, recover, combos, hitboxes. | `PowerType.hx` strings, `powerTypes.csv` |
+| Q8 | 🔄 **PR #18** (Claude): role of every file (89 needed), data registry #857; `.anm` format in **PR #19**. Ledger: classify each file kind in `ledger/game-files.csv` by role in the replay pipeline (status `unread` → `read` → `documented`). | `bht.py inventory`, `swf-info` |
+| Q9 | 🔄 **PR #21** (Claude): flags accessors and corpus use per mode; object 7 only in ball modes. Open: bit names. Meaning of replay object 7 and of the `settings.flags` bits. | `work/corpus.json`, the replay reader (Q1) |
 | Q10 | A minimal **reference oracle**: any way to obtain ground-truth positions for a replay without touching the game process (e.g. frame capture of the in-game player by the human owner, then manual annotation). | discuss first |
 
 ## 5. Tools
