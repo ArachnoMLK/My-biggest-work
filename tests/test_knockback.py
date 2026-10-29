@@ -13,7 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, knockback, swf  # noqa: E402
 from bh.knockback import (STAT_TABLE, as3_round, atan2_netsafe, charged_scale, directional_influence,  # noqa: E402
-                          final_magnitude, hit_damage, key_vector, knockback_force, octant_angle,
+                          final_magnitude, hit_damage, hitstun_ms, key_vector, knockback_force, octant_angle,
                           stat_multiplier)
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
@@ -99,6 +99,13 @@ class Influence(unittest.TestCase):
     def test_no_keys_or_no_point(self):
         self.assertEqual(directional_influence(1.0, 0.0, 0), (1.0, 0.0))
         self.assertEqual(directional_influence(0.0, 0.0, 8), (0.0, 0.0))
+
+
+class Hitstun(unittest.TestCase):
+    def test_frames_to_ms(self):
+        self.assertEqual(hitstun_ms(12), 192.0)
+        self.assertEqual(hitstun_ms(12, minus5=True), 187.0)
+        self.assertEqual(hitstun_ms(0, minus5=True), 0.0)
 
 
 class Cli(unittest.TestCase):

@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 148 anchors
+python -I tools/bht.py knockback-verify                 # 161 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -109,6 +109,18 @@ else: ang = a + limit if diff > 0 else a - limit
 So a held direction turns the knockback by at most 0.8 rad (about 46°), and replaces it outright when
 the two are closer than that. Which key word is passed is in §4 (`_-R5q._-66U`, the victim's current
 keys). [V]
+
+## 6. Hitstun duration
+
+| Step | Where | Status |
+|---|---|---|
+| `stun = 16 × power._-T6p[i]` when the power has `_-T6p`, else `16 × power._-7Z` (frames → ms) | #1675 @1785–1824 | [V] |
+| `stun −= 5` when `power._-g4i == 11`, damage > 0, `power._-538 > 0`, local 15 == 1 and `stun > 5` | @1869–1940 | [V]; [H] meaning |
+| `stun` goes to `_-91G` (argument 6, @2182) and from there to `_-L3f(t, victim, stun, …)`, which stores it as `_-v3y` next to `_-u4B = t` | #1677 @1441–1473; #1670 @79–88 | [V] |
+| Hitstun ends in `Entity._-Re` once `t > _-u4B + _-v3y` and the speed is at most 50 (ko-11.00.md §4, PR #25) | #2981 | [V] |
+
+`hitstun_ms` transcribes the first two rows. Earlier in the same block the damage is doubled when
+`_-Z3E(victim)` holds and then applied with `_-B6t` (@1733–1781) [V]; [H] meaning of `_-Z3E`.
 
 ## Limits
 

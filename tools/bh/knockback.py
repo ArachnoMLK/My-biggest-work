@@ -169,6 +169,16 @@ def directional_influence(px, py, keys, limit=DI_LIMIT):
     return cos_netsafe(ang), sin_netsafe(ang)
 
 
+def hitstun_ms(frames, minus5=False):
+    """Hitstun given to `_-L3f`, `local 41` of #1675 @1785-1940: 16 * frames (power `_-T6p[i]`, else
+    `_-7Z`); `minus5` is the case `_-g4i == 11`, damage > 0, `_-538 > 0`, local 15 == 1, which takes
+    5 ms off a stun above 5."""
+    stun = float(16 * frames)
+    if minus5 and stun > 5:
+        stun = stun - 5
+    return stun
+
+
 ANCHORS = {ABC_1100: {
     "_-u1x: z4f factor, d = (W22 + w3F + damage) / 100 (50 instead of W22 when _-U6g == 5)": [
         (1674, 85, "getproperty", "_-z4f"),
@@ -329,6 +339,21 @@ ANCHORS = {ABC_1100: {
         (1728, 347, "pushbyte", "1"),
         (1728, 381, "pushbyte", "2"),
         (1728, 405, "add_i", ""),
+    ],
+    "hitstun: 16 * (power._-T6p[i] or _-7Z) ms, minus 5 in one case; passed to _-91G then _-L3f": [
+        (1675, 1786, "getproperty", "_-T6p"),
+        (1675, 1816, "getproperty", "_-7Z"),
+        (1675, 1820, "pushbyte", "16"),
+        (1675, 1822, "multiply_i", ""),
+        (1675, 1824, "setlocal", "41"),
+        (1675, 1874, "getproperty", "_-g4i"),
+        (1675, 1877, "pushbyte", "11"),
+        (1675, 1935, "pushbyte", "5"),
+        (1675, 1938, "subtract", ""),
+        (1675, 2182, "getlocal", "41"),
+        (1677, 1446, "getlocal", "6"),
+        (1670, 86, "getlocal_3", ""),
+        (1670, 88, "initproperty", "_-v3y"),
     ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
