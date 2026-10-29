@@ -8,7 +8,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.power_timeline import Timeline, schedule, tick_index  # noqa: E402
+from bh.power_timeline import Timeline, momentum, schedule, step_cap, tick_index  # noqa: E402
 
 
 class Timing(unittest.TestCase):
@@ -32,6 +32,19 @@ class Timing(unittest.TestCase):
         tl = Timeline([1, 1, 1], 0, cap=1)
         fired = [tl.update(k) for k in range(5)]
         self.assertEqual([f for f in fired if f is not None], [0, 1])
+
+
+class Constructor(unittest.TestCase):
+    def test_step_cap(self):
+        self.assertIsNone(step_cap(False, 100, 200, 6, 1))
+        self.assertEqual(step_cap(True, 100, 200, 6, 1), 3)
+        self.assertEqual(step_cap(True, 0, 200, 6, 2), 2)
+        self.assertEqual(step_cap(True, 100, 0, 6, 1), 1)
+
+    def test_momentum(self):
+        self.assertEqual(momentum(30.0, False), 0.5)
+        self.assertEqual(momentum(-30.0, False), 0)
+        self.assertEqual(momentum(-90.0, True), 1)
 
 
 if __name__ == "__main__":

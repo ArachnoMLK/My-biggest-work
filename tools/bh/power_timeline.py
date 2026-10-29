@@ -6,6 +6,8 @@ one step: on the tick its start is reached, the step fires once (hit detection o
 `frame_window`) and the next step is scheduled. The start set-up (`_-f14`: `_-k4b`, first `_-82O`) is in
 entity-step-11.00.md (PR #26). Static evidence only.
 """
+import math
+
 from .movement import ABC_1100, check, listing
 
 TICK_MS = 16
@@ -15,6 +17,29 @@ def tick_index(t):
     """#46 @183-204: round((t - t % 16) / 16), the tick number of a time in ms."""
     q = (t - t % TICK_MS) / TICK_MS
     return int(q // 1 + (1 if q % 1 >= 0.5 else 0))
+
+
+def step_cap(charged, held, i6c, n_steps, minimum):
+    """`_-Q1n` from the power constructor `_-l4X.<init>` #39 @592-750, or None when the power is not charged.
+
+    For a charged power (`_-t3b`): ceil((held / `_-I6c`, or 0 when `_-I6c` is 0) * len(CastTime)), at least
+    `_-L2X` (`minimum`). `held` is constructor argument 5 (`_-a6i`) [H: the charge time].
+    """
+    if not charged or n_steps is None:
+        return None
+    frac = held / i6c if i6c != 0 else 0
+    cap = math.ceil(frac * n_steps)
+    if cap < minimum:
+        cap = minimum
+    return cap
+
+
+def momentum(v1d, facing_left):
+    """`_-qm` at power creation (#39 @753-880): |x speed| / 60 when moving the way the fighter faces, else 0;
+    at most 1."""
+    q = abs(v1d) if (v1d < 0) == facing_left else 0
+    q = q / 60.0
+    return 1 if q > 1 else q
 
 
 class Timeline:
@@ -86,6 +111,16 @@ ANCHORS = {ABC_1100: {
         (46, 4629, "lessthan", ""),
         (46, 4645, "initproperty", "_-82O"),
         (46, 4654, "initproperty", "_-d38"),
+    ],
+    "_-l4X.<init>: _-Q1n = ceil(a6i / I6c * len(a2)) for charged (_-t3b) powers, at least _-L2X; _-qm = |v1D| / 60 (<= 1)": [
+        (39, 601, "getproperty", "_-t3b"),
+        (39, 666, "getproperty", "_-I6c"),
+        (39, 669, "divide", ""),
+        (39, 707, "callproperty", "ceil, 1"),
+        (39, 712, "initproperty", "_-Q1n"),
+        (39, 729, "getproperty", "_-L2X"),
+        (39, 853, "pushdouble", "60.0"),
+        (39, 880, "initproperty", "_-qm"),
     ],
 }}
 

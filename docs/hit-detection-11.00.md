@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(543 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(551 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -52,6 +52,11 @@ per tick. Each call [V]:
    last step.
 4. **Cancels.** A cancel path (`_-m2j`, gated by MinCancelTime `_-i2o`) can end the power instead. It is
    not modelled.
+
+The cap `_-Q1n` comes from the power constructor `_-l4X.<init>` #39 (`step_cap`) [V]. For a charged power
+(`_-t3b`) it is `ceil(held / _-I6c × len(CastTime))`, at least `_-L2X`, where held is constructor argument
+5, `_-a6i` [H: the charge time]. A longer charge therefore plays more steps. The constructor also sets
+`_-qm` = |x speed| / 60, at most 1, when the fighter moves the way it faces (`momentum`).
 
 So **each step fires once**, on the tick it starts. A 0-tick step still takes 1 tick. `_-X2G` is the step
 index, which indexes BaseDamage, `_-q24`, CenterOffset and AoERadius [V].
