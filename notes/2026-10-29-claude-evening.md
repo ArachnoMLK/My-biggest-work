@@ -23,7 +23,7 @@ PRs #16–#23 from earlier sessions are still open and mergeable.
 
 ## Next steps
 - PRNG draw order: the two R draws of `_-X6R._-b3x` (match start) are now in prng-order-11.00.md §4b (PR #30).
-- Resume here: the 7 → 0 transition (methods that test `_-65w == 7`: `_-I4N._-51g`, `_-h3U._-kW`, `_-s3m._-a1k`, `_-24k._-o4N`, `_-P4P._-b3X`, `_-D6n._-f40` / `_-94p`, `_-d2C._-e2F`, `_-99._-8W`, `_-q1M`, `_-v5Q.Think`, `Companion._-4v`; ruled out: `_-19`, `_-r2M`, `_-X6R._-K5c`, `_-su` and `_-E6A` (display), `_-Hx` (match end), `_-99._-e5L` (mode flag 128 only)), then the animation frame table `_-cA` (`_-l4X._-54L`, needs PR #19), then an integration branch and a first falling smoke test.
+- Resume here: the 7 → 0 transition (methods that test `_-65w == 7`: `_-I4N._-51g`, `_-h3U._-kW`, `_-s3m._-a1k`, `_-24k._-o4N`, `_-P4P._-b3X`, `_-D6n._-f40` / `_-94p`, `_-d2C._-e2F`, `_-99._-8W`, `_-q1M`, `_-v5Q.Think`, `Companion._-4v`; ruled out: `_-19`, `_-r2M`, `_-X6R._-K5c`, `_-su` and `_-E6A` (display), `_-Hx` (match end), `_-99._-e5L` (mode flag 128 only), `_-I4N._-51g` (mode flag `_-L4e` only)), then the animation frame table `_-cA` (`_-l4X._-54L`, needs PR #19), then an integration branch and a first falling smoke test.
 - `_-JQ`: the ImpulseToPoint branch. Hit detection is done in #30, except the other guards in `_-T5A`
   (HoldHitEnts, Uninterruptable), platform rotation on lines, and the item gates (catch windows, `_-Io` / `_-x5G` bits).
 - Power timeline: what `_-82O` (cast end) and `_-E5S` (end tick) gate after the first update.
