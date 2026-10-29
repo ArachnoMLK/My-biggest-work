@@ -94,6 +94,13 @@ ANCHORS = {ABC_1100: {
         (6784, 180, "callpropvoid", "_-hq, 0"),
         (2996, 27, "initproperty", "_-65w"),
     ],
+    "_-b6D: in state 7 (8) true until _-164 (_-a2O) + 4000 ms; _-X1J releases a grab (6 -> 0)": [
+        (3015, 92, "getproperty", "_-164"),
+        (3015, 96, "pushuint", "4000"),
+        (3015, 117, "getproperty", "_-a2O"),
+        (3036, 59, "pushbyte", "6"),
+        (3036, 73, "initproperty", "_-65w"),
+    ],
 }}
 
 

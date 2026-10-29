@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(538 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(543 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -566,7 +566,11 @@ map collision only run in states 0 and 5**.
 - `_-X6R.Respawn` #6784 calls `Entity._-hq`, which sets 0;
 - `_-d2C._-85Y` calls `Entity._-220`, which sets 9.
 
-What moves a fighter from 7 to 0 in a normal match is still open.
+- `Entity._-X1J` releases a grab (6 → 0).
+
+`Entity._-b6D` #3015 is true for 4000 ms after entering, from `_-164` in state 7 or `_-a2O` in state 8 (it
+first requires the `_-8` bit of `_-e3e`). [H] It is the post-spawn protection. What moves a fighter from 7
+to 0 in a normal match is still open.
 
 **How an input starts a power** [V shape]:
 1. The input consumer `_-i4Z._-rU` / `_-I35` (input-buffer-11.00.md, PR #28) calls one of:
