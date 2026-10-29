@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
+from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
 from bh import swf as swfmod  # noqa: E402
@@ -233,6 +234,29 @@ def cmd_movement_verify(a):
         print(f"  {label:<18} x {scale} = {v * scale!r} per tick")
 
 
+def cmd_prng_order_verify(a):
+    """Check the pinned static evidence of PRNG draw order (Q3); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in prngordermod.ANCHORS:
+        print(f"no draw-order anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in prngordermod.ANCHORS)})")
+        sys.exit(2)
+    bad = prngordermod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    anchors, refs, slots = prngordermod.counts(sha)
+    print(f"ABC {sha[:8]}...  anchors {anchors}  reference sets {refs}  slot types {slots}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in prngordermod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/prng-order-11.00.md)")
+
+
 def cmd_swz_key(a):
     """Find the .swz key: try every uint of the main ABC, else brute-force keys ending with --suffix."""
     data = open(os.path.join(a.game, "Init.swz"), "rb").read()
@@ -437,6 +461,7 @@ def main():
     seeds = (["--seeds"], {"type": lambda t: [_bounded_int(0, (1 << 32) - 1)(x) for x in t.split(",")],
                            "default": [0, 1, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 123456789]})
     add("prng-verify", cmd_prng_verify, abc, seeds, (["--draws"], {"type": _bounded_int(1, 100000), "default": 256}))
+    add("prng-order-verify", cmd_prng_order_verify, abc)
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
