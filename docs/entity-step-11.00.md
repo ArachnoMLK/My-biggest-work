@@ -14,7 +14,7 @@ was executed. Velocities live in the fighter store `_-Z2G` (movement-11.00.md) u
 ## Reproduce
 
 ```text
-python -I tools/bht.py step-verify                    # 104 anchors, 9 slot types
+python -I tools/bht.py step-verify                    # 126 anchors, 9 slot types
 python -I tools/bht.py movement-verify                # gravity, jump impulses (movement-11.00.md)
 python -I tools/bht.py abc-disasm --method 2984       # Entity._-8i
 ```
@@ -86,6 +86,21 @@ P5S = clamp(P5S, cap)                        # @4399-4483, every tick, impulse o
   running", so attacks can move a fighter up to 3000 units/s instead of 1000.
 - The meaning of the `_-e3e` bit 524288 is open [H].
 - The clamp tests are `ifngt` / `ifnlt`, so a NaN velocity passes unchanged.
+
+## Wall contact (`_-r51`)
+
+| Claim | Where | Status |
+|---|---|---|
+| Each step saves `_-r51` in local 27 and sets `_-r51 = 0` | @8869–8886 | [V] |
+| After a sweep, when the line hit (local 40) is vertical (`startX == _-f1i`) and not `_-S1A`, the fighter is pushed out along the normal `Entity._-04L` scaled to 1.01 | @11349–11481 | [V]; [H] `_-f1i` = end x |
+| Then, when `!_-t46()` and (local 38 or the saved `_-r51 ≠ 0`) and not local 37: `_-r51 = 1` if `_-96f.startX ≤ x`, else `2` | @11489–11581 | [V]; [H] 1 = wall on the left, 2 = wall on the right |
+| On the first tick of contact (saved `_-r51 == 0`) with `_-P5S ≥ 0`, `_-P5S = 0`: a falling fighter stops on the wall; y is then bounded by the line's `startY` / `_-P2s` | @11586–11700 | [V] shape |
+| The KO reset `_-p1Y` clears it | #3034 @281–287 | [V] |
+
+So `_-r51 ≠ 0` reads as "on a wall" [H]. This fits its other readers: the KO test lets the top line
+count when the fighter is on the ground or on a wall (ko-11.00.md), `_-H5F` allows an air jump with
+`_-r51 ≠ 0` (a wall jump), and the input consumer does not chain an attack with `_-I35` while it is set
+(input-buffer-11.00.md §6). The meaning of locals 37 / 38 and of `_-t46()` is open.
 
 ## Limits
 
