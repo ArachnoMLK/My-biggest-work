@@ -96,6 +96,21 @@ handled by code paths that do not store them right away).
 (10.09: "Priority, then `_-F5f`, then `_-V6R`, then loser marking"); check the record fields
 `_-82K` / `_-l18` before relying on the roles.
 
+## Repeated hits (`MinTimeBetweenHits`)
+
+**[V]** In `_-F5N._-T5A` #1731 (two copies of the gate, @340–413 and @671–744, for two target kinds),
+with `t` = the power (local 3), `now` = parameter 2 and `prior` = the last hit time of this target
+(`_-168(_-03K())` on the hit history, local 9):
+
+- `present` = the target is in the hit history list (`_-x3r.indexOf(target) >= 0`, @342–356);
+- if `present` and `MinTimeBetweenHits` (`_-ue`) `!= 0`: blocked = `prior + MinTimeBetweenHits > now`
+  (`add_i`: int addition), so **equality admits**;
+- if `present` and `MinTimeBetweenHits == 0`: **blocked** (one hit per target);
+- not present: admitted.
+
+Same rule as brawlhalla-sim on 10.09 (`_-M5v._-D3h`). `IsMultihit` is `_-s5N` and `InheritAlreadyHit`
+`_-54E` (read in `_-l4X._-R63` #46 @3931).
+
 ## Next
 
 - Phase vectors (`CastTime`, `AoERadiusX/Y`, `CenterOffsetX/Y`) and the active-power tick (10.09 #46
