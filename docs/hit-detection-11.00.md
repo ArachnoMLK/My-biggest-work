@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(343 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(359 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -37,6 +37,24 @@ At each index, `_-L5r` is called when one of these holds [V]:
 
 The call is `_-L5r(power, _-X2G, index, owner x, owner y, list)`. The owner position is read from the
 fighter store `_-Z2G` with the keys `_-M43` and `_-E3d` [V].
+
+### 1.1 Which step fires on which tick ([`tools/bh/power_timeline.py`](../tools/bh/power_timeline.py))
+
+The power is a list of **steps**, one per CastTime entry (`_-a2`, in ticks). `_-l4X._-R63` #46 runs once
+per tick. Each call [V]:
+
+1. **Tick number.** It computes `round((t − t mod 16) / 16)`. On the first update (`_-k4b == 0`) it runs
+   the start set-up `_-f14`: start tick, then `_-82O = start + CastTime[0]` (entity-step-11.00.md).
+2. **Gate.** A step fires only when it is not already running (`_-d38`) and the tick has reached `_-82O`.
+   It then sets `_-d38`, and the step's hit detection runs over its frame window (§1).
+3. **Advance.** If there is a next step (and, when `_-t3b` is set, the step is below `_-Q1n`), then
+   `_-X2G += 1`, `_-82O += max(CastTime[_-X2G], 1)` and `_-d38` is cleared. Otherwise the power stays on its
+   last step.
+4. **Cancels.** A cancel path (`_-m2j`, gated by MinCancelTime `_-i2o`) can end the power instead. It is
+   not modelled.
+
+So **each step fires once**, on the tick it starts. A 0-tick step still takes 1 tick. `_-X2G` is the step
+index, which indexes BaseDamage, `_-q24`, CenterOffset and AoERadius [V].
 
 ## 2. Hit area of one frame (`_-L5r` #65)
 
