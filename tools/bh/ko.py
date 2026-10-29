@@ -307,6 +307,20 @@ ANCHORS = {ABC_1100: {
         (6711, 636, "pushbyte", "0"),
         (6711, 638, "callpropvoid", "_-b5p, 2"),
     ],
+    "base: _-n4k is the match start (_-Px.StartTime), set to the clock of the first tick by #3336": [
+        (10723, 8, "getproperty", "_-n4k"),
+        (10723, 11, "returnvalue", ""),
+        (3545, 153, "findproperty", "_-n4k"),
+        (3545, 156, "getlocal_1", ""),
+        (3545, 157, "initproperty", "_-n4k"),
+        (3336, 1910, "pushbyte", "16"),
+        (3336, 1912, "add_i", ""),
+        (3336, 1929, "getproperty", "_-n4k"),
+        (3336, 1932, "pushbyte", "0"),
+        (3336, 1935, "iffalse", "22"),
+        (3336, 1943, "getlocal", "17"),
+        (3336, 1945, "callpropvoid", "_-Y6a, 1"),
+    ],
 }}
 
 # (class, slot, declared type) of every field the KO path reads or writes.
