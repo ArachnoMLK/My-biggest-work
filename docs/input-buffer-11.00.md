@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 221 anchors
+python -I tools/bht.py input-buffer-verify            # 242 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -105,11 +105,23 @@ groups from "jump lock" to "`_-y2r`" pin every row below.
 | Cancel window: when the owner's current move record (`_-h3i._-Z4V[_-Q42]`) exists and `_-E6P()`, local 32 is set while `_-H2b + 16 _-M4L ≤ t ≤ _-H2b + 16 _-GX` (frames → ms); local 33 when the extra test local 39 holds. Light and heavy may fire with local 32 even after an action was taken | @2009–2342, @2763–2798 | [V]; [H] `_-H2b` = start of the current move |
 | Light / heavy route: if a move runs (`_-Kc._-O2R ≠ null`) without `_-93n._-Z6M[1]` and `owner._-r51 == 0`, the press goes to `_-I35` (chain); otherwise to `_-rU` (new attack), but only when no move runs or the press is **newer than `_-Kc._-sM`**. `_-sM` is written with `_-O2R` in `_-F5N._-s1u`, so it is the start time of the current move | @2709–2959, @2996–3135; #1734 @182–189 | [V] |
 | `_-I35(t, dir, a, b, kind)` returns false while `t − _-sM ≤ 300` (unsigned) or with no move; otherwise it calls `_-Kc._-V5I(t, dir)` if the move has `_-93n._-qo`, else `_-Kc._-A3Q(t, kind)` (kind 2 light, 3 heavy) | #6335 | [V]; [H] "string / chain the next part of the move" |
-| `_-rU` picks the move slot `_-i4Z._-y2r[class + kind + air]`: class 0 when Drop (2) is held, else 1 when bit 32 is set, else 2 when MoveLeft / MoveRight is held, else 1; kind 0 light, 6 heavy; air +3 when `_-wn()` (in the air) or the jump flag is set. `_-y2r = [3, 1, 2, 6, 4, 5, 8, 11, 7, 10, 9, 9]`; then `_-Kc._-C5S(t, slot, …)` | #6334 @93–671; `script347.<init>` #6336 @150–191 | [V]; [H] slot names |
+| `_-rU` picks the move slot `_-i4Z._-y2r[class + kind + air]`: class 0 when Drop (2) is held, else 1 when bit 32 is set, else 2 when MoveLeft / MoveRight is held, else 1; kind 0 light, 6 heavy; air +3 when `_-wn()` (in the air) or the jump flag is set. `_-y2r = [3, 1, 2, 6, 4, 5, 8, 11, 7, 10, 9, 9]`; then `_-Kc._-C5S(t, slot, …)` | #6334 @93–671; `script347.<init>` #6336 @150–191 | [V] |
 
-Reading the slots as light down / neutral / side = 3 / 1 / 2, air light = 6 / 4 / 5, heavy = 8 / 11 / 7
-and air heavy = 10 / 9 / 9 [H]: side and neutral air heavy share slot 9, which fits the game's rule
-that a side air heavy is the recovery.
+What the slots are: `_-Kc._-C5S(t, slot, …)` #1700 gets the power from `_-F5N._-42t(t, slot, …)` #1726.
+
+| Slot | Power name taken from | Status |
+|---|---|---|
+| 11 | the legend's `mSpecialPower1` / `mSpecialPower2` (by which of `mBaseWeapon1` / `2` is held) | [V] → neutral signature |
+| 7 | `mSpecialPower1_Forward` / `mSpecialPower2_Forward`, else the weapon list | [V] → side signature |
+| 8 | `mSpecialPower1_Down` / `mSpecialPower2_Down`, else the weapon list | [V] → down signature |
+| other slots | the held weapon's list `ItemType._-Z6M[slot]` (unarmed: `ItemType._-m4V`) | [V] |
+| 13–20 | a per-fighter table `_-b14[slot − 13]` (emote / taunt slots) | [V] shape |
+
+So, by the `_-y2r` table: ground heavy down / neutral / side = signatures 8 / 11 / 7 [V]. Light
+down / neutral / side = 3 / 1 / 2 and air light = 6 / 4 / 5 come from the weapon list [V slots; H
+names]. Air heavy down = 10 and neutral = side = 9 [V]; slot 9 is refused when `_-UT` is set and the
+fighter's `_-P5Y() ≥ _-56T()` (the jump-count test of `_-H5F`), so 9 reads as the recovery and 10 as
+the ground pound [H]. `SLOT_NAMES` in the module uses these names.
 
 On the input bit names (replay-format.md "naming conflict"): in `_-rU`, bit 1 is not read, and bit 32
 turns a side attack into a neutral one. That is the behaviour the name `PrioritiseNeutralOverSide`

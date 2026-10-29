@@ -49,6 +49,10 @@ def buffered_presses(records, t, n=DEFAULT_WINDOW, skip_current=False):
 JUMP_LOCK_MS = 192        # Entity._-z3C: no jump at the first site until t > _-532 + 192
 CHAIN_MIN_MS = 300        # _-I35: no chain until the current move has run more than 300 ms
 DODGE_REARM_MS = 480      # _-g3B + 480 > t sets the third Dodge argument (local 31)
+# Slot names from _-F5N._-42t #1726: 7 / 8 / 11 are the side / down / neutral signatures, 9 / 10 the
+# air heavies (recovery, ground pound) [H for 9 / 10], 1-6 the light attacks; 13-20 taunt / emote slots.
+SLOT_NAMES = {1: "NLight", 2: "SLight", 3: "DLight", 4: "NAir", 5: "SAir", 6: "DAir",
+              7: "SideSig", 8: "DownSig", 9: "Recovery", 10: "GroundPound", 11: "NeutralSig"}
 # _-i4Z._-y2r: move slot for (kind offset + air offset + direction class); script347.<init> @150-191
 ATTACK_SLOTS = (3, 1, 2, 6, 4, 5, 8, 11, 7, 10, 9, 9)
 HEAVY_OFFSET = 6          # pushbyte 6 in the heavy block (@3097); the light block passes 0
@@ -337,6 +341,29 @@ ANCHORS = {ABC_1100: {
         (6336, 186, "pushbyte", "9"),
         (6336, 189, "newarray", "12"),
         (6336, 191, "initproperty", "_-y2r"),
+    ],
+    "slot -> power: _-Kc._-C5S calls _-42t; slots 7 / 8 / 11 read the legend's side / down / neutral signature, others the weapon list _-Z6M[slot]": [
+        (1700, 55, "callproperty", "_-42t, 3"),
+        (1700, 81, "pushbyte", "9"),
+        (1700, 93, "getproperty", "_-UT"),
+        (1700, 134, "callproperty", "_-P5Y, 0"),
+        (1700, 146, "callproperty", "_-56T, 0"),
+        (1700, 151, "greaterequals", ""),
+        (1700, 423, "callpropvoid", "Jump, 2"),
+        (1726, 168, "pushbyte", "13"),
+        (1726, 178, "pushbyte", "20"),
+        (1726, 495, "pushbyte", "11"),
+        (1726, 520, "getproperty", "mSpecialPower1"),
+        (1726, 550, "getproperty", "mSpecialPower2"),
+        (1726, 661, "getproperty", "_-Z6M"),
+        (1726, 665, "getlocal_2", ""),
+        (1726, 681, "pushbyte", "7"),
+        (1726, 708, "getproperty", "mSpecialPower1_Forward"),
+        (1726, 757, "getproperty", "mSpecialPower2_Forward"),
+        (1726, 790, "pushbyte", "8"),
+        (1726, 817, "getproperty", "mSpecialPower1_Down"),
+        (1726, 868, "getproperty", "mSpecialPower2_Down"),
+        (1726, 899, "callproperty", "_-p4G, 1"),
     ],
 }}
 
