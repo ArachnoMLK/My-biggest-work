@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(462 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(490 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -55,6 +55,44 @@ per tick. Each call [V]:
 
 So **each step fires once**, on the tick it starts. A 0-tick step still takes 1 tick. `_-X2G` is the step
 index, which indexes BaseDamage, `_-q24`, CenterOffset and AoERadius [V].
+
+### 1.2 Reading the power data ([`tools/bh/power_data.py`](../tools/bh/power_data.py))
+
+`PowerType.static._-A3R` #6483 turns the powerTypes cells into the per-step lists used above [V]:
+
+**CastTime.** Comma-separated entries:
+- `D`, `D@F` or `D:R[@F[-G]]`, where D is a duration in ticks and R adds R extra steps of 0 ticks;
+- F and G only feed `_-g1x`, which is not modelled;
+- an empty cell counts as "0".
+
+**Related columns** (VariableImpulse, FixedImpulse, AoERadiusX/Y, CenterOffsetX/Y, BaseDamage,
+ImpulseOffsetX/Y, FixedStunTime, …) have one cell per CastTime entry, or one cell for all. When AoERadiusY
+is empty it uses AoERadiusX. `_-42F` #6484 expands each cell over its entry's steps:
+
+| Cell | Steps get |
+|---|---|
+| `v` | v on every step |
+| `tN` | N / steps each |
+| `a\|b` | alternating a, b, … |
+| `a~b~c` | linear ranges between the points |
+| `a&b` | k simultaneous values (k hitboxes) |
+
+Most of these lists are `Vector.<int>`: values are truncated, and NaN becomes 0.
+
+**Frame windows.** When any cell uses `&`, `_-q24[step] = (k << 16) | first` (`_-v5o` #6463). Every other
+step gets a window of 1 at its place in the AoERadiusX list. This is the frame window of §1.
+
+**`_-D6M`.** It is the sum of the BaseDamage expansions. Its sign picks the team mask of §2.
+
+Local check (aggregate): all 3,768 powers parse with no error, and the lists of steps without `&` always
+have the CastTime length:
+
+| Powers | Count |
+|---|---|
+| use `&` | 1,141 |
+| use ranges `~` | 258 |
+| use totals `t` | 214 |
+| use alternation `\|` | 1 |
 
 ## 2. Hit area of one frame (`_-L5r` #65)
 
