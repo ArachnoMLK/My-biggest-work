@@ -178,9 +178,11 @@ while `_-J1m` / `_-d4x` hold the real speed. [V]
 | The vector is `(_-J1m, _-d4x)` when `big`, else `(_-v1D, _-P5S)`; its length becomes `length − decay × 0.384` (`Point.normalize`) | @128–262 | [V] |
 | When `big` the vector goes back to `(_-J1m, _-d4x)` (the capped velocity is left as is); otherwise it becomes the velocity and `_-J1m = _-d4x = 0` | @266–380 | [V] |
 
-`knockback_decay` transcribes `_-V12`. So the real speed loses `Recovery × 0.384` units/s per tick;
-the fighter moves at the capped 250 per axis until the stored speed falls back under the cap [H for
-how the stored speed reaches the velocity again when only one axis was capped].
+`knockback_decay` transcribes `_-V12`. So the stored speed loses `Recovery × 0.384` units/s per tick
+while the fighter moves at the capped 250 per axis; once neither stored component is past the cap, the
+decay works on the (capped) velocity itself and the stored speed is dropped (`_-J1m = _-d4x = 0`). The
+stored speed thus only sets how long the capped flight lasts [V]. The normal step (gravity, sweeps) still
+runs on the velocity [V entity-step-11.00.md].
 
 ## Limits
 
