@@ -16,10 +16,12 @@ STATES = {
         "`SpawnBot._-m1O`, `_-W6p._-Y2v`"),
     6: ("held by a power (grab)", "power update; back to 0 and `mHeldByPower = null` when the holder's power "
                                  "ends, or through `_-j9` (Uninterruptable `_-C5G` checked)", "`Entity._-j4e`"),
-    7: ("entering", "flags `_-e3e = _-e3c`, `_-k5S` reset, `_-81Z`, `_-2c`, power update, `_-f5u = 0`",
-        "`Entity._-Y6o`, `_-I4N`, `_-y3M`, ..."),
-    8: ("entering (variant)", "as 7, with `_-lV` instead of `_-164`", "`Entity._-S1D`"),
-    9: ("respawning", "`_-44x` set, `_-e3e = _-e3c`, `_-W1R.Respawn(...)`, `_-q4u._-b3v(.., 7)`", "`Entity._-220`"),
+    7: ("entering", "once 1500 ms have passed since `_-164` (or `_-s3D._-zv() <= 1`), the bit `Entity._-e3c` is "
+                    "added to `_-e3e`; `_-k5S` reset, `_-81Z`, `_-2c`, power update, `_-f5u = 0`, `_-P4K = false`; "
+                    "the state itself is left by other code", "`Entity._-Y6o`, `_-I4N`, `_-y3M`, ..."),
+    8: ("entering (variant)", "as 7, timed from `_-lV` instead of `_-164`", "`Entity._-S1D`"),
+    9: ("respawning", "`_-44x` set, the bit `Entity._-e3c` cleared from `_-e3e`, `_-W1R.Respawn(t, this)`, "
+                      "`_-q4u._-b3v(t, 7)`", "`Entity._-220`"),
 }
 UNHANDLED = (1,)   # the switch sends 1 (and anything above 9) to the "Unaccounted-for entity state" message
 
@@ -69,6 +71,14 @@ ANCHORS = {ABC_1100: {
         (1744, 125, "getproperty", "_-E2S"),
         (1744, 165, "getproperty", "_-w3H"),
         (1750, 118, "callpropvoid", "_-q1S, 5"),
+    ],
+    "States 7/8: add the _-e3c bit after 1500 ms or zv() <= 1; state 9: clear it, Respawn": [
+        (2991, 1489, "getproperty", "_-e3c"),
+        (2991, 1512, "callproperty", "_-zv, 0"),
+        (2991, 1529, "pushuint", "1500"),
+        (2991, 1558, "bitor", ""),
+        (2991, 1691, "bitnot", ""),
+        (2991, 1692, "bitand", ""),
     ],
 }}
 

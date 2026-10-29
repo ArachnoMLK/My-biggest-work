@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(527 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(533 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -553,8 +553,8 @@ In step 5, each fighter first reads its inputs (`_-1L(t)`), then switches on `_-
 | 4 | held still | as 3 | `SpawnBot`, `_-y3M` |
 | 5 | in play, timed | as 0; back to 0 after 2500 ms (`_-f5u`), on lava, or other conditions | `SpawnBot`, `_-W6p` |
 | 6 | held by a power (grab) | power update; released when the holder's power ends (`mHeldByPower`) | `Entity._-j4e` |
-| 7 / 8 | entering | flags restored (`_-e3e = _-e3c`), power update | `Entity._-Y6o` / `_-S1D` |
-| 9 | respawning | `_-W1R.Respawn(...)` | `Entity._-220` |
+| 7 / 8 | entering | once 1500 ms have passed since `_-164` (7) or `_-lV` (8), or when `_-s3D._-zv() <= 1`, the bit `Entity._-e3c` is added to `_-e3e`; power update. The state is left by other code | `Entity._-Y6o` / `_-S1D` |
+| 9 | respawning | the bit `Entity._-e3c` is cleared from `_-e3e`, then `_-W1R.Respawn(t, this)` and `_-q4u._-b3v(t, 7)` | `Entity._-220` |
 
 Value 1, and anything above 9, falls into the "Unaccounted-for entity state" message. So **movement and
 map collision only run in states 0 and 5**.
