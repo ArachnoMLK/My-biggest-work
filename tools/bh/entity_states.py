@@ -18,10 +18,10 @@ STATES = {
         "`SpawnBot._-m1O`, `_-W6p._-Y2v`"),
     6: ("held by a power (grab)", "power update; back to 0 and `mHeldByPower = null` when the holder's power "
                                  "ends, or through `_-j9` (Uninterruptable `_-C5G` checked)", "`Entity._-j4e`"),
-    7: ("entering", "once 1500 ms have passed since `_-164` (or `_-s3D._-zv() <= 1`), the bit `Entity._-e3c` is "
+    7: ("eliminated", "once 1500 ms have passed since `_-164` (or `_-s3D._-zv() <= 1`), the bit `Entity._-e3c` is "
                     "added to `_-e3e`; `_-k5S` reset, `_-81Z`, `_-2c`, power update, `_-f5u = 0`, `_-P4K = false`; "
                     "the state itself is left by other code", "`Entity._-Y6o`, `_-I4N`, `_-y3M`, ..."),
-    8: ("entering (variant)", "as 7, timed from `_-lV` instead of `_-164`", "`Entity._-S1D`"),
+    8: ("eliminated (variant)", "as 7, timed from `_-lV` instead of `_-164`", "`Entity._-S1D`"),
     9: ("respawning", "`_-44x` set, the bit `Entity._-e3c` cleared from `_-e3e`, `_-W1R.Respawn(t, this)`, "
                       "`_-q4u._-b3v(t, 7)`", "`Entity._-220`"),
 }
@@ -35,8 +35,8 @@ UNHANDLED = (1,)   # the switch sends 1 (and anything above 9) to the "Unaccount
 # `_-E2S` / `_-w3H`), ends the running power (`_-VY`) and sets `_-o3I = new _-l4X(...)`.
 # State transitions found so far [V call edges]: a KO commit sets 3 (`Entity._-eR`, ko-11.00.md, PR #25);
 # the respawn reset `_-X6R._-U6W` (#6787, which also resets the damage `_-W22`) calls `Entity._-Y6o` (#3122),
-# which sets 7 (entering); `_-X6R.Respawn` (#6784) calls `Entity._-hq` (#2996), which sets 0; `_-d2C._-85Y`
-# calls `Entity._-220` (#3000), which sets 9. What moves a fighter from 7 to 0 in a normal match is open.
+# which sets 7 (eliminated: `_-s3m._-a1k` #3948 @225-241 exports 'Eliminated' = (`_-65w` == 7)); `_-X6R.Respawn` (#6784) calls `Entity._-hq` (#2996), which sets 0; `_-d2C._-85Y`
+# calls `Entity._-220` (#3000), which sets 9. State 7 is final for the match; a normal respawn places the fighter through `_-k5S._-P3o` (SpawnBot._-P3o sets 0).
 # Match start, `_-X6R._-b3x` #6777 (tick step 4, `_-W1R._-b3x(t)`): on the first tick with t >= `_-n4k` + 256 ms
 # (flag `_-C3h`), eligible fighters get state 3 and are passed to `Respawn` (-> `_-U6W` -> 7), and the replay
 # generator R (`_-s3D._-22`) is drawn twice: `_-G5X[i] = R._-f4c() % n` for i = 0, 1, with n = the number of
@@ -151,6 +151,11 @@ ANCHORS = {ABC_1100: {
         (6778, 437, "urshift", ""),
         (6778, 464, "callproperty", "ceil, 1"),
         (6778, 482, "modulo", ""),
+        (6778, 499, "callpropvoid", "_-P3o, 2"),
+    ],
+    "State 7 is 'Eliminated' (_-s3m._-a1k); respawn placement _-k5S._-P3o -> SpawnBot._-P3o sets 0": [
+        (3948, 227, "pushstring", "'Eliminated'"),
+        (3948, 236, "pushbyte", "7"),
         (6778, 499, "callpropvoid", "_-P3o, 2"),
     ],
 }}

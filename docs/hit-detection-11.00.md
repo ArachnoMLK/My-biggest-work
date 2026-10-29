@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(585 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(588 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -567,7 +567,7 @@ In step 5, each fighter first reads its inputs (`_-1L(t)`), then switches on `_-
 | 4 | held still | as 3 | `SpawnBot`, `_-y3M` |
 | 5 | in play, timed | as 0; back to 0 after 2500 ms (`_-f5u`), on lava, or other conditions | `SpawnBot`, `_-W6p` |
 | 6 | held by a power (grab) | power update; released when the holder's power ends (`mHeldByPower`) | `Entity._-j4e` |
-| 7 / 8 | entering | once 1500 ms have passed since `_-164` (7) or `_-lV` (8), or when `_-s3D._-zv() <= 1`, the bit `Entity._-e3c` is added to `_-e3e`; power update. The state is left by other code | `Entity._-Y6o` / `_-S1D` |
+| 7 / 8 | **eliminated** (`_-s3m._-a1k` #3948 exports `Eliminated = (_-65w == 7)`) [V] | once 1500 ms have passed since `_-164` (7) or `_-lV` (8), or when `_-s3D._-zv() <= 1`, the bit `Entity._-e3c` is added to `_-e3e`; power update. The state is left by other code | `Entity._-Y6o` / `_-S1D` |
 | 9 | respawning | the bit `Entity._-e3c` is cleared from `_-e3e`, then `_-W1R.Respawn(t, this)` and `_-q4u._-b3v(t, 7)` | `Entity._-220` |
 
 Value 1, and anything above 9, falls into the "Unaccounted-for entity state" message. So **movement and
@@ -576,7 +576,7 @@ map collision only run in states 0 and 5**.
 **Transitions found so far** [V call edges]:
 - a KO commit sets 3 (`Entity._-eR`, ko-11.00.md);
 - the respawn reset `_-X6R._-U6W` #6787 (which also resets the damage `_-W22`) calls `Entity._-Y6o`, which sets
-  7 (entering);
+  7 (eliminated);
 - `_-X6R.Respawn` #6784 calls `Entity._-hq`, which sets 0;
 - `_-d2C._-85Y` calls `Entity._-220`, which sets 9.
 
@@ -595,9 +595,7 @@ map collision only run in states 0 and 5**.
     team 2 uses counter 1 and the second half (the same plus ceil(n/2));
   - the fighter is then placed with `_-k5S._-P3o`.
 
-`Entity._-b6D` #3015 is true for 4000 ms after entering, from `_-164` in state 7 or `_-a2O` in state 8 (it
-first requires the `_-8` bit of `_-e3e`). [H] It is the post-spawn protection. What moves a fighter from 7
-to 0 in a normal match is still open.
+`Entity._-b6D` #3015 is true for 4000 ms after the elimination, from `_-164` in state 7 or `_-a2O` in state 8 (it first requires the `_-8` bit of `_-e3e`) [V]. [H] It drives the post-elimination display.
 
 **How an input starts a power** [V shape]:
 1. The input consumer `_-i4Z._-rU` / `_-I35` (input-buffer-11.00.md, PR #28) calls one of:
