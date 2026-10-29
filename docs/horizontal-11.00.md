@@ -43,4 +43,30 @@ vx  = max(v, 0) * s
 accel = AirAcceleration * _-Kc._-R4I  if _-wn()  else  Acceleration * _-Kc._-E16
 accel *= 1.25 and max *= 1.25         when the mode hook _-N1k._-s3D._-H1g._-m47._-43P(now, this) is true
 ```
-How `accel` and `max` are applied to `vx` from the inputs (@2066 onward) is the next step.
+
+## Applying the acceleration (@2066–2659) [V]
+
+Reached when the move condition of @517 holds (local 4) [H: a horizontal direction is held and movement is
+not locked]. `left = _-141()` [H: the held direction is left].
+
+```
+accel *= _-Kc._-o3I._-x1E(now)                         when a power/weapon modifier is active (@2070–2109)
+if left != (vx < 0) and vx != 0:                       # pushing against the current motion
+    if not _-5q() and _-wn() and not (_-M3V and _-v3x > _-I5A) and not weapon._-ud:
+        accel *= max(1 - |vx| / 50, 0)                 # in the air: no reversal above |vx| = 50 (@2329–2396)
+if left:
+    if vx > -max: vx -= accel * 0.384;  vx = max(vx, -max)     (@2412–2527)
+else:
+    if vx <  max: vx += accel * 0.384;  vx = min(vx,  max)     (@2535–2648)
+_-t1A(now, max)                                        (@2652)
+```
+
+So one tick of horizontal motion is: **friction first** (linear, clamped at 0), **then acceleration toward
+the held direction, clamped at the max speed** (only when already below it: a fighter faster than `max`,
+e.g. after a hit, is not slowed down by the clamp, only by friction).
+
+## Next
+
+- Confirm `_-141` (direction) and the move condition (local 4, @480–517) against the input bits.
+- Order of friction / acceleration / gravity / position update inside #2984, and the knockback decay
+  (`docs/powers-11.00.md`).
