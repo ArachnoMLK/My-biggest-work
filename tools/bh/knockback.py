@@ -465,6 +465,8 @@ ANCHORS = {ABC_1100: {
         (15351, 30066, "pushdouble", "2500.0"),
         (15351, 30070, "initproperty", "_-i4P"),
         (2984, 2901, "initproperty", "_-J1m"),
+        (3057, 12, "callproperty", "_-86K, 0"),
+        (3057, 28, "getproperty", "_-P4q"),
     ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
