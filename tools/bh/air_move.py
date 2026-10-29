@@ -105,6 +105,87 @@ def air_move(lines, team, x, y, x_step, p5s, on_ground, drop_through=False, atta
     return MoveResult(x, y, hit, head_stop, ceilings, mv, u, mask)
 
 
+LEDGE_REACH = 60.0    # `Entity._-w2p` (script157.<init> @1868)
+LEDGE_MIN_VY = -35.0  # `Entity._-w5U` (@1877)
+STICKY = 8            # `_-z2k._-h5W`
+
+
+@dataclass
+class WallState:
+    """Fighter state read by the wall branch (@10776-12336); names are the obfuscated fields."""
+    t: int                    # time (argument 1 of `_-8i`)
+    can_cling: bool           # `_-wn()` (and the line is not no-slide, checked here)
+    t46: bool                 # `_-t46()`
+    r51_before: int           # `_-r51` saved at @8869 (local 27)
+    g1t: bool = False         # `_-G1T`
+    y1l: int = 0              # `_-y1L`
+    m5t: bool = False         # `_-M5t`
+    has_power: bool = False   # `_-Kc._-o3I != null`
+    f84q: float = 0.0         # `_-84Q`
+    gravity: float = 0.0      # local 18 (this step's y term)
+
+
+def wall_contact(lines, team, x, y, wall, p5s, v1d, ws):
+    """Wall branch of `Entity._-8i` before the slide along the wall. Returns (x, y, p5s, v1d, r51, g1t, y1l,
+    mantled). r51 is None when unchanged.
+
+    - Ledge assist (@10819-11487, when `_-wn()` and not no-slide): a hard-line probe at head height toward the
+      wall; if none is vertical there, the feet are within 60 below the wall top and `_-P5S` > -35, a probe
+      from 5 above the top toward the wall, (±2.02, 6), lands on a walkable line: the fighter is put on it
+      (1.01 back-off) and counts as mantled.
+    - Contact (@11489-11950, when not `_-t46()`): when the head is on a wall or the fighter was already on one,
+      and it did not mantle, `_-r51` = 1 (wall at or left of the feet) or 2. On first contact a falling
+      `_-P5S` becomes 0 and, below the wall's bottom, `_-y1L` = t + 112. Sticky walls hold for 5000 ms; other
+      walls damp a fall faster than `_-84Q` × 0.85 × 0.384 by (`_-84Q` + gravity) × 0.85 × 0.384.
+    - Then (@12148-12332): mantled → `_-P5S` = `_-84Q` × 0.384; no-slide wall → `_-v1D` = 0; no power and not
+      `_-M5t` → `_-v1D` = ±10 toward the wall.
+    """
+    def cands(cx, cy, d):
+        return lines.candidates(cx, cy, cx + d[0], cy + d[1]) if hasattr(lines, "candidates") else lines
+    head_wall = False
+    mantled = False
+    r51 = None
+    g1t, y1l = ws.g1t, ws.y1l
+    if ws.can_cling and not (wall.type & NO_SLIDE):
+        dx = wall.sx - x
+        dx = dx + (-2.02 if dx < 0 else 2.02)
+        probe, _ = _cast(cands, team, x, y - HEAD, (dx, 0.0), 1)
+        if probe is not None and probe.sx == probe.ex:
+            head_wall = True
+        top = wall.sy if wall.sy < wall.ey else wall.ey
+        if not head_wall and y - LEDGE_REACH < top and p5s > LEDGE_MIN_VY:
+            d = (2.02 if x <= wall.sx else -2.02, 6.0)
+            hit = ray_cast(cands(x, top - 5.0, d), team, x, top - 5.0, d[0], d[1], 1, 0, 0)
+            if hit is not None and hit.line.sx != hit.line.ex and not steep(hit.line):
+                b = _normalize(d, BACK_OFF)
+                x, y = hit.point[0] - b[0], hit.point[1] - b[1]
+                mantled = True
+    if not ws.t46:
+        if (head_wall or ws.r51_before != 0) and not mantled:
+            r51 = 1 if wall.sx <= x else 2
+            if ws.r51_before == 0 and p5s >= 0:
+                p5s = 0
+                bottom = wall.sy if wall.sy > wall.ey else wall.ey
+                if y >= bottom:
+                    y1l = ws.t + 112
+            if g1t and wall.type & STICKY:
+                if y1l == 0:
+                    y1l = ws.t + 5000
+                elif y1l > ws.t:
+                    p5s = 0
+                else:
+                    g1t, y1l = False, 0
+            elif p5s > ws.f84q * 0.85 * STEP:
+                p5s = p5s - (ws.f84q + ws.gravity) * 0.85 * STEP
+    if mantled:
+        p5s = ws.f84q * STEP
+    elif wall.type & NO_SLIDE:
+        v1d = 0
+    elif not ws.m5t and not ws.has_power:
+        v1d = -10.0 if wall.sx <= x else 10.0
+    return x, y, p5s, v1d, r51, g1t, y1l, mantled
+
+
 @dataclass
 class Response:
     x: float
@@ -115,7 +196,7 @@ class Response:
     power_k3: bool = False            # `_-o3I._-K3 = true` (the power has `_-4A`)
 
 
-def respond(lines, team, r, p5s, v1d, power_4a=False):
+def respond(lines, team, r, p5s, v1d, power_4a=False, wall_state=None):
     """The part of `Entity._-8i` after the move that is transcribed (@9709-10710, @12336-12834).
 
     Not transcribed, and reported as kind "other": bounce `_-048` (@9275-9704), game-mode lines `_-ao`,
@@ -156,6 +237,8 @@ def respond(lines, team, r, p5s, v1d, power_4a=False):
             x, y = x - b[0], y - b[1]
         return Response(x, y, p5s, v1d, "slope", r.head_stop and power_4a)
     if vertical:                                                       # remaining y along the wall, @12336-12834
+        if wall_state is not None:
+            x, y, p5s, v1d, _, _, _, _ = wall_contact(lines, team, x, y, g, p5s, v1d, wall_state)
         dy = r.wanted[1] - r.move[1]
         feet, fv = _cast(cands, team, x, y, (0.0, dy), r.mask)
         head, hv = _cast(cands, team, x, y - HEAD, (0.0, dy), 1)
@@ -226,6 +309,25 @@ ANCHORS = {ABC_1100: {
         (2984, 12604, "callproperty", "_-X2e, 10"),
         (2984, 12822, "pushdouble", "-1.01"),
         (2984, 12927, "initproperty", "_-O6z"),
+    ],
+    "_-8i wall branch: ledge probe (+-2.02 at head, (+-2.02, 6) from top - 5, reach 60, vy > -35), r51, sticky 5000 ms, damping 0.85, +-10 push": [
+        (2984, 10904, "pushdouble", "-2.02"),
+        (2984, 11008, "callproperty", "_-X2e, 10"),
+        (2984, 11133, "getproperty", "_-w2p"),
+        (2984, 11167, "getproperty", "_-w5U"),
+        (2984, 11178, "pushdouble", "5.0"),
+        (2984, 11247, "pushdouble", "6.0"),
+        (2984, 11322, "callproperty", "_-X2e, 10"),
+        (2984, 11383, "getproperty", "_-S1A"),
+        (2984, 11400, "pushdouble", "1.01"),
+        (2984, 11581, "initproperty", "_-r51"),
+        (2984, 11714, "pushbyte", "112"),
+        (2984, 11748, "getproperty", "_-h5W"),
+        (2984, 11781, "pushdouble", "5000.0"),
+        (2984, 11874, "pushdouble", "0.85"),
+        (2984, 12175, "getproperty", "_-Vj"),
+        (2984, 12305, "pushdouble", "-10.0"),
+        (2984, 12312, "pushdouble", "10.0"),
     ],
 }}
 

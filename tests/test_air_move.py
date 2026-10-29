@@ -8,7 +8,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.air_move import MoveResult, air_move, respond, steep  # noqa: E402
+from bh.air_move import MoveResult, WallState, air_move, respond, steep, wall_contact  # noqa: E402
 from bh.raycast import Line  # noqa: E402
 
 
@@ -75,6 +75,33 @@ class Respond(unittest.TestCase):
         f = floor(100)
         r = air_move([f], 1, 0.0, 50.0, 0.0, 200.0, False)
         self.assertEqual(respond([f], 1, r, 200.0, 0.0).kind, "other")
+
+
+class Wall(unittest.TestCase):
+    WALL = Line(50, 0, 50, 500, type=1, normal=(-1.0, 0.0))     # top at y = 0
+    TOP = Line(50, 0, 300, 0, type=1, normal=(0.0, -1.0))
+
+    def test_ledge_assist(self):
+        ws = WallState(t=1000, can_cling=True, t46=False, r51_before=0, f84q=10.0)
+        x, y, p5s, v1d, r51, _, _, mantled = wall_contact([self.WALL, self.TOP], 1, 48.99, 40.0, self.WALL, 0.0, 0.0, ws)
+        self.assertTrue(mantled)
+        self.assertIsNone(r51)
+        self.assertLess(y, 0)                       # standing on the top
+        self.assertAlmostEqual(p5s, 10.0 * 0.384)
+
+    def test_first_contact_stops_fall(self):
+        ws = WallState(t=1000, can_cling=False, t46=False, r51_before=2, f84q=10.0)
+        _, _, p5s, v1d, r51, _, _, _ = wall_contact([self.WALL], 1, 48.99, 300.0, self.WALL, 50.0, 0.0, ws)
+        self.assertEqual(r51, 2)
+        self.assertLess(p5s, 50.0)                  # damped: 50 - (10 + 0) * 0.85 * 0.384
+        self.assertAlmostEqual(p5s, 50 - 10 * 0.85 * 0.384)
+        self.assertEqual(v1d, 10.0)                 # pushed toward the wall on its right
+
+    def test_sticky_hold(self):
+        sticky = Line(50, 0, 50, 500, type=9, normal=(-1.0, 0.0))
+        ws = WallState(t=1000, can_cling=False, t46=False, r51_before=2, g1t=True, y1l=3000)
+        _, _, p5s, _, _, g1t, y1l, _ = wall_contact([sticky], 1, 48.99, 300.0, sticky, 40.0, 0.0, ws)
+        self.assertEqual((p5s, g1t, y1l), (0, True, 3000))
 
 
 if __name__ == "__main__":

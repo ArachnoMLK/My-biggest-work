@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(426 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(443 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -399,10 +399,28 @@ above.
 | 2 | head stop on a flat line, or on a down-facing no-slide line | **ceiling**: an upward `_-P5S` becomes 0; the power's `_-K3` is set when it has `_-4A` | yes |
 | 3 | head stop on a non-vertical line, or a steep line (`_-S1A`: ny < 0 and \|nx/ny\| ≥ 5/3) | **slope**: the missing y (move.y − wanted.y) is replayed along the line, the x speed `_-v1D` is pushed to at least 15 in that direction, with a hard-line sweep and a 1.01 back-off | yes |
 | 4 | game-mode line with `_-ao` | mode-specific | no |
-| 5 | vertical line | wall cling, ledge assist (probe from 5 below the top, ±2.02 / 6), sticky-wall timers (`_-y1L`, 5000 ms), slide damping `_-84Q` × 0.85 × 0.384, `_-r51` (PR #26); then **the remaining y continues along the wall** (feet and head sweeps, ±1.01 back-off) | the slide along the wall |
+| 5 | vertical line | wall cling, ledge assist (probe from 5 below the top, ±2.02 / 6), sticky-wall timers (`_-y1L`, 5000 ms), slide damping `_-84Q` × 0.85 × 0.384, `_-r51` (PR #26); then **the remaining y continues along the wall** (feet and head sweeps, ±1.01 back-off) | yes (`wall_contact` + slide), with the fighter state passed in (`WallState`) |
 | 6 | anything else (floors) | pressure plates `_-U5a` | no |
 
 At the end, `_-O6z` = `_-96f`.
+
+Wall details (`wall_contact`) [V]:
+- **Ledge assist.** It runs when `_-wn()` holds and the wall is not no-slide:
+  1. a hard-line probe at head height reaches 2.02 past the wall;
+  2. if it finds no vertical line there, the feet are within 60 (`_-w2p`) below the wall top, and `_-P5S` is
+     above −35 (`_-w5U`), a second probe goes from 5 above the top, (±2.02, 6), toward the wall;
+  3. if that probe lands on a walkable line (not vertical, not steep), the fighter is put on it with a
+     1.01 back-off, and `_-P5S` becomes `_-84Q` × 0.384.
+- **Contact.** It runs when `_-t46()` is false, the head is on a wall or the fighter was already on one, and
+  the fighter did not climb onto the ledge:
+  - `_-r51` = 1 (wall at or left of the feet) or 2;
+  - on first contact, a falling `_-P5S` becomes 0, and `_-y1L` = t + 112 when below the wall's bottom;
+  - on a sticky wall with `_-G1T` set, the hold lasts 5000 ms (`_-P5S` = 0), then `_-G1T` is cleared;
+  - otherwise a fall faster than `_-84Q` × 0.85 × 0.384 is reduced by (`_-84Q` + this step's gravity) ×
+    0.85 × 0.384.
+- **After the contact.**
+  - On a no-slide wall, `_-v1D` = 0.
+  - Otherwise, with no power and not `_-M5t`, `_-v1D` = ±10 toward the wall.
 
 
 ## 8. Thrown items and projectiles (`_-p5k`)
