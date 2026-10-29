@@ -46,8 +46,10 @@ accel *= 1.25 and max *= 1.25         when the mode hook _-N1k._-s3D._-H1g._-m47
 
 ## Applying the acceleration (@2066–2659) [V]
 
-Reached when the move condition of @517 holds (local 4) [H: a horizontal direction is held and movement is
-not locked]. `left = _-141()` [H: the held direction is left].
+Reached when the move condition holds: local 4 = `not IsMoveLocked(now) and _-81n() and not _-Kc._-J4Z`
+(@471–517) [H: `_-81n()` = a horizontal input is held]. `left = Entity._-141()` #2935, which tests one bit
+of the packed field `_-i3X`, the bit index being stored in bits 24–28 of the same field
+(`i3X & (1 << ((i3X >>> 24) & 31)) != 0`) [H: the facing direction, updated from the input elsewhere].
 
 ```
 accel *= _-Kc._-o3I._-x1E(now)                         when a power/weapon modifier is active (@2070–2109)
@@ -67,6 +69,6 @@ e.g. after a hit, is not slowed down by the clamp, only by friction).
 
 ## Next
 
-- Confirm `_-141` (direction) and the move condition (local 4, @480–517) against the input bits.
+- Find where the facing bit of `_-i3X` and `_-81n()` are set from MoveLeft / MoveRight.
 - Order of friction / acceleration / gravity / position update inside #2984, and the knockback decay
   (`docs/powers-11.00.md`).
