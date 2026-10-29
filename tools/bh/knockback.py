@@ -355,6 +355,14 @@ ANCHORS = {ABC_1100: {
         (1670, 86, "getlocal_3", ""),
         (1670, 88, "initproperty", "_-v3y"),
     ],
+    "_-04o is the replay's 9th settings u32 (damage_multiplier), read by _-I3W._-b2L; default 100": [
+        (3876, 91, "callproperty", "_-a16, 0"),
+        (3876, 96, "initproperty", "_-Z1I"),
+        (3876, 105, "callproperty", "_-a16, 0"),
+        (3876, 110, "initproperty", "_-04o"),
+        (3861, 6, "pushbyte", "100"),
+        (3861, 9, "initproperty", "_-04o"),
+    ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
         (1679, 91, "pushdouble", "0.9699"),

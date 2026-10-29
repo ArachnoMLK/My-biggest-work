@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 161 anchors
+python -I tools/bht.py knockback-verify                 # 167 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -31,7 +31,7 @@ and `knockback_force`; `tests/test_knockback.py` pins their behaviour.
 | `d *= attacker._-45J` when the attacker is an Entity | @569–590 | [V] |
 | `d *= _-26u._-M3e[11 + attacker._-P3I − victim._-92e]` (attacker term 0 when not an Entity), skipped when the entry is 0 | @592–662 | [V]; [H] strength vs defence |
 | A negative `d` (a heal) is kept above `−victim._-W22` (the `int` of it) | @664–704 | [V]; [H] `_-W22` = damage taken |
-| Later: `d *= _-N1k._-d3Y._-04o / 100` (a match setting in percent) | @1152–1174 | [V]; [H] damage setting |
+| Later: `d *= _-N1k._-d3Y._-04o / 100`. `_-04o` is the replay header's 9th settings word, `damage_multiplier` (replay-format.md): the settings reader `_-I3W._-b2L` #3876 stores the 9th `_-a16()` read in `_-04o` (@105–110), and `_-I3W.<init>` sets it to 100 | @1152–1174; #3876; #3861 | [V] |
 
 `_-M3e` (script92.<init> #1679 @59–131) has 23 entries, increasing, with 1 at index 11:
 
