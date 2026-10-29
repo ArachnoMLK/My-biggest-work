@@ -1,7 +1,7 @@
 # Level collision (Q6, patch 11.00) — flags and query candidates
 
 Pin: patch 11.00, abc `7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`.
-Check: `python -I tools/bht.py collision-verify` (79 pinned instructions, `tools/bh/collision.py`).
+Check: `python -I tools/bht.py collision-verify` (89 pinned instructions, `tools/bh/collision.py`).
 
 ## Result
 
@@ -72,6 +72,19 @@ wins**. With a collection vector, every hit line is pushed once (`indexOf`, @109
 The offsets of the exception (296–480) are the same as brawlhalla-sim's on 10.09: the method is very
 likely unchanged between the two patches.
 
+## Moving platforms: time to position
+
+**[V]** `MovingPlatform._-V39` #6016 `(t, n)` with `n` key frames, `start = _-N1k._-n4k`:
+```
+t'     = t - start if t >= start else t                 (subtract_i)
+period = 1000 * (n / 60) * SlowMult                      (SlowMult = _-t4q)
+m      = (t' * 0.05) % period
+frame  = StartFrame + m / period * n                     (StartFrame = _-d5L)
+```
+`MovingPlatform._-I4v` #6018: `k = floor(frame + 1e-7)`, `p1 = points[(k + 1) % n]`, `p2 = points[k % n]`,
+`frac = frame - k`, position `= p1 * frac + p2 * (1 - frac)` (same for the origin points). `#6017` is the
+plain `floor(x + 1e-7)`. Same formula as brawlhalla-sim on 10.09 (#47).
+
 ## Next (from docs/prior-art-brawlhalla-sim.md)
 
-Re-prove on 11.00: level selection (`LevelType` → `LevelDesc` in `Dynamic.swz`) and moving platforms (`1000·(N/60)·SlowMult`, `floor(frame + 1e-7)`).
+Re-prove on 11.00: level selection (`LevelType` → `LevelDesc` in `Dynamic.swz`): the moving-platform manager order and line refresh (10.09 #7240, #5836).

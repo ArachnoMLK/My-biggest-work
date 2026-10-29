@@ -13,6 +13,17 @@ TYPES = {"HardCollision": 1, "SoftCollision": 2, "TriggerCollision": 4, "StickyC
          "BouncyNoSlideCollision": 81, "LavaCollision": 657, "MudCollision": 128}
 
 ANCHORS = {ABC_1100: [
+    # MovingPlatform: time -> frame (_-V39 #6016), floor(frame + 1e-7) (#6017), interpolation (#6018)
+    (6016, 36, 'pushint', '1000'),
+    (6016, 40, 'pushbyte', '60'),
+    (6016, 47, 'getproperty', '_-t4q'),
+    (6016, 55, 'pushdouble', '0.05'),
+    (6016, 61, 'modulo', ''),
+    (6016, 68, 'getproperty', '_-d5L'),
+    (6017, 5, 'pushdouble', '1e-07'),
+    (6018, 47, 'pushdouble', '1e-07'),
+    (6018, 118, 'initproperty', 'zzPoint1'),
+    (6018, 140, 'initproperty', 'zzPoint2'),
     # _-CX._-X2e #1581 (13-parameter query) gathers candidates with _-CX._-936 #1582:
     # raster cells of 100, every bucket member in stored order, then every dynamic line _-82D
     (1581, 110, "callproperty", "_-936, 5"), (1581, 850, "callproperty", "_-PK, 7"),
