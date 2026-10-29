@@ -11,7 +11,7 @@ bytecode arithmetic and a `*-verify` command pins it.
 |---|---|---|---|
 | 3 | Moving platforms and their lines (`_-22K._-d4u`) | #30 `platforms.py` | done (rotation on lines open) |
 | 5 | Inputs: replay timeline → keys, buffer, press edges | #28 `input_buffer.py`, #16 bit names | done |
-| 5 | Fighter state dispatch (`_-65w`), power choice (slot → power) | #28 (slots), — | **state machine missing** |
+| 5 | Fighter state dispatch (`_-65w`), power choice (slot → power) | #30 `entity_states.py` (dispatch map), #28 (slots) | dispatch mapped; state transitions and power start missing |
 | 5 | Movement: impulses, friction, gravity, ground walk | #4 / #23 / #26 `step.py` | done (shape) |
 | 5 | Free move against the map: sweeps, back-off, response (ceiling, slope, walls, bounce) | #30 `air_move.py` | done (`_-wn()`, `_-t46()` and other flags passed in) |
 | 5 | Map: LevelDesc lines, curves, default normals, grid, ray cast | #20 (flags), #30 `level_collision.py`, `raycast.py` | done |
@@ -26,8 +26,9 @@ bytecode arithmetic and a `*-verify` command pins it.
 
 ## Missing pieces, by priority
 
-1. **Fighter state machine** (`Entity._-k5H` dispatch on `_-65w`, #2991 @79–). It decides which branch of
-   movement runs and when a power starts. Without it, no input does anything.
+1. **Fighter state transitions and power start.** The dispatch on `_-65w` is mapped (#30); still needed: how
+   an input starts a power (`_-I35` / `_-rU` in #28 → `_-l4X` creation) and the transitions between states
+   (KO → 3, respawn 9 → 0).
 2. **Animation frame table `_-cA`** (`_-l4X._-54L` #86). It maps ticks since cast to animation frames, from
    CastAnim (`_-HT` / `_-6b`) and the animation's frame data (`_-y1v`: `_-T6`, `_-W1n`, `_-012`). It
    selects the target's hurtbox row (§4 of hit-detection-11.00.md). Needs the `.anm` parser of PR #19.
