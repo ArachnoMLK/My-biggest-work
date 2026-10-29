@@ -307,6 +307,17 @@ ANCHORS = {ABC_1100: {
         (1665, 2185, "getproperty", "_-ba"),
         (1665, 2269, "callpropvoid", "_-76s, 21"),
     ],
+    "direction source: _-F5N._-T5A gets it from _-JQ(...), Entity.OnHit normalises it to 1 into the _-P6X record": [
+        (1731, 924, "callproperty", "_-JQ, 11"),
+        (1731, 936, "setlocal", "32"),
+        (1731, 3443, "getlocal", "32"),
+        (1731, 3530, "callpropvoid", "_-5a::OnHit, 17"),
+        (3042, 6, "constructprop", "_-P6X, 0"),
+        (3042, 19, "pushbyte", "1"),
+        (3042, 21, "callpropvoid", "normalize, 1"),
+        (3042, 53, "initproperty", "_-X5n"),
+        (3042, 65, "initproperty", "_-d4V"),
+    ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
         (1679, 91, "pushdouble", "0.9699"),
