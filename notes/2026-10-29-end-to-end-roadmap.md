@@ -15,7 +15,7 @@ bytecode arithmetic and a `*-verify` command pins it.
 | 5 | Movement: impulses, friction, gravity, ground walk | #4 / #23 / #26 `step.py` | done (shape) |
 | 5 | Free move against the map: sweeps, back-off, response (ceiling, slope, walls, bounce) | #30 `air_move.py` | done (`_-wn()`, `_-t46()` and other flags passed in) |
 | 5 | Map: LevelDesc lines, curves, default normals, grid, ray cast | #20 (flags), #30 `level_collision.py`, `raycast.py` | done |
-| 6 | Power timeline: CastTime steps, one hit test per step start | #30 `power_timeline.py`, `power_data.py` | done (cancels open) |
+| 6 | Power timeline: CastTime steps, one hit test per step start | #30 `power_timeline.py`, `power_data.py` | done (end reasons `_-O5N`, step cap `_-Q1n`) |
 | 6 | Hit areas (AoE capsules per TargetMethod), team mask, line of sight, re-hit rule | #30 `hitdetect.py` | done |
 | 6 | Target hurtbox: hurtbox type by power, **row by animation frame `_-c2l`** | #30 (rows), — | **frame table `_-cA` missing** (needs `.anm` frame counts, see #19) |
 | 7a | Thrown items and projectiles | #30 (`_-p5k._-h20` geometry) | item motion and catch gates missing |
