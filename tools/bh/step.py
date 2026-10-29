@@ -1,0 +1,160 @@
+"""Pinned static evidence of the order of operations inside one movement step, Entity._-8i #2984 (11.00).
+
+See docs/entity-step-11.00.md. Byte order and data flow only: which branch runs on a given tick is not
+modelled, and nothing is executed. Anchors are (method id, offset, opname, operand text as printed by
+`abc-disasm`), checked with movement.check / movement.listing; branch operands are relative.
+"""
+from .movement import ABC_1100, check, listing
+from .prng_order import slot_type
+
+IMPULSE_CAP = 250.0      # sqrt(Entity._-y4Q = 62500.0), _-y2E.init #15351 @30022
+SOFT_DROP_DECAY = 0.8    # Entity._-7c initial value, Entity.<init> #2887 @124
+
+
+def fold_impulse(velocity, impulse):
+    """Velocity after folding a one-tick impulse (#2984 @2800-2965 for x, @4217-4395 for y).
+
+    Returns (new velocity, overshoot or None). A zero impulse leaves the velocity unchanged.
+    """
+    if impulse == 0:
+        return velocity, None
+    s = impulse + velocity
+    if s * s > IMPULSE_CAP * IMPULSE_CAP:
+        return (IMPULSE_CAP if s > 0 else -IMPULSE_CAP), s
+    return s, None
+
+
+ANCHORS = {ABC_1100: {
+    "constants: _-7c = 0.8 (Entity.<init>), Entity._-y4Q = 62500 = 250^2": [
+        (2887, 124, "pushdouble", "0.8"),
+        (2887, 127, "initproperty", "_-7c"),
+        (15351, 30022, "pushdouble", "62500.0"),
+        (15351, 30026, "initproperty", "_-y4Q"),
+    ],
+    "1. soft-line drop: on a line with type & 2, _-96f = null and the impulse _-A4A *= _-7c": [
+        (2984, 1815, "getproperty", "type"),
+        (2984, 1819, "pushbyte", "2"),
+        (2984, 1822, "bitand", ""),
+        (2984, 1840, "initproperty", "_-96f"),
+        (2984, 1894, "getproperty", "_-7c"),
+        (2984, 1897, "multiply", ""),
+        (2984, 1914, "callpropvoid", "_-N5C::_-E1t, 2"),
+    ],
+    "2. horizontal impulse fold: v1D = v1D + _-84, or +/-250 (overshoot kept in _-J1m) when the square exceeds _-y4Q": [
+        (2984, 2820, "getproperty", "_-84"),
+        (2984, 2847, "getproperty", "_-84"),
+        (2984, 2865, "getproperty", "_-v1D"),
+        (2984, 2873, "add", ""),
+        (2984, 2887, "getproperty", "_-y4Q"),
+        (2984, 2891, "ifngt", "56"),
+        (2984, 2901, "initproperty", "_-J1m"),
+        (2984, 2931, "pushdouble", "250.0"),
+        (2984, 2939, "pushdouble", "-250.0"),
+        (2984, 2943, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 2965, "callpropvoid", "_-N5C::_-E1t, 2"),
+    ],
+    "3. horizontal step: local12 = v1D * 0.384, then on a ground line a walk loop along _-96f until local12 == 0": [
+        (2984, 3092, "findproperty", "_-v1D"),
+        (2984, 3106, "getproperty", "_-Vj"),
+        (2984, 3110, "multiply", ""),
+        (2984, 3112, "setlocal", "12"),
+        (2984, 3117, "getproperty", "_-96f"),
+        (2984, 3125, "ifeq", "1088"),
+        (2984, 3138, "getproperty", "_-N3a"),
+        (2984, 3203, "callpropvoid", "normalize, 1"),
+        (2984, 3290, "callproperty", "_-X2e, 10"),
+        (2984, 3333, "getproperty", "x"),
+        (2984, 3354, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 3387, "getproperty", "y"),
+        (2984, 3408, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 3426, "getlocal", "12"),
+        (2984, 3448, "setlocal", "12"),
+        (2984, 3466, "initproperty", "_-96f"),
+        (2984, 4197, "pushtrue", ""),
+        (2984, 4202, "ifgt", "7"),
+        (2984, 4211, "lessthan", ""),
+        (2984, 4213, "iftrue", "-1084"),
+    ],
+    "4. vertical impulse fold: P5S = P5S + _-A4A, or +/-250 (overshoot in _-d4x), then P5S clamped to +/-local11": [
+        (2984, 4228, "getproperty", "_-A4A"),
+        (2984, 4239, "ifgt", "24"),
+        (2984, 4254, "getproperty", "_-A4A"),
+        (2984, 4265, "lessthan", ""),
+        (2984, 4281, "getproperty", "_-A4A"),
+        (2984, 4299, "getproperty", "_-P5S"),
+        (2984, 4307, "add", ""),
+        (2984, 4321, "getproperty", "_-y4Q"),
+        (2984, 4325, "ifngt", "52"),
+        (2984, 4334, "initproperty", "_-d4x"),
+        (2984, 4361, "pushdouble", "250.0"),
+        (2984, 4369, "pushdouble", "-250.0"),
+        (2984, 4373, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 4395, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 4416, "getlocal", "11"),
+        (2984, 4418, "ifngt", "22"),
+        (2984, 4436, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 4463, "negate", ""),
+        (2984, 4464, "ifnlt", "19"),
+        (2984, 4483, "callpropvoid", "_-N5C::_-E1t, 2"),
+    ],
+    "5. free move: displacement (local12, P5S * 0.384), +2.02 on y when a ground line is set, swept with _-X2e": [
+        (2984, 6628, "getlocal", "12"),
+        (2984, 6630, "initproperty", "x"),
+        (2984, 6643, "getproperty", "_-P5S"),
+        (2984, 6667, "getproperty", "_-Vj"),
+        (2984, 6671, "multiply", ""),
+        (2984, 6672, "initproperty", "y"),
+        (2984, 6676, "findproperty", "_-96f"),
+        (2984, 6704, "pushdouble", "2.02"),
+        (2984, 6707, "add", ""),
+        (2984, 6896, "callproperty", "_-X2e, 10"),
+    ],
+    "6. end of step: the impulse slots _-84 and _-A4A are reset to 0": [
+        (2984, 14563, "findproperty", "_-Z2G"),
+        (2984, 14573, "getproperty", "_-84"),
+        (2984, 14577, "pushdouble", "0.0"),
+        (2984, 14579, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 14593, "getproperty", "_-A4A"),
+        (2984, 14597, "pushdouble", "0.0"),
+        (2984, 14599, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 14603, "returnvoid", ""),
+    ],
+}}
+
+SLOTS = {ABC_1100: [
+    ("Entity", "_-Z2G", "_-N5C"),
+    ("Entity", "_-v1D", "uint"),
+    ("Entity", "_-P5S", "uint"),
+    ("Entity", "_-A4A", "uint"),
+    ("Entity", "_-84", "uint"),
+    ("Entity", "_-7c", "Number"),
+    ("Entity", "_-J1m", "Number"),
+    ("Entity", "_-d4x", "Number"),
+    ("Entity", "_-96f", "_-R15"),
+]}
+
+
+def verify(abc, sha):
+    """Problems as text lines (empty = every pin holds). None if the ABC is not pinned."""
+    if sha not in ANCHORS:
+        return None
+    bad = []
+    lists = {}
+
+    def lister(m):
+        if m not in lists:
+            lists[m] = listing(abc, m)
+        return lists[m]
+    for group, anchors in ANCHORS[sha].items():
+        for (m, off, op, text), found in check(anchors, lister):
+            bad.append(f"anchor [{group}] #{m} @{off}: want {op} {text}".rstrip() + f", found {found}")
+    for cls, slot, typ in SLOTS[sha]:
+        found = slot_type(abc, cls, slot)
+        if found != typ:
+            bad.append(f"slot {cls}.{slot}: want {typ}, found {found}")
+    return bad
+
+
+def counts(sha):
+    """(anchors, slots) pinned for an ABC."""
+    return sum(len(a) for a in ANCHORS[sha].values()), len(SLOTS[sha])
