@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,8 +57,8 @@ class Stubbed(unittest.TestCase):
 
     def test_changed_opcode_is_reported(self):
         lists = pinned_listings()
-        lists[3624][119] = ("pushint", "2048")  # replay start no longer sets 1024
-        self.assertTrue(any("#3624 @119" in line for line in self.run_verify(lists)))
+        lists[5131][46] = ("iftrue", "38")  # invert the lesson-mode branch
+        self.assertTrue(any("#5131 @46" in line for line in self.run_verify(lists)))
 
     def test_missing_method_reports_every_anchor(self):
         lists = pinned_listings()
@@ -81,6 +82,12 @@ class Stubbed(unittest.TestCase):
     def test_unpinned_hash_is_rejected(self):
         self.assertIsNone(prng_order.verify(None, "0" * 64))
 
+    def test_undecodable_method_cannot_hide_references(self):
+        broken = SimpleNamespace(multinames=[], strings=[],
+                                 bodies=[{"method": 123, "code": b"\xff"}])
+        with self.assertRaisesRegex(ValueError, "cannot scan references in method #123"):
+            prng_order.referencing(broken, {"_-Y15"})
+
 
 class Cli(unittest.TestCase):
     def test_wrong_patch_exits_2(self):
@@ -88,10 +95,11 @@ class Cli(unittest.TestCase):
             p = os.path.join(d, "other.abc")
             with open(p, "wb") as f:
                 f.write(b"not the pinned abc")
-            out = subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "bht.py"),
+            out = subprocess.run([sys.executable, "-I", "-W", "error::ResourceWarning", os.path.join(ROOT, "tools", "bht.py"),
                                   "prng-order-verify", "--abc", p], capture_output=True, text=True)
         self.assertEqual(out.returncode, 2, out.stderr)
         self.assertIn("no draw-order anchors", out.stdout)
+        self.assertNotIn("ResourceWarning", out.stderr)
 
 
 @unittest.skipUnless(HAVE_GAME, "Brawlhalla not installed")

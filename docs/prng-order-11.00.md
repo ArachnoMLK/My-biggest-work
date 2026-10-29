@@ -7,7 +7,8 @@ and offsets ("@N", as printed by `abc-disasm`) apply only to this ABC.
 This page places the draws of the two replay-seeded generators of [prng-11.00.md](prng-11.00.md)
 (**R** = rules `_-h3U._-s3D._-22`, **I** = items `_-h3U._-3z._-22`) on the tick phases of
 [tick-loop-11.00.md](tick-loop-11.00.md). It is **static bytecode evidence**: call sites, guards and
-the order of instructions. It is not a dynamic draw schedule, nothing was executed, and there is no
+the order of instructions. It is not a dynamic draw schedule; neither game nor bytecode was executed
+for these ordering claims, and there is no
 runtime oracle. A "[V]" below means "the bytecode has this shape", checked by the command given.
 
 ## Reproduce
@@ -16,7 +17,7 @@ From the repository root, with the pinned patch installed (`BRAWLHALLA_DIR` set)
 
 ```text
 python -I tools/bht.py abc-extract                 # sha256 must be the pin above
-python -I tools/bht.py prng-order-verify           # 71 anchors, 10 reference sets, 9 slot types
+python -I tools/bht.py prng-order-verify           # 87 anchors, 10 reference sets, 9 slot types
 python -I tools/bht.py abc-disasm --method 3336    # scheduler: phases 3, 4, 9
 python -I tools/bht.py abc-disasm --method 5131    # _-z1C._-O4q, the lesson gate
 python -I tools/bht.py abc-disasm --method 5129    # _-z1C._-44D -> MessageTrigger.Tick
@@ -45,8 +46,8 @@ mismatch or missing method, 2 for an ABC that is not pinned. Its groups are the 
 | 1 | Within one scheduler tick (#3336), the identified R/I entry points run in this order: phase 3 `_-s3D._-u1O(t)` (R side, @2624, skipped when `_-O4t._-O4q()`), phase 4 `_-3z._-O3d(t, …)` (I, @2695), phase 9 **either** `_-O4t._-44D(t)` (lesson, @2992) **or** `_-s3D._-m4d(t)` (R side, @3009), chosen by `_-O4t._-O4q()` @2973. Each of `_-u1O`, `_-O3d`, `_-m4d`, `_-44D` is referenced only by #3336. | [V] `prng-order-verify` |
 | 2 | `MessageTrigger.Tick` (#5809, R draw @731 to pick a random `;`-separated message) is called only from `_-z1C._-44D` @92, i.e. only in phase 9 when `_-O4q()` is true. | [V] (name-based, see limit L4) |
 | 3 | `_-O4q()` is **false** whenever `_-w35` ∈ {1024, 2048}, and whenever `_-z1C._-3I` is null. Replay start sets `_-w35 = 1024`; the replay-side writers found keep 1024 or set 2048. Hence on that path the lesson branch, and with it every `MessageTrigger.Tick` draw, does not run. | [V] for the shapes; boundary in L1 |
-| 4 | `_-9D._-Y15` (#13733, victory-taunt pick, 0–2 R draws) is reached only from `ScreenScoreboard.OnTickScreen` (#10946 @334), which is a **per-frame screen tick outside the 16 ms step**: `_-M4q` #3335 runs the tick batch `_-01I` @1815 and then the screen stack `_-4p._-w10` @2556. These draws can never fall *inside* a tick; they fall *between* frame batches. | [V] |
-| 5 | Whether the scoreboard screen is on the stack during replay playback, and if so before or after the last R-drawing tick, is **unknown**. If it is shown only after the match result (`_-vs`), its draws cannot change KOs or scores. | unknown / [H] |
+| 4 | The identified call to `_-9D._-Y15` (#13733, victory-taunt pick, 0–2 direct R draws) is from `ScreenScoreboard.OnTickScreen` (#10946 @334), a **per-frame screen tick outside the 16 ms step**: `_-M4q` #3335 runs the tick batch `_-01I` @1815 and then the screen stack `_-4p._-w10` @2556. On this path the draws fall *between* frame batches. | [V] (name-based, see L4) |
+| 5 | Whether the scoreboard screen is on the stack during replay playback, and if so before or after the last gameplay-relevant R-drawing tick, is **unknown**. The `_-vs + 450` update window in Q2 means that being after the match-result flag alone does not settle this. | unknown; [V] window in tick-loop-11.00.md |
 | 6 | Item seeding draws `_-Y1h` (I draw 0) and `_-5J` (I draw 1) are two per-lane cached values; they are redrawn in phase 4 by `_-96d` then `_-u43` (both called only by `_-O3d`), each after an `_-e3K(…, 4 args)` call. | [V] shape; [H] meaning |
 
 Net answer to the Q3 question: the lesson/trigger path cannot consume R during a replay as long as
@@ -68,8 +69,9 @@ step and only while that screen is ticking (claim 4, boundary claim 5).
 | `_-h3U._-f3N` #3626 | if `_-w35 & (32\|2048) == 0`: `_-ce = _-w35` (@23–33), then `_-w35 = 2048` when no bit of `2\|4\|0x400000` and none of `1\|8\|8192` is set and one of `1024\|2048\|8192` is set, else `32` (@37–137). From 1024: `_-ce = 1024`, `_-w35 = 2048`. | [V] |
 | `_-h3U._-01I` #3336 @4342–4370 | `_-w35 = 2048` under a time test (end of replay data, [H]) | [V] store |
 
-So lesson matches are not replay-seeded (seeded from `Math.random()` via `_-PW`) and are flagged by bit
-`0x1000000`; replay modes 1024/2048 keep `_-O4q()` false (with `_-ce` = 1024 also on the bit-32 path).
+The identified lesson-start path uses a seed from `Math.random()` via `_-PW`, rather than the replay
+header, and sets bit `0x1000000`. Modes 1024/2048 keep `_-O4q()` false (also on a bit-32 path when
+`_-ce` = 1024). This establishes the guard, not that all mode transitions during playback preserve it (L1).
 
 ## 3. Scoreboard taunt: `_-9D._-Y15`
 
@@ -83,7 +85,7 @@ So lesson matches are not replay-seeded (seeded from `Math.random()` via `_-PW`)
 | `_-h3U._-M4q` #3335 | @1815 `_-01I()` (all 16 ms ticks due this frame), then @2556 `_-4p._-w10()`. Two other `_-w10` calls are on paths that return without `_-01I` (@481 → return @607, @1363 → return @1385). | [V] |
 | `_-4p._-w10` #9548 → `_-E6N._-D6k` #4331 | ticks every screen of `_-4p._-Bn` from top to bottom; `_-D6k` calls `OnTickScreen` @303 (guarded) | [V] |
 
-Per scoreboard showing at most 8 slots × 2 = 16 R draws, once (when `_-xI` reaches 2). They are
+On this call path, at most 8 slots × 2 = 16 direct R draws per scoreboard showing, when `_-xI` reaches 2. They are
 *between* tick batches; the number of ticks before them depends on frame timing, so if they ever
 precede an R-drawing tick the stream position would not be a function of the replay alone. Whether
 that can happen is limit L2.

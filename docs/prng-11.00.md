@@ -155,7 +155,7 @@ unit-tested against ECMAScript values, and the ctypes reference and `SwzRandom` 
   [V] shape: per tick, rules phase 3 `_-u1O` → items phase 4 `_-O3d` → phase 9 lesson `_-44D` *or*
   rules `_-m4d`; `MessageTrigger.Tick` only runs on the lesson branch, which `_-O4q()` closes for replay
   modes 1024/2048; `_-9D._-Y15` is the post-match ScreenScoreboard taunt pick, ticked per frame
-  *after* the 16 ms batch, never inside a tick. Open there: other `_-w35` writers (L1), whether the
+  *after* the 16 ms batch on the identified call path. Open there: other `_-w35` writers (L1), whether the
   scoreboard ticks during playback (L2), the rule call graphs from `_-u1O`/`_-m4d` (L3).
 - [H] meaning of `_-Y1h`/`_-5J`: per-lane cached item values (two spawn lanes), redrawn in phase 4 by
   `_-96d`/`_-u43` (prng-order §4); what they control is unknown.

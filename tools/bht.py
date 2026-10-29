@@ -239,7 +239,8 @@ def cmd_prng_order_verify(a):
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
     if not os.path.exists(p):
         sys.exit("run `abc-extract` first (or pass --abc)")
-    data = open(p, "rb").read()
+    with open(p, "rb") as f:
+        data = f.read()
     sha = hashlib.sha256(data).hexdigest()
     if sha not in prngordermod.ANCHORS:
         print(f"no draw-order anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in prngordermod.ANCHORS)})")

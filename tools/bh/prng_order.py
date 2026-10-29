@@ -26,10 +26,23 @@ ANCHORS = {ABC_1100: {
     ],
     "_-z1C._-O4q: needs _-3I and mode bit 0x1000000 (or bit 32 with saved _-ce bit)": [
         (5131, 5, "getproperty", "_-3I"),
+        (5131, 12, "ifne", "2"),
+        (5131, 16, "pushfalse", ""),
+        (5131, 17, "returnvalue", ""),
         (5131, 29, "pushint", "16777216"),
         (5131, 36, "getproperty", "_-w35"),
+        (5131, 40, "bitand", ""),
+        (5131, 46, "iffalse", "38"),
         (5131, 54, "pushbyte", "32"),
+        (5131, 57, "bitand", ""),
+        (5131, 62, "iffalse", "16"),
         (5131, 67, "getproperty", "_-ce"),
+        (5131, 72, "bitand", ""),
+        (5131, 77, "returnvalue", ""),
+        (5131, 82, "pushfalse", ""),
+        (5131, 83, "returnvalue", ""),
+        (5131, 88, "pushtrue", ""),
+        (5131, 89, "returnvalue", ""),
     ],
     "other mode writers seen on replay paths keep both bits clear": [
         (3336, 4367, "pushint", "2048"),
@@ -42,9 +55,11 @@ ANCHORS = {ABC_1100: {
     ],
     "tick phases: rules 3, items 4, lesson-or-rules 9": [
         (3336, 2606, "callproperty", "_-O4q, 0"),
+        (3336, 2612, "iffalse", "13"),
         (3336, 2624, "callpropvoid", "_-u1O, 1"),
         (3336, 2695, "callpropvoid", "_-O3d, 2"),
         (3336, 2973, "callproperty", "_-O4q, 0"),
+        (3336, 2978, "iffalse", "19"),
         (3336, 2992, "callpropvoid", "_-44D, 1"),
         (3336, 3009, "callproperty", "_-m4d, 1"),
     ],
@@ -87,6 +102,7 @@ ANCHORS = {ABC_1100: {
     "ScreenScoreboard tick: _-9D._-Y15 once, at screen tick _-xI == 2": [
         (10946, 264, "getproperty", "_-xI"),
         (10946, 267, "pushbyte", "2"),
+        (10946, 271, "iffalse", "72"),
         (10946, 293, "getproperty", "_-r5y"),
         (10946, 334, "callpropvoid", "_-Y15, 0"),
         (10962, 222, "initproperty", "_-xI"),
@@ -143,8 +159,8 @@ def referencing(abc, names):
     for body in abc.bodies:
         try:
             ins = abcmod.decode(body["code"])
-        except ValueError:
-            continue
+        except ValueError as exc:
+            raise ValueError(f"cannot scan references in method #{body['method']}: {exc}") from exc
         for _, op, args in ins:
             if op in abcmod.MULTINAME_OPS and args and args[0] in targets:
                 hits[targets[args[0]]].add(body["method"])
