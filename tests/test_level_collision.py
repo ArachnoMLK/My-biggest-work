@@ -9,7 +9,8 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.hitdetect import line_of_sight_blocked, map_ray  # noqa: E402
-from bh.level_collision import Grid, cell_key, cells, curve_lines, element_lines, static_lines  # noqa: E402
+from bh.level_collision import (Grid, cell_key, cells, compute_normals, curve_lines, element_lines,  # noqa: E402
+                                static_lines)
 
 
 class Cells(unittest.TestCase):
@@ -57,6 +58,27 @@ class Elements(unittest.TestCase):
         xml = ('<LevelDesc><HardCollision X1="0" X2="10" Y="0"/><DynamicCollision X="5">'
                '<HardCollision X1="0" X2="10" Y="0"/></DynamicCollision><Foo/></LevelDesc>')
         self.assertEqual(len(static_lines(xml)), 1)
+
+
+class Normals(unittest.TestCase):
+    def test_box_faces_point_out(self):
+        box = [element_lines("HardCollision", a)[0] for a in (
+            ' X1="0" X2="100" Y="0"', ' X1="0" X2="100" Y="100"', ' X="0" Y1="0" Y2="100"', ' X="100" Y1="0" Y2="100"')]
+        compute_normals(box)
+        top, bottom, left, right = (ln.normal for ln in box)
+        self.assertEqual(top, (0.0, -1.0))
+        self.assertEqual((abs(bottom[0]), bottom[1]), (0.0, 1.0))
+        self.assertEqual(left, (-1.0, 0.0))
+        self.assertEqual(right, (1.0, 0.0))
+
+    def test_soft_and_trigger(self):
+        soft = element_lines("SoftCollision", ' X1="0" X2="100" Y="0"')[0]
+        trig = element_lines("TriggerCollision", ' X1="0" X2="100" Y="50"')[0]
+        given = element_lines("HardCollision", ' X1="0" X2="10" Y="9" NormalY="1"')[0]
+        compute_normals([soft, trig, given])
+        self.assertEqual(soft.normal, (0.0, -1.0))
+        self.assertEqual(trig.normal, (0.0, 0.0))
+        self.assertEqual(given.normal, (0.0, 1.0))
 
 
 class GridOrder(unittest.TestCase):

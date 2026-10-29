@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(365 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(380 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -315,6 +315,21 @@ Lines inside `DynamicCollision` and `MovingPlatform` blocks go to the dynamic li
 `_-936` #1582 gathers the candidates of a ray: the buckets of the cells the ray crosses, then every
 dynamic line. There is no de-duplication and no sort [V]. `map_ray` accepts a `Grid` and gathers the
 candidates per ray the same way.
+
+**Default normals.** Most lines have no normal in the file. When the level is set up (`_-139._-c6s` →
+`_-a2j._-u8(W, H)` #5222), every line still without one gets one, static lines first, then dynamic ones.
+W × H is the box around every line (`_-43i` bounds, started at ±MAX_VALUE in `_-y39`) [V]:
+- a trigger line gets (0, 0);
+- otherwise the start is n = (|Δy|, |Δx|);
+- a soft line points up (y negated; x negated when its end is higher than its start);
+- a hard line casts one ray from its midpoint, snapped to `v + 5 − v mod 10`: to the right (W + 10) when it
+  is vertical, down (H + 10) otherwise. The ray is two-sided and sees hard lines only, ignores the line
+  itself, and counts every line it crosses. The parity of that count flips the normal so that it points
+  out of the solid (vertical: odd → x negated; otherwise, by the slope, y or x negated);
+- the normal is then normalised (`_-q3q`).
+
+`compute_normals` transcribes it. Local check: on the 122 maps, the flat hard lines without a normal get
+296 "up" (tops of blocks) and 271 "down" (undersides), with 0 errors.
 
 Local check (aggregate): the 122 LevelDescs parse with no error. They give 1,747 static lines, 61 of
 them with a normal. That file order is the game's insertion order is [H].

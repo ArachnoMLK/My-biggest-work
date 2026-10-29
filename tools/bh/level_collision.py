@@ -10,7 +10,7 @@ import math
 import re
 
 from .movement import ABC_1100, check, listing
-from .raycast import Line
+from .raycast import Line, ray_cast
 
 CELL = 100
 # Element name -> type flags, `_-i2H.static._-T5E` #858 (same table as tools/bh/collision.py, PR #20)
@@ -186,6 +186,65 @@ class Grid:
         return out
 
 
+def _parity_ray(grid, line, mx, my, dx, dy):
+    """One `_-X2e` of #5222: owner 0, mask 1 (hard), options 8 (two-sided), the line itself ignored, every hit
+    line collected once. Returns the number of lines crossed."""
+    hits = []
+    ray_cast(grid.candidates(mx, my, mx + dx, my + dy), 0, mx, my, dx, dy, 1, 8, 0, ignore=line, collect=hits)
+    return len(hits)
+
+
+def _mid(v):
+    """#5222 @445-473: v + (5 - v % 10) (AS3 % keeps the sign of v)."""
+    return v + (5 - math.fmod(v, 10))
+
+
+def compute_normals(static, dynamic=()):
+    """`_-a2j._-u8(W, H)` #5222: a normal for every line that has none, static lines first, then dynamic ones.
+
+    W and H are the width and height of the box around every line added (`_-43i` bounds, from +/-MAX_VALUE in
+    `_-y39`). Trigger lines (type & 4) get (0, 0). Otherwise n = (|dy|, |dx|); a soft line points up (y
+    negated; x negated when the end is higher than the start). A hard line casts two rays from its midpoint
+    (snapped to 10k + 5): to the right / left for a vertical line, down / up otherwise, and flips the normal
+    by the parity of the hard lines the first ray crosses. The normal is then normalised (`_-q3q`).
+    """
+    lines = list(static) + list(dynamic)
+    if not lines:
+        return
+    xs = [v for ln in lines for v in (ln.sx, ln.ex)]
+    ys = [v for ln in lines for v in (ln.sy, ln.ey)]
+    w, h = max(xs) - min(xs), max(ys) - min(ys)
+    grid = Grid(static, dynamic)
+    for ln in lines:
+        if ln.normal is not None:
+            continue
+        if ln.type & 4:
+            ln.normal = (0.0, 0.0)
+            continue
+        ax = ln.sx - ln.ex if ln.sx > ln.ex else ln.ex - ln.sx
+        ay = ln.sy - ln.ey if ln.sy > ln.ey else ln.ey - ln.sy
+        nx, ny = ay, ax
+        mx, my = _mid((ln.sx + ln.ex) * 0.5), _mid((ln.sy + ln.ey) * 0.5)
+        if ln.type & 2:
+            ny = ny * -1
+            if ln.ey < ln.sy:
+                nx = nx * -1
+        elif ln.sx == ln.ex:
+            if _parity_ray(grid, ln, mx, my, w + 10, 0.0) % 2 != 0:
+                nx = nx * -1
+        else:
+            down = _parity_ray(grid, ln, mx, my, 0.0, h + 10)
+            if ln.ey >= ln.sy:
+                if down % 2 != 0:
+                    ny = ny * -1
+                else:
+                    nx = nx * -1
+            elif down % 2 != 0:
+                nx = nx * -1
+                ny = ny * -1
+        ln.normal = normalize_normal(nx, ny)
+
+
 ANCHORS = {ABC_1100: {
     "_-J1j: X / X1 / X2, Y / Y1 / Y2, swap so start.x <= end.x, Flag, Team, Anchor curve or one _-R15, Normal": [
         (5295, 325, "pushstring", "'X'"),
@@ -248,6 +307,23 @@ ANCHORS = {ABC_1100: {
         (1028, 359, "subtract", ""),
         (1028, 450, "negate", ""),
         (1028, 453, "subtract", ""),
+    ],
+    "_-u8 normals: triggers (0, 0); (|dy|, |dx|); soft up; hard: parity of hard lines crossed by a ray from the snapped midpoint": [
+        (5222, 165, "callproperty", "http://adobe.com/AS3/2006/builtin::concat, 1"),
+        (5222, 249, "pushbyte", "4"),
+        (5222, 383, "constructprop", "flash.geom::Point, 2"),
+        (5222, 447, "pushbyte", "5"),
+        (5222, 451, "pushbyte", "10"),
+        (5222, 453, "modulo", ""),
+        (5222, 504, "pushbyte", "-1"),
+        (5222, 564, "pushbyte", "10"),
+        (5222, 627, "callpropvoid", "_-X2e, 13"),
+        (5222, 685, "pushbyte", "2"),
+        (5222, 783, "callpropvoid", "_-X2e, 13"),
+        (5222, 857, "modulo", ""),
+        (5222, 964, "callpropvoid", "_-q3q, 0"),
+        (5302, 200, "callpropvoid", "_-u8, 2"),
+        (5307, 29, "pushdouble", "1.79769313486231e+308"),
     ],
 }}
 
