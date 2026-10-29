@@ -36,7 +36,11 @@ engine again. Nobody has reproduced that engine publicly yet. This project tries
 | Input bits: value 1 = Up, value 32 = Aim Up (`commands-verify`) | 🔄 [PR #16](https://github.com/ArachnoMLK/My-biggest-work/pull/16) |
 | `.anm` animation format (105/105 files, `anm-info`) | 🔄 [PR #19](https://github.com/ArachnoMLK/My-biggest-work/pull/19) |
 | **Q8** — role of every game file (89 needed to re-simulate) | 🔄 [PR #18](https://github.com/ArachnoMLK/My-biggest-work/pull/18) |
-| **Q6, Q7, Q9, Q10** — level collisions, attack state machine, unknown replay fields, ground-truth oracle | ⬜ open |
+| **Q6** — level collisions: flags, query order, acceptance rule (`collision-verify`) | 🔄 [PR #20](https://github.com/ArachnoMLK/My-biggest-work/pull/20) |
+| **Q7** — attacks: parser, clash arbitration, repeated hits, **knockback formula**, stun | 🔄 [PR #22](https://github.com/ArachnoMLK/My-biggest-work/pull/22) |
+| Horizontal movement: max speed, linear friction, acceleration | 🔄 [PR #23](https://github.com/ArachnoMLK/My-biggest-work/pull/23) |
+| **Q9** — settings flags and object 7 (ball modes only) | 🔄 [PR #21](https://github.com/ArachnoMLK/My-biggest-work/pull/21) |
+| **Q10** — ground-truth oracle | ⬜ open |
 | Simulator reproduces the KOs and scores of real replays | ⬜ |
 | Video rendering with the real maps and animations | ⬜ |
 
