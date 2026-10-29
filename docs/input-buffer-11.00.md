@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 85 anchors
+python -I tools/bht.py input-buffer-verify            # 101 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -54,9 +54,13 @@ press and the three ticks after it. A key held down is not a new press.
 
 - [V] Jump: `owner.Jump(t)` @3445 runs when `local14` (an action already taken in this pass) is false and
   a jump press is buffered (`local25 ≠ 0`).
+- [V] **A buffered jump cannot fire twice.**
+  - `Entity.Jump(t, a, b)` #3052 returns at once when `!a && _-H5F(t, b)` (@36–59).
+  - Otherwise it records `_-I5A = t` (@497–502, @540–545).
+  - `Entity._-H5F` #3065 returns true while `t ≤ _-I5A + Entity._-Y35`, and `_-Y35 = 176` ms (11 ticks, `script157.<init>` #3173 @829). That is longer than the 4-tick buffer.
+  - `_-H5F` also allows a jump only in states `_-65w` ∈ {0, 5} (`lookupswitch` @27), and blocks it when `IsMoveLocked(t)`, `_-u4F()`, `_-Xb ≠ 0`, `_-Kc._-cr ≠ 0` or `_-C54(t)` (unless its second argument is set), when `t < _-f6R`, and in the air (`_-wn()`) with `_-P5Y() ≥ _-56T()` and `_-r51 == 0` [H: no jump left].
 - Not read yet [H]:
-  - the eligibility order of the other actions;
-  - how a press that fired is kept from firing again on the next ticks;
+  - the eligibility order of the other actions, and their own re-trigger guards;
   - the role of `_-B5 = t` @3383.
 
 ## Limits

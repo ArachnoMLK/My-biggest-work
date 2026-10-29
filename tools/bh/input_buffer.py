@@ -144,6 +144,24 @@ ANCHORS = {ABC_1100: {
         (15351, 20887, "pushint", "8192"),
         (15351, 20892, "initproperty", "_-z5Y"),
     ],
+    "no re-trigger: Jump sets _-I5A = t and _-H5F blocks jumps while t <= _-I5A + _-Y35 (176)": [
+        (3052, 37, "getlocal_2", ""),
+        (3052, 38, "not", ""),
+        (3052, 49, "callproperty", "_-H5F, 2"),
+        (3052, 59, "returnvoid", ""),
+        (3052, 502, "initproperty", "_-I5A"),
+        (3052, 545, "initproperty", "_-I5A"),
+        (3065, 20, "getproperty", "_-65w"),
+        (3065, 27, "lookupswitch", "23, 29, 23, 23, 23, 23, 29"),
+        (3065, 247, "getproperty", "_-I5A"),
+        (3065, 255, "getproperty", "_-Y35"),
+        (3065, 258, "add_i", ""),
+        (3065, 261, "greaterequals", ""),
+        (3065, 263, "setlocal", "7"),
+        (3065, 271, "pushtrue", ""),
+        (3173, 829, "pushuint", "176"),
+        (3173, 831, "initproperty", "_-Y35"),
+    ],
 }}
 
 
