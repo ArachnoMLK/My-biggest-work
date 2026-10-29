@@ -286,6 +286,30 @@ def skips_line_of_sight(g4i):
     return g4i in (2, 3, 11)
 
 
+ITEM_QUERY_RADIUS = 1050.0   # `_-p5k._-h20` #15239 @492: half size of the broad area query around an item
+
+
+def item_capsule(x, y, offset, segment, radius):
+    """Capsule of a thrown item or projectile `_-p5k` (`_-p5k._-N2t` #15240 and #15239 @1148-1216):
+    start (x + `_-86n`.x, y + `_-86n`.y), segment `_-CB`, radius `_-SW`; (x, y) = (`_-p3V()`, `_-Sb()`)."""
+    return x + offset[0], y + offset[1], segment[0], segment[1], radius
+
+
+def item_swept_capsule(prev_x, prev_y, x, y, item_w, item_h):
+    """Fallback test of #15239 @1234-1282 when the item capsule misses: a capsule from the previous position
+    (`_-X2D`, `_-14l` - h/2) to the current one (`_-p3V()`, `_-Sb()`), radius min(w, h) / 2, with
+    (w, h) = the item type's (`_-93n._-w2s`, `_-S2O`) (@360-417). Catches fast items passing through."""
+    half_h = item_h * 0.5
+    r = item_w * 0.5 if item_w < item_h else half_h
+    return prev_x, prev_y - half_h, x - prev_x, y - prev_y, r
+
+
+def item_query_mask(l5):
+    """Team mask of the item query (#15239 @540-571): `_-34m` alone when the local flag (@419-490) holds,
+    else `_-p3C | _-34m`. [H] `_-34m` selects the `_-E2I` check in `_-G2C`."""
+    return ("_-34m",) if l5 else ("_-p3C", "_-34m")
+
+
 def map_ray(lines, team, item_ignore=False):
     """The `ray` callback of line_of_sight_blocked over map lines, as `_-T5A` calls `_-CX._-X2e`: owner =
     the attacker's team `_-25G`, mask = flags_a, options = flags_b, excluded = `_-z2k._-M4J` (item-ignore, 32)
@@ -527,6 +551,29 @@ ANCHORS = {ABC_1100: {
         (6483, 13301, "pushbyte", "11"),
         (6483, 13316, "pushbyte", "2"),
         (6483, 13321, "initproperty", "_-x28"),
+    ],
+    "Items / projectiles _-p5k._-h20: broad _-R6C 1050, item capsule _-86n/_-CB/_-SW, swept capsule, Q3h -> R58 -> q5 (x4I = target)": [
+        (15239, 492, "pushdouble", "1050.0"),
+        (15239, 549, "getproperty", "_-34m"),
+        (15239, 560, "getproperty", "_-p3C"),
+        (15239, 623, "callpropvoid", "_-R6C, 9"),
+        (15239, 1135, "callproperty", "_-5a::_-N2t, 5"),
+        (15239, 1153, "getproperty", "_-86n"),
+        (15239, 1193, "getproperty", "_-CB"),
+        (15239, 1213, "getproperty", "_-SW"),
+        (15239, 1239, "getproperty", "_-X2D"),
+        (15239, 1245, "getproperty", "_-14l"),
+        (15239, 1248, "getlocal_3", ""),
+        (15239, 1282, "callproperty", "_-5a::_-N2t, 5"),
+        (15239, 369, "pushdouble", "0.5"),
+        (15239, 1792, "callpropvoid", "_-Q3h, 3"),
+        (15240, 79, "callproperty", "_-h2Z, 10"),
+        (15230, 242, "callpropvoid", "_-R58, 4"),
+        (15209, 1829, "callproperty", "_-q5, 12"),
+        (1702, 27, "constructprop", "_-l4X, 7"),
+        (1702, 40, "initproperty", "_-x4I"),
+        (1702, 52, "initproperty", "_-A3S"),
+        (1702, 170, "callpropvoid", "_-R63, 1"),
     ],
 }}
 

@@ -10,7 +10,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, hitdetect, swf  # noqa: E402
-from bh.hitdetect import (AREA_AT_OWNER, line_of_sight_blocked, skips_line_of_sight, HitRecord, deals_damage, records_after_pass, rehit_blocked, CLEAR, COLLIDER, area_center, capsule_of_box, capsules_touch,  # noqa: E402
+from bh.hitdetect import (AREA_AT_OWNER, item_capsule, item_swept_capsule, line_of_sight_blocked, skips_line_of_sight, HitRecord, deals_damage, records_after_pass, rehit_blocked, CLEAR, COLLIDER, area_center, capsule_of_box, capsules_touch,  # noqa: E402
                           frame_window, hit_capsule, hurtbox_capsule, hurtbox_frames, hurtbox_row,
                           point_segment_dist2, query_kind, row_values, segment_dist2, segments_cross,
                           target_method)
@@ -148,6 +148,21 @@ class LineOfSight(unittest.TestCase):
 
     def test_x28(self):
         self.assertEqual([g for g in range(15) if skips_line_of_sight(g)], [2, 3, 11])
+
+
+class Items(unittest.TestCase):
+    def test_item_capsule(self):
+        self.assertEqual(item_capsule(10.0, 20.0, (-5.0, -3.0), (10.0, 0.0), 4.0), (5.0, 17.0, 10.0, 0.0, 4.0))
+
+    def test_swept(self):
+        self.assertEqual(item_swept_capsule(0.0, 100.0, 30.0, 60.0, 20.0, 40.0), (0.0, 80.0, 30.0, -40.0, 10.0))
+        self.assertEqual(item_swept_capsule(0.0, 0.0, 1.0, 0.0, 40.0, 20.0)[4], 10.0)
+
+    def test_swept_catches_a_fast_item(self):
+        hurt = hurtbox_capsule(50.0, 0.0, 40.0, 100.0, 0.0, 0.0, False)
+        now = item_capsule(200.0, -50.0, (0.0, 0.0), (0.0, 0.0), 5.0)
+        self.assertFalse(capsules_touch(now, hurt))
+        self.assertTrue(capsules_touch(item_swept_capsule(-100.0, -40.0, 200.0, -40.0, 10.0, 10.0), hurt))
 
 
 class Rehit(unittest.TestCase):

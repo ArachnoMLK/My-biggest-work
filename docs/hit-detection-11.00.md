@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(205 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(226 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -272,7 +272,38 @@ So the first straight ray of the line of sight sees soft platforms from both sid
 exactly 2 does not block, because only `type != 2` counts. Bouncy soft (66) and soft pressure plates (258)
 do block [V; the effect in game is H]. The detour and edge rays only see hard lines.
 
-## 8. Still open
+## 8. Thrown items and projectiles (`_-p5k`)
+
+Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not powers. Each update,
+`_-p5k._-h20` #15239 runs these steps [V]:
+
+1. **Early exits.** It returns early in states `_-5T` 5 and 7, and when the item type `_-93n` has none of
+   `_-o3Y`, `_-64N`, `_-n2m`.
+2. **Broad query.** `_-R6C` around the item, with half sizes **1050 × 1050** (@492, @623). The mask is
+   `_-34m`, or `_-p3C | _-34m`, depending on a timing flag (@419–571).
+3. **Fine test.** For each candidate other than the item itself, the item capsule is tested against
+   the candidate (`candidate._-N2t`). The capsule starts at (x + `_-86n`.x, y + `_-86n`.y), with segment
+   `_-CB` and radius `_-SW`. While the item is held as a power (`_-gT`), the holder's hurtbox is used
+   instead.
+4. **Swept test.** When the fine test misses, a swept capsule from the previous position (`_-X2D`,
+   `_-14l` − h/2) to the current one is tried, with radius min(w, h)/2 of the item type (@1234–1282). A
+   fast item cannot pass through a target between two ticks.
+5. **Per-target gates.** Gates per target run on the bit `1 << _-03K()` of `_-Io` / `_-x5G`. They
+   involve:
+   - catch windows `_-O13 + 400`;
+   - 32 or 64 ms depending on whether the item moves mostly along x (`_-Lu`) or y (`_-33c`);
+   - `_-K3V`, `_-J5Z`, `_-66f`, `_-I1E`.
+
+   These are read but **not transcribed** [V shape; meanings H].
+6. **Hit.** The last target that passes is handed to `_-Q3h(t, holder, target)` (@1792). That calls
+   `_-R58` (#15230 @242), which spawns a power of the thrower with `_-F5N._-q5` (#15209 @1829). `_-q5`
+   builds a new `_-l4X` with **`_-x4I = the hit target`** and `_-A3S = true`, adds it to `_-pX` and runs
+   `_-R63` once (#1702).
+
+So for TargetMethod 2 / 11 (Ranged, ThrownItem), §2's "list = [`_-x4I`]" means the power hits exactly the
+target the item touched. `_-A3S` makes the line of sight ignore item-ignore lines (§7.1).
+
+## 9. Still open
 
 - Building the candidate list of §7.1 from a LevelDesc (grid traversal `_-A6B._-t2D`, moving platforms at
   time t, see PR #20).
@@ -280,7 +311,7 @@ do block [V; the effect in game is H]. The detour and edge rays only see hard li
   Uninterruptable `_-C5G`, `_-hQ` / `_-72e`). The order of the list follows `_-5r` [H].
 - The meaning of `_-X2G`, `_-B5B`, `_-q24`, and the exact gate on `_-L5r` per frame (§1).
 - The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
-- Projectiles: the Ranged / ThrownItem object `_-x4I` is used by 16 methods (`_-l4X._-V5R`, `_-RW`,
-  `_-F5N._-q5`, `_-33h`, `_-F16`, `Entity._-j4e`, …); not read yet.
+- Items: the per-target gates of §8 step 5, the item's own motion and map collision (`_-p5k._-8i` uses
+  `_-X2e`), and the other spawners `_-F5N._-33h` (15 callers) and `_-p5k._-u1I`.
 - Nothing has been checked against a running game. The next step towards the KO oracle
   (oracle-ko.md) is one scripted exchange: a hit, its knockback, then a ring-out.
