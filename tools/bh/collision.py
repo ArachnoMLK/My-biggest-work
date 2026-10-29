@@ -13,6 +13,13 @@ TYPES = {"HardCollision": 1, "SoftCollision": 2, "TriggerCollision": 4, "StickyC
          "BouncyNoSlideCollision": 81, "LavaCollision": 657, "MudCollision": 128}
 
 ANCHORS = {ABC_1100: [
+    # _-CX._-X2e #1581 (13-parameter query) gathers candidates with _-CX._-936 #1582:
+    # raster cells of 100, every bucket member in stored order, then every dynamic line _-82D
+    (1581, 110, "callproperty", "_-936, 5"), (1581, 850, "callproperty", "_-PK, 7"),
+    (1581, 956, "callproperty", "_-R5v, 9"),
+    (1582, 64, "pushbyte", "100"), (1582, 66, "callproperty", "_-t2D, 7"), (1582, 131, "callproperty", "_-a2E, 2"),
+    (1582, 143, "getproperty", "_-S4a"), (1582, 254, "getproperty", "_-82D"), (1582, 286, "getproperty", "_-82D"),
+    (1582, 313, "returnvalue", ""),
     # _-i2H.static._-T5E: XML collision name -> base flag | statics
     (858, 7, 'pushbyte', '2'),
     (858, 10, 'pushstring', "'SoftCollision'"),

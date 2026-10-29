@@ -1,7 +1,7 @@
-# Level collision types (Q6, patch 11.00) — first part: flags
+# Level collision (Q6, patch 11.00) — flags and query candidates
 
 Pin: patch 11.00, abc `7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`.
-Check: `python -I tools/bht.py collision-verify` (58 pinned instructions, `tools/bh/collision.py`).
+Check: `python -I tools/bht.py collision-verify` (68 pinned instructions, `tools/bh/collision.py`).
 
 ## Result
 
@@ -31,8 +31,23 @@ brawlhalla-sim found on 10.09.
 | `LavaCollision` | 657 | hard, no-slide, game-mode, lava |
 | `MudCollision` | 128 | game-mode only (no hard bit) |
 
+## Collision query: candidate order
+
+**[V]** The query is **`_-CX._-X2e` #1581**: 13 parameters `(int, Number, Number, Point, Point, _-R15,
+Point, Point, uint, uint, int, uint, Vector.<_-R15>)`, returns a collision line `_-R15`, called from 38
+methods (`abc-find --member _-X2e`), as the 13-argument form on 10.09.
+
+It gathers candidates with **`_-CX._-936` #1582** (returns their count):
+1. raster traversal `_-A6B._-t2D(x0, y0, x1, y1, cellsX, cellsY, 100)` (@66): **cell size 100**;
+2. for each cell, key `_-CX._-a2E(cx, cy)` (@131), bucket `_-S4a.h[key]`, and **every member appended
+   in stored order**;
+3. **then every dynamic line** `_-82D` appended in stored order (@251–303).
+
+No sort anywhere in #1582, as on 10.09. The segment test is `_-A6B._-PK` #1017 (7 Numbers + Point →
+Number) at @850, and `_-Q3r._-R5v` #6297 (8 Numbers + Point → Boolean) at @956.
+
 ## Next (from docs/prior-art-brawlhalla-sim.md)
 
-Re-prove on 11.00: level selection (`LevelType` → `LevelDesc` in `Dynamic.swz`), the collision query
-(10.09 `_-91W._-K2O` #1390, raster cell `100`, candidates in stored order then dynamic lines, later
-equal-distance hit wins) and moving platforms (`1000·(N/60)·SlowMult`, `floor(frame + 1e-7)`).
+Re-prove on 11.00: level selection (`LevelType` → `LevelDesc` in `Dynamic.swz`), the acceptance rule in
+#1581 (10.09: query end shortened to each accepted hit, later equal-distance hit wins, one hard-before-soft
+exception) and moving platforms (`1000·(N/60)·SlowMult`, `floor(frame + 1e-7)`).
