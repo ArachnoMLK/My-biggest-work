@@ -14,7 +14,7 @@ was executed. Velocities live in the fighter store `_-Z2G` (movement-11.00.md) u
 ## Reproduce
 
 ```text
-python -I tools/bht.py step-verify                    # 138 anchors, 9 slot types
+python -I tools/bht.py step-verify                    # 149 anchors, 9 slot types
 python -I tools/bht.py movement-verify                # gravity, jump impulses (movement-11.00.md)
 python -I tools/bht.py abc-disasm --method 2984       # Entity._-8i
 ```
@@ -114,8 +114,22 @@ when `_-SQ` is not set (@374–381). [V] shape:
 | Otherwise other branches run (flags `_-I2g & 2`, combo fields) | @475–1083, @1148–1491 | not read |
 
 So a power's cast impulse replaces the velocity (it is not one of the one-tick impulses `_-84` /
-`_-A4A`), and the next step's friction, gravity and clamps apply to it. [V for the write; H for when
-`_-O1K` runs within the power's timeline]
+`_-A4A`), and the next step's friction, gravity and clamps apply to it. [V]
+
+When it runs: `_-l4X._-f14(t)` #59 does its set-up only while `_-k4b == 0` (the first update of the
+power, @47–58) [V]:
+
+```
+_-k4b = round((t - t % 16) / 16)                     # the start tick, @62-173
+_-82O = _-k4b + power._-a2[0]                        # @177-210; [H] _-a2 = CastTime
+r     = power._-Sp (RecoverTime), x _-01d when _-s5C # @214-252
+_-E5S = floor(_-k4b + power._-f5c (FixedRecoverTime) + r)   # @253-289, the end tick
+(+ a charge share when _-a6i and _-e5i, + _-J2L(_-Q1n) or _-wj, AntigravTime _-q12)  # @292-592
+_-54L(); _-O1K(t)                                    # @595-609: the cast impulse, on that first update
+```
+
+So the cast impulse is applied on the power's first update, and the power's times are counted in
+ticks from `_-k4b` [V]; what `_-82O` / `_-E5S` gate later is not read.
 
 ## Limits
 

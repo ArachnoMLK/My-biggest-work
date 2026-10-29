@@ -208,6 +208,17 @@ ANCHORS = {ABC_1100: {
         (91, 1125, "getproperty", "_-P5S"),
         (91, 1136, "getproperty", "_-8S"),
         (91, 1140, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (59, 51, "getproperty", "_-k4b"),
+        (59, 58, "iffalse", "1511"),
+        (59, 68, "pushbyte", "16"),
+        (59, 70, "modulo", ""),
+        (59, 173, "initproperty", "_-k4b"),
+        (59, 197, "getproperty", "_-a2"),
+        (59, 210, "initproperty", "_-82O"),
+        (59, 222, "getproperty", "_-Sp"),
+        (59, 276, "getproperty", "_-f5c"),
+        (59, 289, "initproperty", "_-E5S"),
+        (59, 609, "callpropvoid", "_-O1K, 1"),
     ],
 }}
 
