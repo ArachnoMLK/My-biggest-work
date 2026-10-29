@@ -15,6 +15,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
+from bh import movement as movementmod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
 from bh import swf as swfmod  # noqa: E402
@@ -207,6 +208,30 @@ def cmd_abc_strings(a):
             print(f"  #{i:6d} {s[:200]!r}")
 
 
+def cmd_movement_verify(a):
+    """Check the pinned bytecode anchors of the jump/gravity chain (Q4); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    data = open(p, "rb").read()
+    sha = hashlib.sha256(data).hexdigest()
+    anchors = movementmod.ANCHORS.get(sha)
+    if anchors is None:
+        print(f"no anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in movementmod.ANCHORS)})")
+        sys.exit(2)
+    abc = abcmod.Abc(data)
+    owner = abc.method_owner()
+    bad = movementmod.check(anchors, lambda m: movementmod.listing(abc, m))
+    for (m, off, op, text), found in bad:
+        print(f"  MISMATCH #{m} {owner.get(m, '?')} @{off}: want {op} {text}, found {found}")
+    print(f"ABC {sha[:8]}...  anchors {len(anchors)}  ok {len(anchors) - len(bad)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    scale = 0.384
+    for label, v in (("grounded jump 57", 57.0), ("dash jump 170", 170.0), ("gravity 3.75", 3.75)):
+        print(f"  {label:<18} x {scale} = {v * scale!r} per tick")
+
+
 def cmd_swz_key(a):
     """Find the .swz key: try every uint of the main ABC, else brute-force keys ending with --suffix."""
     data = open(os.path.join(a.game, "Init.swz"), "rb").read()
@@ -350,6 +375,7 @@ def main():
     add("abc-find", cmd_abc_find, abc, (["value"], {}), (["--member"], {"action": "store_true", "help": "value is a member name"}))
     add("abc-refs", cmd_abc_refs, abc, (["--method"], {"type": int, "required": True}))
     add("abc-strings", cmd_abc_strings, abc, (["pattern"], {}))
+    add("movement-verify", cmd_movement_verify, abc)
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
