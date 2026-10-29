@@ -298,6 +298,15 @@ ANCHORS = {ABC_1100: {
         (15351, 12009, "pushbyte", "2"),
         (15351, 12012, "initproperty", "PI2"),
     ],
+    "hit pass #1665: each queued hit _-P6X of _-T4G not yet done (_-fP) puts (_-X5n, _-d4V) in _-26u._-ba and calls _-76s": [
+        (1665, 2048, "getproperty", "_-T4G"),
+        (1665, 2069, "getproperty", "_-fP"),
+        (1665, 2081, "getproperty", "_-ba"),
+        (1665, 2087, "getproperty", "_-X5n"),
+        (1665, 2105, "getproperty", "_-d4V"),
+        (1665, 2185, "getproperty", "_-ba"),
+        (1665, 2269, "callpropvoid", "_-76s, 21"),
+    ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),
         (1679, 91, "pushdouble", "0.9699"),

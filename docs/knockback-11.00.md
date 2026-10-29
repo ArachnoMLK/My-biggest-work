@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 122 anchors
+python -I tools/bht.py knockback-verify                 # 129 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -114,6 +114,6 @@ keys). [V]
 
 - The power fields (`_-W1a`, `_-w4x`, `_-538`, `_-C7`…) come from the game's power data, which this
   repository does not publish; a simulator reads them from the user's own install.
-- The direction itself is an argument of #1675 (from the hit pass); how the hit pass builds it is not traced.
+- The direction comes from the hit pass `_-26u._-d3s` #1665 @2038–2269: for each queued hit `_-P6X` of the list `_-T4G` whose `_-fP` is false, the shared point `_-26u._-ba` gets `(_-X5n, _-d4V)` and `_-76s` is called with it as argument 7 [V]. Where `_-X5n` / `_-d4V` are filled (hit detection) is not traced.
 - `Math.atan2`, `cos`, `sin`, `sqrt` of the Flash runtime are assumed to match IEEE / libm closely enough that the 1/1000 rounding hides any difference [H]; values that land on a rounding edge could still differ.
 - Which arguments the hit pass passes as p10 / p11 / held is not traced.
