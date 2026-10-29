@@ -39,7 +39,10 @@ ANCHORS = {ABC_1100: [
     (11983, 66, "pushdouble", "30.0"), (11983, 69, "initproperty", "_-z2v"),
     (3049, 383, "pushbyte", "0"), (3049, 404, "pushbyte", "1"), (3049, 425, "pushbyte", "2"),
     (3049, 446, "pushbyte", "3"), (3049, 451, "callproperty", "_-q2w, 2"),
-    (3049, 535, "getproperty", "_-z4f"), (3049, 623, "getproperty", "_-z2p"),
+    (3049, 535, "getproperty", "_-z4f"),
+    # replay parser _-24q._-b2L #6699: per hero, costume then stance; Entity._-f6Q #3051 passes the stance on
+    (6699, 1156, "initproperty", "_-617"), (6699, 1168, "initproperty", "_-b67"),
+    (3051, 379, "getproperty", "_-b67"), (3051, 382, "callpropvoid", "_-p1E, 2"), (3049, 623, "getproperty", "_-z2p"),
 ]}
 
 

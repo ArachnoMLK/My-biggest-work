@@ -1,7 +1,7 @@
 # Fighter stats from the legend's stance (Q5, patch 11.00)
 
 Pin: patch 11.00, abc `7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`.
-Checks: `python -I tools/bht.py stats-verify` (25 pinned instructions, `tools/bh/stats.py`), then
+Checks: `python -I tools/bht.py stats-verify` (29 pinned instructions, `tools/bh/stats.py`), then
 `python -I tools/bht.py legend-stats --hero <HeroName> --stance <n>` to print the result for one stance
 from your local `swz-dump` (no game data is stored in the repository).
 
@@ -19,7 +19,10 @@ from your local `swz-dump` (no game data is stored in the repository).
    `FAMILY[family] + level` for level 0…11 (`11 + 1` loop bound @175, string `add` @202, error
    `'Missing Core Stat: '` @302), with `FAMILY = [Strength, Dexterity, Weight, Speed]` (`_-36d`, #11990).
    `_-C5c.static._-q2w(family, level)` #11988 returns it, or `null` if `family ≥ 4` or `level > 11`.
-4. `Entity._-p1E` #3049 reads the stance's four levels, calls `_-q2w(0…3, level)` and copies **only each
+4. **[V] The stance is the replay's.** The replay parser `_-24q._-b2L` #6699 reads, per hero, `hero_id`
+   (`_-TC`), `costume` (`_-617` @1156), `stance` (`_-b67` @1168), weapon skins (`_-T3n`), in the order of
+   `docs/replay-format.md`; `Entity._-f6Q` #3051 calls `_-p1E(heroType, record._-b67)` (@372–382).
+5. `Entity._-p1E` #3049 reads the stance's four levels, calls `_-q2w(0…3, level)` and copies **only each
    family's own fields** into the fighter. A mode override (`_-nt`, non-null) replaces all four lookups.
 
 | Family | Fields copied into the fighter |
@@ -46,7 +49,5 @@ These are exactly the fields each family sets in `StatTypes.xml`.
 
 ## Open
 
-- [H] The second argument of `Entity._-p1E` is the replay's `stance` (it selects the `RuneType` through
-  `_-44G` and is stored in `_-b67`); confirm with the caller.
 - [H] The `JumpXImpulse` default comes from a static field (`_-32g`), not a literal.
 - Not yet: how `RunSpeed`, `Acceleration`, `Friction` are used per tick (Q4 covers vertical motion only).
