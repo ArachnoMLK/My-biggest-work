@@ -19,8 +19,8 @@ def ko_mask(x, y, cam, kill, exact, top_allowed):
 
     cam: (left, top, right, bottom) of the map's CameraBounds rectangle (flash Rectangle getters).
     kill: dict with LeftKill, RightKill, TopKill, BottomKill (uint) and HardLeftKill, HardRightKill,
-    SoftTopKill (Boolean) of the LevelType. `exact` is the caller's `_-5q()`, `top_allowed` its
-    `!_-wn() || _-r51 != 0` (see docs/ko-11.00.md for what is known of their meaning).
+    SoftTopKill (Boolean) of the LevelType. `exact` is the caller's `_-5q()` (in hitstun),
+    `top_allowed` its `!_-wn() || _-r51 != 0` (`!_-wn()` = touching a collision line); see docs/ko-11.00.md.
     Comparisons are strict, as `ifnlt` / `ifngt` branch on their negation.
     """
     left, top, right, bottom = cam
@@ -155,6 +155,59 @@ ANCHORS = {ABC_1100: {
         (3138, 414, "pushint", "4194304"),
         (3138, 472, "callpropvoid", "_-84v, 4"),
     ],
+    "exact = _-5q(): hitstun flag, set by the hit with (t, stun) and cleared after t > start + stun at speed <= 50": [
+        (2931, 5, "getproperty", "_-H5X"),
+        (2931, 10, "urshift", ""),
+        (2931, 14, "bitand", ""),
+        (2931, 28, "bitand", ""),
+        (2889, 9, "callproperty", "_-W2b, 1"),
+        (2889, 14, "initproperty", "_-H5X"),
+        (1675, 198, "getproperty", "_-7Z"),
+        (1675, 203, "multiply_i", ""),
+        (1675, 229, "callpropvoid", "_-L3f, 7"),
+        (1675, 1816, "getproperty", "_-7Z"),
+        (1675, 1822, "multiply_i", ""),
+        (1675, 1824, "setlocal", "41"),
+        (1675, 2541, "getlocal", "41"),
+        (1675, 2565, "callpropvoid", "_-L3f, 7"),
+        (1670, 73, "pushtrue", ""),
+        (1670, 74, "callpropvoid", "_-q2W, 1"),
+        (1670, 81, "initproperty", "_-u4B"),
+        (1670, 86, "getlocal_3", ""),
+        (1670, 88, "initproperty", "_-v3y"),
+        (2984, 214, "getproperty", "_-v1D"),
+        (2984, 234, "callproperty", "_-N5C::_-U13, 1"),
+        (2984, 249, "getproperty", "_-P5S"),
+        (2984, 269, "callproperty", "_-N5C::_-U13, 1"),
+        (2984, 275, "add", ""),
+        (2984, 285, "callpropvoid", "_-Re, 2"),
+        (2981, 34, "callproperty", "_-5q, 0"),
+        (2981, 73, "getproperty", "_-u4B"),
+        (2981, 81, "getproperty", "_-v3y"),
+        (2981, 85, "add_i", ""),
+        (2981, 88, "lessthan", ""),
+        (2981, 100, "getproperty", "_-Nj"),
+        (2981, 103, "lessequals", ""),
+        (2981, 113, "pushfalse", ""),
+        (2981, 114, "callpropvoid", "_-q2W, 1"),
+        (15351, 30077, "pushdouble", "2500.0"),
+        (15351, 30081, "initproperty", "_-Nj"),
+        (3034, 221, "callpropvoid", "_-q2W, 1"),
+    ],
+    "_-wn() = (_-96f == null), _-96f = the line returned by the collision query": [
+        (2949, 5, "getproperty", "_-j5M"),
+        (2907, 9, "callproperty", "_-W2b, 1"),
+        (2907, 14, "initproperty", "_-j5M"),
+        (2984, 3290, "callproperty", "_-X2e, 10"),
+        (2984, 3302, "setlocal", "17"),
+        (2984, 3464, "getlocal", "17"),
+        (2984, 3466, "initproperty", "_-96f"),
+        (2984, 13127, "initproperty", "_-96f"),
+        (2984, 13160, "getproperty", "_-96f"),
+        (2984, 13168, "equals", ""),
+        (2984, 13169, "callpropvoid", "_-v2J, 1"),
+        (3034, 193, "callpropvoid", "_-v2J, 1"),
+    ],
 }}
 
 # (class, slot, declared type) of every field the KO path reads or writes.
@@ -171,6 +224,11 @@ SLOTS = {ABC_1100: [
     ("LevelType", "_-M58", "Boolean"),
     ("Entity", "_-a3D", "uint"),
     ("Entity", "_-r51", "uint"),
+    ("Entity", "_-H5X", "uint"),
+    ("Entity", "_-j5M", "uint"),
+    ("Entity", "_-u4B", "uint"),
+    ("Entity", "_-v3y", "uint"),
+    ("Entity", "_-96f", "_-R15"),
 ]}
 
 
