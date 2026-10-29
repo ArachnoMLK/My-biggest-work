@@ -31,6 +31,13 @@ UNHANDLED = (1,)   # the switch sends 1 (and anything above 9) to the "Unaccount
 # held item: `_-3z._-q1S` spawns it at the feet). They end in `_-F5N._-J5R`, which returns unless `_-O5u` allows
 # it (not while the running power has `_-82f`; `_-H1V` may swap the power for the weapon through `_-M1g` /
 # `_-E2S` / `_-w3H`), ends the running power (`_-VY`) and sets `_-o3I = new _-l4X(...)`.
+# State transitions found so far [V call edges]: a KO commit sets 3 (`Entity._-eR`, ko-11.00.md, PR #25);
+# the respawn reset `_-X6R._-U6W` (#6787, which also resets the damage `_-W22`) calls `Entity._-Y6o` (#3122),
+# which sets 7 (entering); `_-X6R.Respawn` (#6784) calls `Entity._-hq` (#2996), which sets 0; `_-d2C._-85Y`
+# calls `Entity._-220` (#3000), which sets 9. What moves a fighter from 7 to 0 in a normal match is open.
+TRANSITIONS = {(None, 3): "Entity._-eR (KO commit)", (None, 7): "_-X6R._-U6W -> Entity._-Y6o",
+               (None, 0): "_-X6R.Respawn -> Entity._-hq", (None, 9): "_-d2C._-85Y -> Entity._-220"}
+
 POWER_START = ("_-i4Z._-rU / _-I35", "_-F5N._-C5S / _-A3Q / _-V5I", "_-F5N._-J5R", "_-O5u", "new _-l4X")
 
 
@@ -79,6 +86,13 @@ ANCHORS = {ABC_1100: {
         (2991, 1558, "bitor", ""),
         (2991, 1691, "bitnot", ""),
         (2991, 1692, "bitand", ""),
+    ],
+    "Transitions: _-U6W -> _-Y6o sets 7; Respawn -> _-hq sets 0": [
+        (6787, 34, "callpropvoid", "_-Y6o, 1"),
+        (3122, 5, "pushbyte", "7"),
+        (3122, 8, "initproperty", "_-65w"),
+        (6784, 180, "callpropvoid", "_-hq, 0"),
+        (2996, 27, "initproperty", "_-65w"),
     ],
 }}
 
