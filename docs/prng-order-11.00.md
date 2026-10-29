@@ -103,6 +103,17 @@ that can happen is limit L2.
 `_-e3K` #4920 is the only method referencing `_-K5X` (an I draw site) and one of seven referencing
 `_-p1K`; so phase 4 may draw I inside `_-e3K` *before* the lane refresh. [H] until `_-e3K` is traced.
 
+## 4b. Match start: `_-X6R._-b3x` (added from hit-detection-11.00.md §10)
+
+| Element | Evidence | Status |
+|---|---|---|
+| `_-X6R._-b3x` #6777 (tick phase 4, `_-W1R._-b3x(t)` in #3336 @2708) | @49–80: local 2 = `!_-C3h && t >= _-n4k + 256`; @140–149 sets `_-C3h`, so this happens on one tick only | [V] |
+| | @904–1002, only when local 2: n = `_-N1k._-I1f._-o5y.length`, or 37 when 0 (@919–943); **two draws** `_-G5X[i] = R._-f4c() % n` for i = 0, 1 with `R = _-N1k._-s3D._-22` (@972–992) | [V] draws; [H] `_-G5X` meaning |
+| | the same call gives the eligible fighters state 3 (@408–411) and passes them to `Respawn` (@879–886) | [V] |
+
+So the replay generator R is drawn twice on the first tick with t ≥ `_-n4k` + 256 ms, in phase 4, before
+the entity passes. Pinned by `hit-detection-verify` (group "Match start in _-X6R._-b3x").
+
 ## 5. Limits and unknowns (precise boundaries)
 
 - **L1 — other `_-w35` writers.** `abc-find _-w35 --member` lists every method touching the name.
