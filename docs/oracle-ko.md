@@ -35,7 +35,12 @@ In code: `bh.oracle.ko_ticks(parsed_replay)` gives `[(tick, victim)]`, oldest fi
   start time: the clock of the first tick (`_-Px.StartTime`, set by the scheduler on its first tick). So
   the recorded time is then 16 × (ticks since the first tick + 1), and otherwise the absolute tick time.
   A simulator that counts ticks from the first one should compare against both readings until the
-  modes are told apart [H: which header fields select the base is open].
+  modes are told apart [H: which header fields select the base is open]. The exact bit condition is in
+  ko-11.00.md §6 (`ko.ko_time_base`).
+- **Corpus check of the origin.** On the 756 patch 11.00 replays of the local corpus (format 271), every
+  input timeline starts at **0 ms**, and the last KO falls before the last input record in all but 2
+  files (median 1 s before). So KO faces and input records share one origin. [V] corpus statistics; [H]
+  that this origin is the first tick, which would make `_-n4k − 16 = 0` and the two readings equal.
 - **Coverage.** Only KOs. Score modes keep list 5 empty and use object 7 instead (replay-format.md).
   Positions between KOs are not checked.
 - **Off-by-one risk.** The time is the tick of the phase 6 commit, which follows the phase 5 detection
