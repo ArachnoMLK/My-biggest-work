@@ -8,7 +8,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.input_buffer import buffered_presses, state_at  # noqa: E402
+from bh.input_buffer import (attack_slot, buffered_presses, chain_allowed, first_jump_allowed,  # noqa: E402
+                             state_at)
 
 JUMP, LIGHT, HEAVY = 16, 128, 64
 
@@ -51,6 +52,31 @@ class Buffer(unittest.TestCase):
     def test_longer_window(self):
         rec = [(1600, JUMP)]
         self.assertEqual(buffered_presses(rec, 1600 + 7 * 16, n=9), {"Jump": 1600})
+
+
+class Guards(unittest.TestCase):
+    def test_attack_slots(self):
+        # ground light: down, neutral, side; air light; ground heavy; air heavy
+        self.assertEqual([attack_slot(k) for k in (2, 0, 4)], [3, 1, 2])
+        self.assertEqual([attack_slot(k, air=True) for k in (2, 0, 8)], [6, 4, 5])
+        self.assertEqual([attack_slot(k, heavy=True) for k in (2, 0, 4)], [8, 11, 7])
+        self.assertEqual([attack_slot(k, heavy=True, air=True) for k in (2, 0, 4)], [10, 9, 9])
+
+    def test_attack_direction_priority(self):
+        self.assertEqual(attack_slot(2 | 4), attack_slot(2))           # Drop beats side
+        self.assertEqual(attack_slot(4 | 32), attack_slot(0))          # bit 32 beats side
+        self.assertEqual(attack_slot(1 | 4), attack_slot(4))           # bit 1 alone does not
+        self.assertEqual(attack_slot(1), attack_slot(0))
+
+    def test_first_jump_lock(self):
+        self.assertTrue(first_jump_allowed(1600, 0))
+        self.assertFalse(first_jump_allowed(1600 + 192, 1600))
+        self.assertTrue(first_jump_allowed(1600 + 208, 1600))
+
+    def test_chain_needs_300_ms(self):
+        self.assertFalse(chain_allowed(1600 + 288, 1600))
+        self.assertTrue(chain_allowed(1600 + 304, 1600))
+        self.assertTrue(chain_allowed(1600, 1616))                      # unsigned wrap
 
 
 if __name__ == "__main__":

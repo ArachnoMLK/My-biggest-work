@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 143 anchors
+python -I tools/bht.py input-buffer-verify            # 221 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -59,9 +59,8 @@ press and the three ticks after it. A key held down is not a new press.
   - Otherwise it records `_-I5A = t` (@497–502, @540–545).
   - `Entity._-H5F` #3065 returns true while `t ≤ _-I5A + Entity._-Y35`, and `_-Y35 = 176` ms (11 ticks, `script157.<init>` #3173 @829). That is longer than the 4-tick buffer.
   - `_-H5F` also allows a jump only in states `_-65w` ∈ {0, 5} (`lookupswitch` @27), and blocks it when `IsMoveLocked(t)`, `_-u4F()`, `_-Xb ≠ 0`, `_-Kc._-cr ≠ 0` or `_-C54(t)` (unless its second argument is set), when `t < _-f6R`, and in the air (`_-wn()`) with `_-P5Y() ≥ _-56T()` and `_-r51 == 0` [H: no jump left].
-- Not read yet [H]:
-  - the re-trigger guards of the attacks (`_-I35`, `_-rU`) and the meaning of `_-C51`, `_-z3C`;
-  - the role of `_-B5 = t` @3383.
+- The guards of the dodge and the attacks, and `_-C51`, `_-z3C`: see §6.
+- Not read yet [H]: the role of `_-B5 = t` (written after every action block).
 
 ## 5. Order of the action blocks
 
@@ -89,6 +88,32 @@ meaning of the helpers is [H].
 So a light or heavy press beats a pick-up only when the pick-up press is not newer. A jump press is
 tried before the attacks (block 5) and again after them (block 11). The 2 / 3 / 4 codes passed to
 `_-I35`, `_-LY`, `_-b1I` and `_-Y1K` look like action kinds [H].
+
+## 6. Guards against re-triggering
+
+`tools/bh/input_buffer.py` gives `first_jump_allowed`, `chain_allowed` and `attack_slot`; the anchor
+groups from "jump lock" to "`_-y2r`" pin every row below.
+
+| Claim | Where | Status |
+|---|---|---|
+| The first jump site needs `owner._-532 == 0` or `t > _-532 + Entity._-z3C`, with `_-z3C = 192` ms (12 ticks). The second jump site (block 11) has no such test | #6313 @2350–2556; `script157.<init>` #3173 @893 | [V] |
+| `_-532 = t` is written by `Entity._-c1r` (called only from `_-F5N._-h1T` @853, right after `_-BC` starts a move) and by the pick-up `_-q2i._-b1I` @274 | #3025 @29, #1742, #3814 | [V]; [H] "time the last move / pick-up started" |
+| Dodge fires only for a press newer than `_-C51` (or `_-C51 == 0`). When `Dodge` returns false while `owner._-P50` is set, `_-C51 = _-B5 = t` and the press counts as handled: the same buffered press is not tried on the next ticks | @2389–2504 | [V]; [H] meaning of `_-P50` |
+| Late dodge: with no dodge press in the window, not move-locked, `t > 16 (n+7)` and `owner._-C2E(t, dir)`, the six ticks `t − 16(n+5) … t − 16n` are scanned for a dodge press | @1538–1734 | [V] |
+| `_-C2E(t, dir)` is false once `t > _-532 + Entity._-84e` (`_-84e = 192`), when `dir` points against `_-M3h` (Left with `!_-M3h`, Right with `_-M3h`), when `dir == 0`, or when `dir == 2` on the ground (`_-96f ≠ null`) | #3073; #3173 @812 | [V] |
+| Held dodge: with still no press, a dodge held since `_-D3F` (local 27) counts as a press when `owner._-01g ≠ 0`, `_-D3F > _-C51` and `_-D3F + 32 > owner._-01g`; the third `Dodge` argument (local 31) is then true. It is also true when a press exists and `_-g3B + 480 > t` (`_-g3B` = the previous `_-D3F`) | @1282–1384, @1742–1867, @2431 | [V]; [H] "dodge right after another dodge" |
+| Cancel window: when the owner's current move record (`_-h3i._-Z4V[_-Q42]`) exists and `_-E6P()`, local 32 is set while `_-H2b + 16 _-M4L ≤ t ≤ _-H2b + 16 _-GX` (frames → ms); local 33 when the extra test local 39 holds. Light and heavy may fire with local 32 even after an action was taken | @2009–2342, @2763–2798 | [V]; [H] `_-H2b` = start of the current move |
+| Light / heavy route: if a move runs (`_-Kc._-O2R ≠ null`) without `_-93n._-Z6M[1]` and `owner._-r51 == 0`, the press goes to `_-I35` (chain); otherwise to `_-rU` (new attack), but only when no move runs or the press is **newer than `_-Kc._-sM`**. `_-sM` is written with `_-O2R` in `_-F5N._-s1u`, so it is the start time of the current move | @2709–2959, @2996–3135; #1734 @182–189 | [V] |
+| `_-I35(t, dir, a, b, kind)` returns false while `t − _-sM ≤ 300` (unsigned) or with no move; otherwise it calls `_-Kc._-V5I(t, dir)` if the move has `_-93n._-qo`, else `_-Kc._-A3Q(t, kind)` (kind 2 light, 3 heavy) | #6335 | [V]; [H] "string / chain the next part of the move" |
+| `_-rU` picks the move slot `_-i4Z._-y2r[class + kind + air]`: class 0 when Drop (2) is held, else 1 when bit 32 is set, else 2 when MoveLeft / MoveRight is held, else 1; kind 0 light, 6 heavy; air +3 when `_-wn()` (in the air) or the jump flag is set. `_-y2r = [3, 1, 2, 6, 4, 5, 8, 11, 7, 10, 9, 9]`; then `_-Kc._-C5S(t, slot, …)` | #6334 @93–671; `script347.<init>` #6336 @150–191 | [V]; [H] slot names |
+
+Reading the slots as light down / neutral / side = 3 / 1 / 2, air light = 6 / 4 / 5, heavy = 8 / 11 / 7
+and air heavy = 10 / 9 / 9 [H]: side and neutral air heavy share slot 9, which fits the game's rule
+that a side air heavy is the recovery.
+
+On the input bit names (replay-format.md "naming conflict"): in `_-rU`, bit 1 is not read, and bit 32
+turns a side attack into a neutral one. That is the behaviour the name `PrioritiseNeutralOverSide`
+describes. [V] for this path; other readers of bit 32 are not checked here.
 
 ## Limits
 

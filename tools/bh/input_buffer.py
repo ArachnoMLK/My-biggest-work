@@ -46,6 +46,44 @@ def buffered_presses(records, t, n=DEFAULT_WINDOW, skip_current=False):
     return out
 
 
+JUMP_LOCK_MS = 192        # Entity._-z3C: no jump at the first site until t > _-532 + 192
+CHAIN_MIN_MS = 300        # _-I35: no chain until the current move has run more than 300 ms
+DODGE_REARM_MS = 480      # _-g3B + 480 > t sets the third Dodge argument (local 31)
+# _-i4Z._-y2r: move slot for (kind offset + air offset + direction class); script347.<init> @150-191
+ATTACK_SLOTS = (3, 1, 2, 6, 4, 5, 8, 11, 7, 10, 9, 9)
+HEAVY_OFFSET = 6          # pushbyte 6 in the heavy block (@3097); the light block passes 0
+AIR_OFFSET = 3            # _-rU @128 when airborne (_-wn) or with the jump flag
+
+
+def attack_slot(keys, heavy=False, air=False):
+    """Move slot `_-rU` #6334 starts for a light / heavy press with key word `keys`.
+
+    Direction class: 0 when Drop (2) is held, else 1 (neutral) when bit 32 is set, else 2 (side)
+    when MoveLeft / MoveRight (4 / 8) is held, else 1. The forced direction `_-O5C` and the
+    ground-snap `_-y1U` cases are not modelled.
+    """
+    d = keys & 15
+    if d & 2:
+        cls = 0
+    elif keys & 32:
+        cls = 1
+    elif d & 12:
+        cls = 2
+    else:
+        cls = 1
+    return ATTACK_SLOTS[cls + (HEAVY_OFFSET if heavy else 0) + (AIR_OFFSET if air else 0)]
+
+
+def first_jump_allowed(t, last_move_start):
+    """First jump site of #6313 (@2529-2556): `_-532 == 0` or t > `_-532` + 192."""
+    return last_move_start == 0 or t > last_move_start + JUMP_LOCK_MS
+
+
+def chain_allowed(t, move_start):
+    """`_-I35` #6335 @17-46 refuses while t - `_-sM` <= 300 (unsigned difference)."""
+    return (t - move_start) % (1 << 32) > CHAIN_MIN_MS
+
+
 ANCHORS = {ABC_1100: {
     "window size n: 5, or _-i3b(_-L3a), 9 or 11 by state; no action before n ticks": [
         (6313, 64, "pushbyte", "5"),
@@ -205,6 +243,100 @@ ANCHORS = {ABC_1100: {
         (6313, 3647, "callproperty", "_-Y1K, 4"),
         (6313, 3723, "callpropvoid", "HandleInput, 4"),
         (6313, 4011, "returnvoid", ""),
+    ],
+    "jump lock: local 28 = owner._-532, set at move start (_-F5N._-h1T -> _-c1r) and by _-q2i._-b1I; _-z3C = 192": [
+        (6313, 2350, "getproperty", "_-532"),
+        (6313, 2355, "setlocal", "28"),
+        (6313, 2541, "getlocal", "28"),
+        (3025, 29, "initproperty", "_-532"),
+        (1742, 853, "callpropvoid", "_-c1r, 5"),
+        (3814, 274, "initproperty", "_-532"),
+        (3173, 893, "pushuint", "192"),
+        (3173, 895, "initproperty", "_-z3C"),
+    ],
+    "dodge: a refused dodge under _-P50 stamps _-C51 = t, so the same press is not tried again": [
+        (6313, 2468, "getproperty", "_-P50"),
+        (6313, 2480, "initproperty", "_-B5"),
+        (6313, 2487, "getlocal_1", ""),
+        (6313, 2488, "initproperty", "_-C51"),
+    ],
+    "late dodge: 6 ticks before the window when _-C2E; held dodge since _-D3F within 32 ms of _-01g; _-g3B + 480": [
+        (6313, 1560, "pushbyte", "7"),
+        (6313, 1585, "callproperty", "_-C2E, 2"),
+        (6313, 1630, "pushbyte", "5"),
+        (6313, 1684, "pushint", "256"),
+        (6313, 1717, "setlocal", "23"),
+        (6313, 1791, "pushbyte", "32"),
+        (6313, 1802, "getproperty", "_-01g"),
+        (6313, 1853, "pushuint", "480"),
+        (6313, 1867, "setlocal", "31"),
+        (6313, 2431, "getlocal", "31"),
+        (3073, 6, "getproperty", "_-532"),
+        (3073, 14, "getproperty", "_-84e"),
+        (3173, 810, "pushuint", "192"),
+        (3173, 812, "initproperty", "_-84e"),
+    ],
+    "cancel window: local 32 when _-H2b + 16 _-M4L <= t <= _-H2b + 16 _-GX of the current move record": [
+        (6313, 2263, "getproperty", "_-M4L"),
+        (6313, 2267, "pushbyte", "16"),
+        (6313, 2276, "getproperty", "_-GX"),
+        (6313, 2295, "getproperty", "_-H2b"),
+        (6313, 2332, "setlocal", "32"),
+        (6313, 2342, "setlocal", "33"),
+    ],
+    "light / heavy route: _-I35 (chain) when a move runs without _-Z6M[1], else _-rU when the press is newer than _-sM": [
+        (6313, 2726, "getproperty", "_-r51"),
+        (6313, 2836, "callproperty", "_-I35, 5"),
+        (6313, 2881, "getproperty", "_-sM"),
+        (6313, 2884, "getlocal", "18"),
+        (6313, 2886, "lessthan", ""),
+        (6313, 2916, "pushbyte", "0"),
+        (6313, 2922, "callproperty", "_-rU, 6"),
+        (6313, 3097, "pushbyte", "6"),
+        (6313, 3104, "callproperty", "_-rU, 6"),
+        (1734, 182, "initproperty", "_-O2R"),
+        (1734, 189, "initproperty", "_-sM"),
+    ],
+    "_-I35: refuse while t - _-sM <= 300; then _-V5I (move has _-qo) or _-A3Q(t, kind)": [
+        (6335, 21, "getproperty", "_-sM"),
+        (6335, 24, "subtract_i", ""),
+        (6335, 26, "pushuint", "300"),
+        (6335, 29, "lessequals", ""),
+        (6335, 64, "getproperty", "_-qo"),
+        (6335, 76, "callproperty", "_-V5I, 2"),
+        (6335, 98, "callproperty", "_-A3Q, 2"),
+        (6335, 134, "callpropvoid", "_-bC, 2"),
+    ],
+    "_-rU: direction class (Drop 0, bit 32 neutral, side 2, else 1), air +3, slot _-y2r[...], _-Kc._-C5S": [
+        (6334, 112, "callproperty", "_-wn, 0"),
+        (6334, 128, "pushbyte", "3"),
+        (6334, 413, "pushbyte", "2"),
+        (6334, 494, "pushbyte", "32"),
+        (6334, 515, "pushbyte", "1"),
+        (6334, 527, "pushbyte", "4"),
+        (6334, 530, "pushbyte", "8"),
+        (6334, 590, "pushbyte", "2"),
+        (6334, 600, "pushbyte", "1"),
+        (6334, 628, "add_i", ""),
+        (6334, 632, "add_i", ""),
+        (6334, 640, "getproperty", "_-y2r"),
+        (6334, 671, "callproperty", "_-C5S, 6"),
+    ],
+    "_-y2r = [3, 1, 2, 6, 4, 5, 8, 11, 7, 10, 9, 9]": [
+        (6336, 153, "pushbyte", "3"),
+        (6336, 156, "pushbyte", "1"),
+        (6336, 159, "pushbyte", "2"),
+        (6336, 162, "pushbyte", "6"),
+        (6336, 165, "pushbyte", "4"),
+        (6336, 168, "pushbyte", "5"),
+        (6336, 171, "pushbyte", "8"),
+        (6336, 174, "pushbyte", "11"),
+        (6336, 177, "pushbyte", "7"),
+        (6336, 180, "pushbyte", "10"),
+        (6336, 183, "pushbyte", "9"),
+        (6336, 186, "pushbyte", "9"),
+        (6336, 189, "newarray", "12"),
+        (6336, 191, "initproperty", "_-y2r"),
     ],
 }}
 
