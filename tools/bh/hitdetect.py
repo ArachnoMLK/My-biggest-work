@@ -577,6 +577,20 @@ ANCHORS = {ABC_1100: {
         (1702, 52, "initproperty", "_-A3S"),
         (1702, 170, "callpropvoid", "_-R63, 1"),
     ],
+    "Place in the tick (#3336): platforms _-d4u, pass 5 _-k5H, pass 6 _-10 -> _-n2B -> _-h1T -> _-R63 (hits queued in _-26u._-T4G by OnHit), pass 7 items _-s4H then queue _-d3s": [
+        (3336, 2654, "callpropvoid", "_-d4u, 1"),
+        (3336, 2751, "callpropvoid", "_-k5H, 1"),
+        (3336, 2802, "callpropvoid", "_-10, 1"),
+        (3336, 2824, "callpropvoid", "_-s4H, 1"),
+        (3336, 2836, "callpropvoid", "_-d3s, 1"),
+        (2990, 98, "callpropvoid", "_-n2B, 1"),
+        (2990, 124, "callpropvoid", "_-n2B, 1"),
+        (1688, 43, "callpropvoid", "_-h1T, 3"),
+        (1742, 227, "callproperty", "_-R63, 1"),
+        (3042, 179, "getproperty", "_-T4G"),
+        (3042, 184, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+        (1665, 2024, "getproperty", "_-T4G"),
+    ],
 }}
 
 

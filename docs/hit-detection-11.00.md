@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(331 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(343 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -369,7 +369,28 @@ Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not po
 So for TargetMethod 2 / 11 (Ranged, ThrownItem), §2's "list = [`_-x4I`]" means the power hits exactly the
 target the item touched. `_-A3S` makes the line of sight ignore item-ignore lines (§7.1).
 
-## 9. Still open
+## 9. Where this runs in a tick
+
+The order of one 16 ms tick is in tick-loop-11.00.md (scheduler `_-h3U._-01I` #3336). The pieces of this
+document sit in it as follows [V]:
+
+| Step in #3336 | What runs | This document |
+|---|---|---|
+| 3 (@2654) | `_-22K._-d4u(t)`, only while `_-vs == 0`: every moving platform `_-Y3I`, so its lines move | §7.3 |
+| 5 (@2751) | every `Entity._-k5H(t)`: inputs, state, movement, map collision | — |
+| 6 (@2802) | every `Entity._-10(t)` → `_-Kc._-n2B` (#2990 @98 / @124) → `_-F5N._-h1T` (#1688 @43) → `_-l4X._-R63` (#1742 @227): hit areas, line of sight, re-hit rule; `_-T5A` → `Entity.OnHit` **queues** a hit record in `_-26u._-T4G` (#3042 @179–184) | §1–§7 |
+| 7a (@2824) | `_-3z._-s4H(t)`: every item `_-p5k._-h20` | §8 |
+| 7b (@2836) | `_-32h._-d3s(t)`: the queue `_-T4G` is read (#1665 @2024) and each hit goes to `_-26u._-76s` (damage, knockback) | knockback-11.00.md |
+
+Consequences:
+- **Hits are applied after every entity has attacked.** Hits are only queued in step 6 and applied in
+  step 7b, so two fighters can hit each other in the same tick [V].
+- **Hit tests see the positions after movement.** Movement runs in step 5, hit tests in step 6, and both
+  run in `_-5r` order [V]. The platforms have already moved in step 3.
+- `Entity._-8i` #2984 also calls `Entity.OnHit` directly in step 5 under some condition
+  (tick-loop-11.00.md); that path is not mapped here.
+
+## 10. Still open
 
 - Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
   and curves inside a DynamicCollision block (offset of the anchor) [H].
