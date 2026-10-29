@@ -14,7 +14,7 @@ was executed. Velocities live in the fighter store `_-Z2G` (movement-11.00.md) u
 ## Reproduce
 
 ```text
-python -I tools/bht.py step-verify                    # 126 anchors, 9 slot types
+python -I tools/bht.py step-verify                    # 138 anchors, 9 slot types
 python -I tools/bht.py movement-verify                # gravity, jump impulses (movement-11.00.md)
 python -I tools/bht.py abc-disasm --method 2984       # Entity._-8i
 ```
@@ -101,6 +101,21 @@ So `_-r51 ≠ 0` reads as "on a wall" [H]. This fits its other readers: the KO t
 count when the fighter is on the ground or on a wall (ko-11.00.md), `_-H5F` allows an air jump with
 `_-r51 ≠ 0` (a wall jump), and the input consumer does not chain an attack with `_-I35` while it is set
 (input-buffer-11.00.md §6). The meaning of locals 37 / 38 and of `_-t46()` is open.
+
+## Attack movement at power fire
+
+`_-l4X._-O1K` #91 (a running power, `_-l4X`; called from `_-l4X._-f14` #59) moves its owner `_-pr`
+when `_-SQ` is not set (@374–381). [V] shape:
+
+| Step | Where | Status |
+|---|---|---|
+| If the power type's `_-C6Z` (column **CastImpulseX**, power-columns-11.00.md in PR #29) is not 2147483647 (unset), the owner's `_-v1D` is **set** to `_-C6Z`, negated when `_-L0` | @385–471 | [V]; [H] `_-L0` = facing left |
+| If `_-8S` (**CastImpulseY**) is not 2147483647, `_-P5S` is **set** to `_-8S` | @1087–1144 | [V] |
+| Otherwise other branches run (flags `_-I2g & 2`, combo fields) | @475–1083, @1148–1491 | not read |
+
+So a power's cast impulse replaces the velocity (it is not one of the one-tick impulses `_-84` /
+`_-A4A`), and the next step's friction, gravity and clamps apply to it. [V for the write; H for when
+`_-O1K` runs within the power's timeline]
 
 ## Limits
 

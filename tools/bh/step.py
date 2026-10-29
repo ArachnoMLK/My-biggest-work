@@ -195,6 +195,20 @@ ANCHORS = {ABC_1100: {
         (3034, 285, "pushbyte", "0"),
         (3034, 287, "initproperty", "_-r51"),
     ],
+    "power fire _-l4X._-O1K: CastImpulseX / Y (_-C6Z / _-8S) set v1D (sign by _-L0) / P5S unless 2147483647": [
+        (91, 381, "iffalse", "1260"),
+        (91, 393, "getproperty", "_-C6Z"),
+        (91, 396, "pushint", "2147483647"),
+        (91, 430, "getproperty", "_-L0"),
+        (91, 446, "getproperty", "_-C6Z"),
+        (91, 449, "negate_i", ""),
+        (91, 467, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (91, 1095, "getproperty", "_-8S"),
+        (91, 1098, "pushint", "2147483647"),
+        (91, 1125, "getproperty", "_-P5S"),
+        (91, 1136, "getproperty", "_-8S"),
+        (91, 1140, "callpropvoid", "_-N5C::_-E1t, 2"),
+    ],
 }}
 
 SLOTS = {ABC_1100: [
