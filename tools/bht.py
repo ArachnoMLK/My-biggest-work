@@ -5,6 +5,7 @@ never commit game files, decrypted data, decompiled code or replays.
 """
 import argparse
 import csv
+import glob
 import hashlib
 import json
 import os
@@ -15,6 +16,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
+from bh import anm as anmmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
@@ -233,6 +235,23 @@ def cmd_movement_verify(a):
         print(f"  {label:<18} x {scale} = {v * scale!r} per tick")
 
 
+def cmd_anm_info(a):
+    """Summarize .anm files (sets, animations, frames, bones); with --anim, print one animation's header."""
+    files = [a.file] if a.file else sorted(glob.glob(os.path.join(a.game, "anims", "*.anm")))
+    total = Counter()
+    for path in files:
+        sets = anmmod.parse(open(path, "rb").read())
+        anims = [an for s in sets.values() for an in s["animations"]]
+        frames = sum(len(an["frames"]) for an in anims)
+        total.update(files=1, anims=len(anims), frames=frames, bones=sum(len(f["bones"]) for an in anims for f in an["frames"]))
+        if a.file or a.verbose:
+            print(f"{os.path.basename(path)}: {len(sets)} sets, {len(anims)} animations, {frames} frames")
+        for an in anims:
+            if a.anim and an["name"] == a.anim:
+                print("  " + ", ".join(f"{k} {an[k]}" for k in ["name"] + anmmod.ANIM_FIELDS) + f", data {an['data']}")
+    print(" ".join(f"{k} {v}" for k, v in total.items()))
+
+
 def cmd_swz_key(a):
     """Find the .swz key: try every uint of the main ABC, else brute-force keys ending with --suffix."""
     data = open(os.path.join(a.game, "Init.swz"), "rb").read()
@@ -425,6 +444,8 @@ def main():
     add("abc-refs", cmd_abc_refs, abc, (["--method"], {"type": int, "required": True}))
     add("abc-strings", cmd_abc_strings, abc, (["pattern"], {}))
     add("movement-verify", cmd_movement_verify, abc)
+    add("anm-info", cmd_anm_info, game, (["--file"], {}), (["--anim"], {"help": "animation name to print"}),
+        (["--verbose"], {"action": "store_true"}))
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
