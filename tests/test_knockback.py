@@ -12,7 +12,8 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, knockback, swf  # noqa: E402
-from bh.knockback import (STAT_TABLE, charged_scale, final_magnitude, hit_damage, knockback_force,  # noqa: E402
+from bh.knockback import (STAT_TABLE, as3_round, atan2_netsafe, charged_scale, directional_influence,  # noqa: E402
+                          final_magnitude, hit_damage, key_vector, knockback_force, octant_angle,
                           stat_multiplier)
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
@@ -73,6 +74,31 @@ class Magnitude(unittest.TestCase):
         self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 1.0, a6p=50.0), 50.0)
         self.assertEqual(final_magnitude(30.0, 5.0, 2.0, 0.0, a6p=50.0), 37.0)   # no floor without fixed
         self.assertEqual(final_magnitude(30.0, 5.0, 5.0, 0.0, soft_flag=True), 36.0)
+
+
+class Influence(unittest.TestCase):
+    def test_as3_round(self):
+        self.assertEqual([as3_round(v) for v in (2.5, -2.5, 0.4999, -0.5)], [3, -2, 0, 0])
+
+    def test_netsafe_atan2(self):
+        self.assertEqual(atan2_netsafe(0.5, 1.0), 0.464)
+        self.assertEqual(atan2_netsafe(0.0, 0.0), 0.0)
+
+    def test_keys(self):
+        self.assertEqual(key_vector(4 | 1), (-1, -1))
+        self.assertEqual(key_vector(8 | 2), (1, 1))
+        self.assertEqual(octant_angle(-1, 1), -0.785)
+        self.assertEqual(octant_angle(0, -1), 3.142)
+
+    def test_snap_inside_limit(self):
+        self.assertEqual(directional_influence(1.0, 0.5, 8), (1.0, 0.0))
+
+    def test_turn_by_limit(self):
+        self.assertEqual(directional_influence(1.0, 0.0, 1), (0.697, -0.717))   # up: turn by -0.8 rad
+
+    def test_no_keys_or_no_point(self):
+        self.assertEqual(directional_influence(1.0, 0.0, 0), (1.0, 0.0))
+        self.assertEqual(directional_influence(0.0, 0.0, 8), (0.0, 0.0))
 
 
 class Cli(unittest.TestCase):

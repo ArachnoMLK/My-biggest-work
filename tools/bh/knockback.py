@@ -5,6 +5,8 @@ IEEE doubles, like Python floats); field names are the obfuscated ones, their me
 Anchors are (method id, offset, opname, operand text as printed by `abc-disasm`); branch operands are
 relative. Static evidence only; nothing is executed.
 """
+import math
+
 from .movement import ABC_1100, check, listing
 
 # _-26u._-M3e, script92.<init> #1679 @59-131: multiplier by stat difference, index 11 + a - b
@@ -88,6 +90,83 @@ def final_magnitude(u1x_value, c7_part, variable, fixed, a6p=0.0, soft_flag=Fals
     if soft_flag and (fixed == 0 or di_case):
         m = m * 0.9
     return m
+
+
+PI2 = math.pi * 2           # _-A6B.PI2 = Math.PI * 2, set in _-y2E.init #15351 @12002-12012
+DI_LIMIT = 0.8              # #1664 @344, unless power._-x1F != Number.MAX_VALUE
+
+
+def as3_round(x):
+    """AS3 `Math.round`: halves go up (floor(x + 0.5)), unlike Python's round."""
+    return math.floor(x + 0.5)
+
+
+def _milli(x):
+    return as3_round(x * 1000.0) / 1000.0
+
+
+def atan2_netsafe(y, x):
+    """`_-A6B.atan2_netsafe(y, x)` #1098: unit vector and result rounded to 1/1000."""
+    r = math.sqrt(x * x + y * y)
+    if not r > 0:
+        return 0.0
+    return _milli(math.atan2(_milli(y / r), _milli(x / r)))
+
+
+def octant_angle(y, x):
+    """`_-A6B._-75B(y, x)` #1084: the angle of a key direction, from a fixed list (eps 1e-6)."""
+    if y < -1e-06:
+        return -0.785 if x > 1e-06 else (-2.356 if x < -1e-06 else -1.571)
+    if y > 1e-06:
+        return 0.785 if x > 1e-06 else (2.356 if x < -1e-06 else 1.571)
+    return 3.142 if x < -1e-06 else 0.0
+
+
+def _wrap_round(a):
+    k = int(math.floor(a / PI2))
+    return _milli(a - k * PI2)
+
+
+def cos_netsafe(a):
+    """`_-A6B._-K6l(a)` #1094: angle wrapped by PI2 and rounded, cosine rounded, both to 1/1000."""
+    return _milli(math.cos(_wrap_round(a)))
+
+
+def sin_netsafe(a):
+    """`_-A6B._-b4l(a)` #1093: as cos_netsafe with sine."""
+    return _milli(math.sin(_wrap_round(a)))
+
+
+def key_vector(keys):
+    """`_-26u._-Cg` as #1664 @30-172 sets it: x -1 Left (4) / +1 Right (8), y -1 Up (1) / +1 Drop (2)."""
+    x = -1 if keys & 4 else (1 if keys & 8 else 0)
+    y = -1 if keys & 1 else (1 if keys & 2 else 0)
+    return x, y
+
+
+def directional_influence(px, py, keys, limit=DI_LIMIT):
+    """`_-26u._-e4x(point, keys, power)` #1664: the knockback direction after a held direction.
+
+    Returns the new (x, y) direction (its length is set later by normalize). Within `limit` radians
+    of the held direction the point becomes the key vector itself; otherwise it turns by `limit`
+    toward it.
+    """
+    if px == 0 and py == 0:
+        return px, py
+    cx, cy = key_vector(keys)
+    if cx == 0 and cy == 0:
+        return px, py
+    a = atan2_netsafe(py, px)
+    b = octant_angle(cy, cx)
+    diff = b - a
+    if diff > math.pi:
+        diff = diff - math.pi * 2
+    elif diff < -math.pi:
+        diff = diff + math.pi * 2
+    if abs(diff) < limit:
+        return float(cx), float(cy)
+    ang = a + limit if diff > 0 else a - limit
+    return cos_netsafe(ang), sin_netsafe(ang)
 
 
 ANCHORS = {ABC_1100: {
@@ -182,6 +261,42 @@ ANCHORS = {ABC_1100: {
         (1675, 1435, "getproperty", "_-66U"),
         (1675, 1439, "pushbyte", "15"),
         (1675, 1480, "callpropvoid", "_-e4x, 3"),
+    ],
+    "_-e4x: key vector, netsafe angles, wrap to (-pi, pi], limit 0.8 (or _-x1F), snap or turn by the limit": [
+        (1664, 31, "pushbyte", "4"),
+        (1664, 50, "pushbyte", "-1"),
+        (1664, 61, "pushbyte", "8"),
+        (1664, 104, "pushbyte", "1"),
+        (1664, 134, "pushbyte", "2"),
+        (1664, 229, "callproperty", "atan2_netsafe, 2"),
+        (1664, 263, "callproperty", "_-75B, 2"),
+        (1664, 276, "subtract", ""),
+        (1664, 286, "getproperty", "PI"),
+        (1664, 344, "pushdouble", "0.8"),
+        (1664, 351, "getproperty", "_-x1F"),
+        (1664, 375, "callproperty", "abs, 1"),
+        (1664, 434, "add", ""),
+        (1664, 447, "subtract", ""),
+        (1664, 458, "callproperty", "_-K6l, 1"),
+        (1664, 474, "callproperty", "_-b4l, 1"),
+    ],
+    "netsafe trig: inputs and results rounded to 1/1000; PI2 = Math.PI * 2": [
+        (1098, 12, "callproperty", "sqrt, 1"),
+        (1098, 42, "pushdouble", "1000.0"),
+        (1098, 104, "callproperty", "atan2, 2"),
+        (1098, 122, "callproperty", "round, 1"),
+        (1084, 1, "pushdouble", "-1e-06"),
+        (1084, 16, "pushdouble", "-0.785"),
+        (1084, 32, "pushdouble", "-2.356"),
+        (1084, 39, "pushdouble", "-1.571"),
+        (1084, 94, "pushdouble", "3.142"),
+        (1094, 9, "getproperty", "PI2"),
+        (1094, 14, "callproperty", "floor, 1"),
+        (1094, 62, "callproperty", "cos, 1"),
+        (1093, 62, "callproperty", "sin, 1"),
+        (15351, 12006, "getproperty", "PI"),
+        (15351, 12009, "pushbyte", "2"),
+        (15351, 12012, "initproperty", "PI2"),
     ],
     "_-26u._-M3e: 23 stat multipliers, 1 at index 11": [
         (1679, 63, "pushdouble", "0.8349"),

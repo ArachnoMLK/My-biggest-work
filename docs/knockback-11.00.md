@@ -12,7 +12,7 @@ the point goes into the one-tick impulses `_-84` / `_-A4A`).
 ## Reproduce
 
 ```
-python -I tools/bht.py knockback-verify                 # 90 anchors
+python -I tools/bht.py knockback-verify                 # 122 anchors
 python -I tools/bht.py abc-disasm --method 1674         # _-26u._-u1x, the magnitude
 python -I tools/bht.py abc-disasm --method 1675         # _-26u._-76s, damage and force
 python -I tools/bht.py abc-disasm --method 1679         # script92.<init>, the _-M3e table
@@ -81,9 +81,39 @@ return max(F - victim._-P1r, 0)                                              # @
 plus this hit's damage), which matches the game's "more damage, more knockback" [H for `_-W22`]. The
 order `d * (d / 2)` matters for exact doubles.
 
+## 5. Directional influence: `_-26u._-e4x(point, keys, power)` #1664
+
+`directional_influence` transcribes it; the angle helpers are the game's "netsafe" ones, which round
+their inputs and results to 1/1000 [V] (the reason, cross-machine determinism, is [H]).
+
+```
+if point == (0, 0): return                                         # @3-29
+c = (-1 if Left(4) else +1 if Right(8) else 0,
+     -1 if Up(1) else +1 if Drop(2) else 0)      # _-26u._-Cg   @30-172
+if c == (0, 0): return                                             # @176-214
+a = atan2_netsafe(point.y, point.x)                                # #1098
+b = _-75B(c.y, c.x)        # octant: 0, ±0.785, ±1.571, ±2.356, 3.142 (#1084)
+diff = b - a, wrapped once into [-pi, pi]                          # @272-342
+limit = 0.8, or power._-x1F when it is not Number.MAX_VALUE        # @344-367
+if |diff| < limit: point = c            (not normalised here)      # @369-418
+else: ang = a + limit if diff > 0 else a - limit
+      point = (cos_netsafe(ang), sin_netsafe(ang))   # #1094, #1093 @422-479
+```
+
+| Helper | Body | Status |
+|---|---|---|
+| `atan2_netsafe(y, x)` #1098 | `r = sqrt(x² + y²)`; 0 if `r ≤ 0`; `atan2(R(y / r), R(x / r))` rounded, with `R(v) = Math.round(v × 1000) / 1000` | [V] |
+| `_-K6l(a)` / `_-b4l(a)` #1094 / #1093 | `a − floor(a / PI2) × PI2`, rounded by `R`, then `cos` / `sin`, rounded by `R`; `PI2 = Math.PI × 2` (`_-y2E.init` @12002–12012) | [V] |
+| `Math.round` | AS3 rounds halves up (`floor(v + 0.5)`), not to even | [V] language rule; `as3_round` |
+
+So a held direction turns the knockback by at most 0.8 rad (about 46°), and replaces it outright when
+the two are closer than that. Which key word is passed is in §4 (`_-R5q._-66U`, the victim's current
+keys). [V]
+
 ## Limits
 
 - The power fields (`_-W1a`, `_-w4x`, `_-538`, `_-C7`…) come from the game's power data, which this
   repository does not publish; a simulator reads them from the user's own install.
-- The direction itself is an argument of #1675 (from the hit pass), and `_-e4x` (how a held direction bends it) is not read.
+- The direction itself is an argument of #1675 (from the hit pass); how the hit pass builds it is not traced.
+- `Math.atan2`, `cos`, `sin`, `sqrt` of the Flash runtime are assumed to match IEEE / libm closely enough that the 1/1000 rounding hides any difference [H]; values that land on a rounding edge could still differ.
 - Which arguments the hit pass passes as p10 / p11 / held is not traced.
