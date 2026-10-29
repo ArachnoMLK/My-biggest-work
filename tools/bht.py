@@ -5,6 +5,7 @@ never commit game files, decrypted data, decompiled code or replays.
 """
 import argparse
 import csv
+import glob
 import hashlib
 import json
 import os
@@ -16,6 +17,7 @@ from collections import Counter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
+from bh import oracle as oraclemod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
@@ -350,6 +352,33 @@ def cmd_replay(a):
             print(f"    {ts:7d} ms  {fl:014b}  {replaymod.describe_flags(fl)}")
 
 
+def cmd_ko_oracle(a):
+    """Print the KO ticks of one replay (Q10 oracle, part 1); with --dir, aggregate counts only."""
+    if a.dir:
+        files = glob.glob(os.path.join(a.dir, "*.replay"))
+        n = kos = bad = err = 0
+        for p in files:
+            try:
+                with open(p, "rb") as f:
+                    rep = replaymod.parse(f.read())
+            except Exception:
+                err += 1
+                continue
+            n += 1
+            try:
+                kos += len(oraclemod.ko_ticks(rep))
+            except ValueError:
+                bad += 1
+        print(f"replays {n}  parse errors {err}  KO faces {kos}  replays with a non-tick KO time {bad}")
+        return
+    if not a.file:
+        sys.exit("pass a replay file, or --dir")
+    with open(a.file, "rb") as f:
+        rep = replaymod.parse(f.read())
+    for tick, victim in oraclemod.ko_ticks(rep):
+        print(f"  tick {tick:6d}  ({tick * oraclemod.TICK_MS:7d} ms)  victim {victim}")
+
+
 def cmd_render_summary(a):
     """Draw a replay as SVG: real map geometry + per-player input timeline + KOs (needs work/swz)."""
     rep = replaymod.parse(open(a.file, "rb").read())
@@ -462,6 +491,7 @@ def main():
                            "default": [0, 1, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 123456789]})
     add("prng-verify", cmd_prng_verify, abc, seeds, (["--draws"], {"type": _bounded_int(1, 100000), "default": 256}))
     add("prng-order-verify", cmd_prng_order_verify, abc)
+    add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
