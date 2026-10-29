@@ -65,3 +65,30 @@ or per-player data is published).
 The four taunt bits are directions, and the 8 taunt commands are the 4 directions plus the 4 diagonals
 (two bits at once). Our names `TauntUp, TauntRight, TauntDown, TauntLeft` for bits 10–13 are kept [H]:
 the table proves the encoding, not which bit is which direction.
+
+## Consumer of the replay input (first pass)
+
+**[V]** `_-i4Z._-51o` #6313 is the method that turns the per-tick input word into fighter actions (it calls
+`Entity.Jump` for bit 16, see `docs/movement-11.00.md`, and `Dodge` for bit 256). It is the 11.00
+counterpart of the ordered eligibility state machine brawlhalla-sim describes on 10.09 (#40, method #6125
+`_-Tx._-B1i`), which was "not located on 11.00 yet".
+
+First-pass list of the masks it tests (offset, mask, first calls after the test) — **[H]**, the edge/held
+logic and the order of eligibility still have to be read:
+
+| Offset | Mask | Bit | Calls that follow |
+|---|---|---|---|
+| @850 | 8 | MoveRight | `_-r35()`, `_-Sz(…, 2)` |
+| @890 | 4 | MoveLeft | `_-Sz(…, 2)` |
+| @1078 | 128 | LightAttack | |
+| @1114 | 64 | HeavyAttack | |
+| @1185, @1300–1701 | 256 | DodgeDash | `_-365(…, 4)`; `Dodge(…, 3)` @2427 |
+| @1222 | 16 | Jump | `Jump(t)` @3445 |
+| @1253, @3173 | 512 | PickUpThrow | `_-b1I(…, 4)` |
+| @3491, @3532 | 4, 8 | MoveLeft, MoveRight | `_-01L()`, `_-B3G()` |
+| @3575, @3975 | 2 | Drop | `_-Y1K(…, 4)` |
+| @3896 | 64 | HeavyAttack | `_-e3f()`, `_-q5E()`, `_-D67(…)` |
+| @510, @635, @2427, @2825, @3030 | 15 | Up \| Drop \| Left \| Right (any direction) | `IsMoveLocked`, `Dodge`, `_-I35`, `_-rU` |
+
+Neither bit 32 (Aim Up) nor the taunt bits are tested here: they are read elsewhere (attack direction
+selection on 10.09: method #6146).
