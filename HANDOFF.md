@@ -1,78 +1,82 @@
-# HANDOFF — 2026-10-28
+# HANDOFF — 2026-10-29
 
-Lead review and local integration of two Claude Opus 5.5 implementation tasks (T3,
-`effort: ultrathink`). Project overview: [PROJECT.md](PROJECT.md); rules: [AGENTS.md](AGENTS.md);
-decisions: [DECISIONS.md](DECISIONS.md).
+Sol lead review of Claude Opus 5.5 implementation (`effort: ultrathink`, fast mode off).
+Overview: [PROJECT.md](PROJECT.md). Rules: [AGENTS.md](AGENTS.md). Decisions: [DECISIONS.md](DECISIONS.md).
 
-## Repository and access
+## Repository and continuity
 
-- [V] Integration branch: `integration/replay-foundations-2026-10-28`, in the existing T3
-  worktree `C:/Users/alex/.t3/worktrees/My-biggest-work/t3-24571f32`. Based on fetched
-  `origin/main` `3e10517`, context commit `105d402`, Q3 cherry-pick `ee165ba`, then lead review fixes.
-  Published after explicit user authorization as [PR #14](https://github.com/ArachnoMLK/My-biggest-work/pull/14),
-  from the same branch on `unfortunatelyalex/My-biggest-work` into upstream `main`. No merge or release.
-- [V] Original `main` remains at `06d1f3b`, one commit behind fetched upstream, with its original
-  local changes: `.gitignore`, `AGENTS.md`, `.claude/`, `.mcp.json`, `.sharelane/`, `CLAUDE.md`.
-  It was not pulled, reset, stashed or modified. Use the integration worktree for the new commands.
-- [V] ShareLane MCP is unavailable: its configured script belongs to the previous machine and
-  is missing here. No ShareLane claims, context updates or onboarding completion were fabricated.
-  Task scopes were separated in T3 worktrees. Restore ShareLane before relying on its context map.
-- [V] GitHub discussions including replies, all ten open issues, PR history and local task branches
-  were read. Q3 claim: [discussion comment](https://github.com/ArachnoMLK/My-biggest-work/discussions/1#discussioncomment-19247299).
+- [V] PR #14 (Q2 map, Q3 WELL512 reference and test repair) and #15 (Q4 movement) are merged.
+  Fetched upstream `main` is `6834ad5`; open PRs #16–#23 cover inputs, stats, ledger, animations,
+  collisions, flags, attacks and horizontal motion. They were inspected for scope, not accepted
+  as verified or reimplemented. See [night relay](notes/2026-10-29-claude-night.md).
+- [V] Current work: branch `t3/prng-order-verification`, T3 worktree
+  `C:/Users/alex/.t3/worktrees/My-biggest-work/t3-ede82da9`, based on `6834ad5`.
+  Claude implementation commit `556d036` is followed by Sol's review fixes and context update.
+  [Claim](https://github.com/ArachnoMLK/My-biggest-work/discussions/1#discussioncomment-19260768).
+  [Posted session relay](https://github.com/ArachnoMLK/My-biggest-work/discussions/1#discussioncomment-19261019).
+- [V] Original dirty `main` at `06d1f3b` was not pulled, reset, stashed or edited by this session.
+  Existing task worktrees `t3-24571f32` and `t3-b64061c8` were preserved. Use the new worktree for
+  the new command; root checkout still lacks the merged tooling.
+- [V] ShareLane tools are unavailable and the executable configured in `.mcp.json` is missing.
+  No ShareLane claim, onboarding completion or context update was fabricated. T3 supplied the
+  isolated worktree. Restore ShareLane before relying on its placeholder context chunks.
 
-## Implemented and independently reviewed
-
-- [V] Recovered the Q2 [tick-loop map](docs/tick-loop-11.00.md), Q1 map update and
-  [previous relay](notes/2026-10-28-codex-q2.md) from local commit `6d7c074`, without its
-  `.gitignore` or ShareLane files. Key scheduler, pass-order and checkpoint anchors were
-  checked against the pinned ABC. Q2 ring-out/score commit order is still open.
-- [V] Repaired replay test sampling: inspect the version first, select at most 20 supported
-  formats (261–271), explicitly skip if none exist, and preserve supported-file parse failures.
-  Synthetic mixed/unsupported/broken samples cover the behavior. Parser support was not broadened.
-- [V] Added Q3's [WELL512 reference and evidence](docs/prng-11.00.md), range/shuffle helpers,
-  `prng` and `prng-verify` commands, and independent/golden tests. Both identified match seed
-  paths reach `Random`: rules starts at draw 0; items consumes two draws in #4908 after seeding.
-- [V] Lead review found and fixed two defects: snapshot restore now rejects noninteger index/words
-  without changing existing state, and verification reports missing required methods rather than
-  silently skipping helpers. Regression tests cover both.
-- [V] Narrowed unsupported exhaustive PRNG claims; consumer totals from the uncommitted exploratory
-  classifier are provisional [H]. Individual sites retain method ids for manual verification.
-
-## Validation
+## Reviewed result — Q3 static ordering
 
 Pin: **11.00 / ABC SHA-256
 `7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`**.
-Local install is `F:/SteamLibrary/steamapps/common/Brawlhalla`; set `BRAWLHALLA_DIR` for commands
-on this host only. All game-derived bytes/listings stay in ignored `work/`.
+Evidence and boundaries: [prng-order-11.00.md](docs/prng-order-11.00.md).
 
-Run from the integration worktree:
+- [V] Scheduler `_-h3U._-01I` #3336 orders the identified entry points as rules phase 3
+  `_-u1O` @2624, items phase 4 `_-O3d` @2695, then phase 9 lesson `_-44D` @2992 or rules
+  `_-m4d` @3009. Receiver slot types now confirm the rules and items owners previously [H] in Q2.
+- [V] `_-z1C._-O4q` #5131 is false for modes 1024/2048. The identified lesson-only path reaches
+  `MessageTrigger.Tick` #5809 (rules draw @731); replay start #3624 sets 1024 before seeding.
+  This proves the guard, not that every playback mode transition preserves it (L1).
+- [V] The identified scoreboard taunt path `_-9D._-Y15` #13733 is called by
+  `ScreenScoreboard.OnTickScreen` #10946. Frame wrapper #3335 calls the tick batch @1815,
+  then screen updates @2556. On this path its direct draws fall between tick batches.
+  Whether it can precede later gameplay-relevant rules draws is unknown (L2).
+- [V] Phase 4 visits the two item refresh helpers in order; their cached fields `_-Y1h`/`_-5J`
+  are refreshed after `_-e3K` calls. [H] these represent two item spawn lanes; their meaning is open.
+- [V] Added `prng-order-verify`, reusing `movement.check/listing`: 87 instruction anchors,
+  10 name-based reference sets, 9 slot types. Wrong patch exits 2; mismatches fail.
+  Sol fixed an unclosed CLI file and a reference scan that skipped undecodable methods,
+  added explicit guard branches and a regression test, and narrowed unsupported prose.
+
+## Validation
+
+Local install: `F:/SteamLibrary/steamapps/common/Brawlhalla` (host setting, not a portable default).
+All extracted data and review listings stay under ignored `work/`.
 
 ```powershell
 $env:BRAWLHALLA_DIR='F:/SteamLibrary/steamapps/common/Brawlhalla'
-python -I tools/bht.py abc-extract --game $env:BRAWLHALLA_DIR
+python -I tools/bht.py abc-extract
 python -I -W error::ResourceWarning -m unittest discover -s tests -v
+python -I -W error::ResourceWarning tools/bht.py prng-order-verify
 python -I tools/bht.py prng-verify --draws 1000
+python -I tools/bht.py movement-verify
 python -I tools/bht.py abc-validate
 git diff --check
 ```
 
-- [V] Full combined suite: **29 tests passed, zero skipped**, resource warnings treated as errors.
-- [V] PRNG verifier: **6 seeds × 1,000 draws plus range/shuffle cases passed**.
-- [V] ABC validation: **15,453 bodies decoded, zero errors, zero bad branch targets**.
-- [V] Signed-seed/skip/JSON CLI smoke passed; original main's dirty file list remains unchanged.
-- [V] Context worker counted 9,079 local replays (formats 248–271), including 2,373 supported files;
-  this differs from the owner's documented corpus. The integration test parsed 20 format-271 files.
-  Full local corpus validation was not run.
+- [V] Lead rerun after review fixes: **42 tests pass, zero skipped**; new CLI has no resource warning.
+- [V] New verifier: **87 anchors, 10 reference sets, 9 slot types, zero mismatches**.
+- [V] Existing PRNG verifier: **6 seeds × 1,000 draws plus helpers pass**; movement **31/31**;
+  ABC **15,453 bodies decoded, zero errors, zero bad branches**. Diff whitespace check passes.
+- [V] Replay integration test samples 20 supported local files. Full local corpus was not run.
 
-## Limits and next step
+## Open boundaries and next step
 
-- No simulator, runtime equivalence or video. The bytecode interpreter models AVM2 semantics;
-  a running-game oracle has not confirmed its arithmetic or output. Snapshot byte order is unknown.
-- Consumer counts are provisional. Whether global-generator draws affect simulated state remains
-  unknown; UI `_-9D._-Y15` and `MessageTrigger.Tick` draw from the rules stream and need tracing.
-- **Next:** combine Q2's scheduler with Q3's rules/items consumers to establish draw order during
-  replay playback, including those UI/trigger paths. Then continue Q2's #2977/#3138/KO-writer trace.
-- The user explicitly authorized PR creation after local integration. [PR #14](https://github.com/ArachnoMLK/My-biggest-work/pull/14)
-  now publishes the reviewed Q2/Q3 integration and links both relays. Upstream push access was
-  unavailable, so publication uses a fork; original remotes and dirty main were preserved.
-  Original task commits remain `105d402` and `5960f14` on their task branches. Review and merge are pending.
+No simulator, positions, video, complete random draw schedule or running-game equivalence yet.
+The verifier checks static bytecode evidence; reference sets do not resolve dynamic dispatch.
+Other game-mode writers, scoreboard activation during playback, global-generator effects,
+rollback snapshot byte order and runtime arithmetic remain unresolved.
+
+**Next:** trace rules entries `_-99._-u1O` #7128 and `_-99._-m4d` #7130 to their draw sites (L3),
+then scoreboard `_-y4L` screen-stack pushes (L2). Audit remaining `_-w35` writers before asserting
+unconditional lesson exclusion (L1). Q2 KO/score-writer ordering and Q10's oracle remain open.
+
+[Session relay and reproduction commands](notes/2026-10-29-claude-prng-order.md).
+[PR #24](https://github.com/ArachnoMLK/My-biggest-work/pull/24) publishes this work through the existing
+fork under the user's PR authorization. It awaits upstream review; no merge or release was performed.
