@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(359 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(365 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -405,8 +405,11 @@ Consequences:
   step 7b, so two fighters can hit each other in the same tick [V].
 - **Hit tests see the positions after movement.** Movement runs in step 5, hit tests in step 6, and both
   run in `_-5r` order [V]. The platforms have already moved in step 3.
-- `Entity._-8i` #2984 also calls `Entity.OnHit` directly in step 5 under some condition
-  (tick-loop-11.00.md); that path is not mapped here.
+- **Mud splash.** `Entity._-8i` #2984 also calls `Entity.OnHit` directly in step 5 (@6522–6597). The
+  power is `PowerType._-h1r`, which `PowerType.static._-B6` #6482 sets to the power named `MudSplash`
+  (@3116–3126). It fires once while `_-k2j == 0`, which then holds the time. The attacker is `_-W6D` (the last
+  attacker, when 1–15) or the fighter itself. Its X velocity is scaled by `_-I1f._-X4E` just before [V].
+  [H] The trigger is contact with mud (`MudCollision`); the gate before @5961 is not read.
 
 ## 10. Still open
 

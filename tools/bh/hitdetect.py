@@ -591,6 +591,14 @@ ANCHORS = {ABC_1100: {
         (3042, 184, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
         (1665, 2024, "getproperty", "_-T4G"),
     ],
+    "Mud splash: Entity._-8i calls OnHit directly with PowerType._-h1r (MudSplash) while _-k2j == 0": [
+        (2984, 6425, "getproperty", "_-k2j"),
+        (2984, 6440, "getproperty", "_-W6D"),
+        (2984, 6548, "getproperty", "_-h1r"),
+        (2984, 6597, "callpropvoid", "OnHit, 17"),
+        (6482, 3116, "pushstring", "'MudSplash'"),
+        (6482, 3126, "initproperty", "_-h1r"),
+    ],
 }}
 
 
