@@ -22,7 +22,8 @@ PRs #16–#23 from earlier sessions are still open and mergeable.
   the code names.
 
 ## Next steps
-- PRNG draw order: add the two R draws of `_-X6R._-b3x` (match start, `% len(_-o5y)` or 37) to prng-order-11.00.md.
+- PRNG draw order: the two R draws of `_-X6R._-b3x` (match start) are now in prng-order-11.00.md §4b (PR #30).
+- Resume here: the 7 → 0 transition (methods that test `_-65w == 7`: `Entity._-su`, `_-19`, `_-r2M`, `_-E6A`, `_-Hx`, `_-X6R._-K5c`, `_-I4N._-51g`, …), then the animation frame table `_-cA` (`_-l4X._-54L`, needs PR #19), then an integration branch and a first falling smoke test.
 - `_-JQ`: the ImpulseToPoint branch. Hit detection is done in #30, except the other guards in `_-T5A`
   (HoldHitEnts, Uninterruptable), platform rotation on lines, and the item gates (catch windows, `_-Io` / `_-x5G` bits).
 - Power timeline: what `_-82O` (cast end) and `_-E5S` (end tick) gate after the first update.
