@@ -149,6 +149,16 @@ So the **fixed part is added after the damage scaling**, the variable part is sc
 from `BaseDamage`, `VariableImpulse`, `FixedImpulse` (stored raw as `_-f5`, `_-c6N`, `_-A2b` by #6483
 @10477–10560); `MinimumImpulse` = `_-A6P` is [V] from the column map.
 
+## Damage and stun (#1675 @1692–1942) [V]
+
+```
+damage *= 2.0                       in one mode hook (_-N1k._-s3D._-H1g._-06A._-Z3E(target._-11)) (@1700–1756)
+_-B6t(power, attacker, target, damage, ...)   applies the damage when damage != 0 (@1758–1781)
+stun   = (power._-T6p[phase] if the vector exists else FixedStunTime) * 16     (multiply_i, @1785–1824)
+stun  -= 5                          when power._-g4i == 11, damage > 0, power._-538 > 0, local 15 == 1, stun > 5
+```
+**`FixedStunTime` is in ticks**: the game multiplies it by 16 ms. [H] `_-T6p` is a per-phase stun vector.
+
 ## Next
 
 - Phase vectors (`CastTime`, `AoERadiusX/Y`, `CenterOffsetX/Y`) and the active-power tick (10.09 #46
