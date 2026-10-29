@@ -24,6 +24,14 @@ STATES = {
 UNHANDLED = (1,)   # the switch sends 1 (and anything above 9) to the "Unaccounted-for entity state" message
 
 
+# How an input starts a power [V shape]: the input consumer `_-i4Z._-rU` / `_-I35` (PR #28) calls
+# `_-F5N._-C5S` (attack slot -> power through `_-42t`; slot 9 has extra checks), `_-A3Q` or `_-V5I` (throw the
+# held item: `_-3z._-q1S` spawns it at the feet). They end in `_-F5N._-J5R`, which returns unless `_-O5u` allows
+# it (not while the running power has `_-82f`; `_-H1V` may swap the power for the weapon through `_-M1g` /
+# `_-E2S` / `_-w3H`), ends the running power (`_-VY`) and sets `_-o3I = new _-l4X(...)`.
+POWER_START = ("_-i4Z._-rU / _-I35", "_-F5N._-C5S / _-A3Q / _-V5I", "_-F5N._-J5R", "_-O5u", "new _-l4X")
+
+
 def handler(state):
     """(name, handler) of a `_-65w` value, or None for an unhandled one."""
     if state in STATES:
@@ -47,6 +55,20 @@ ANCHORS = {ABC_1100: {
         (2991, 1447, "pushbyte", "7"),
         (2991, 1707, "callpropvoid", "Respawn, 2"),
         (2991, 1741, "callpropvoid", "_-b3v, 2"),
+    ],
+    "Power start: _-i4Z._-rU / _-I35 -> _-F5N._-C5S (slot -> _-42t) / _-A3Q / _-V5I (throw) -> _-J5R: _-O5u check, old power _-VY, new _-l4X": [
+        (1700, 55, "callproperty", "_-42t, 3"),
+        (1700, 81, "pushbyte", "9"),
+        (1699, 7, "callproperty", "_-O5u, 2"),
+        (1699, 43, "callpropvoid", "_-VY, 0"),
+        (1699, 79, "constructprop", "_-l4X, 7"),
+        (1699, 83, "initproperty", "_-o3I"),
+        (1744, 39, "getproperty", "_-82f"),
+        (1744, 54, "callproperty", "_-H1V, 1"),
+        (1744, 87, "getproperty", "_-M1g"),
+        (1744, 125, "getproperty", "_-E2S"),
+        (1744, 165, "getproperty", "_-w3H"),
+        (1750, 118, "callpropvoid", "_-q1S, 5"),
     ],
 }}
 

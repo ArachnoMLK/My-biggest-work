@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(515 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(527 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -558,6 +558,19 @@ In step 5, each fighter first reads its inputs (`_-1L(t)`), then switches on `_-
 
 Value 1, and anything above 9, falls into the "Unaccounted-for entity state" message. So **movement and
 map collision only run in states 0 and 5**.
+
+**How an input starts a power** [V shape]:
+1. The input consumer `_-i4Z._-rU` / `_-I35` (input-buffer-11.00.md, PR #28) calls one of:
+   - `_-F5N._-C5S`: attack slot → power through `_-42t`, with extra checks for slot 9;
+   - `_-A3Q`;
+   - `_-V5I`: throws the held item; `_-3z._-q1S` spawns it at the feet.
+2. All three end in `_-F5N._-J5R`. It returns unless `_-O5u` allows the start. `_-O5u` refuses while the
+   running power has `_-82f`. It may swap the power for the held weapon through `_-H1V` (`_-M1g` / `_-E2S` /
+   `_-w3H` matched against `_-r1e`).
+3. `_-J5R` then ends the running power (`_-VY`) and sets `_-o3I = new _-l4X(...)`.
+4. From the next update, `_-R63` runs the new power (§1.1).
+
+Chained powers start from `_-h1T` through the same `_-J5R`.
 
 ## 11. Still open
 
