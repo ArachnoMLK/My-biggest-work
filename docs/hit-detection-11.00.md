@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(278 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(331 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -301,6 +301,43 @@ candidates per ray the same way.
 Local check (aggregate): the 122 LevelDescs parse with no error. They give 1,747 static lines, 61 of
 them with a normal. That file order is the game's insertion order is [H].
 
+### 7.3 Moving platforms and dynamic lines ([`tools/bh/platforms.py`](../tools/bh/platforms.py))
+
+**Key frames.** `_-139._-Jb` #5298 walks the `Animation` of a `MovingPlatform` [V]:
+- each `KeyFrame` becomes `_-A2j(x, y, frame, rotation, centre, cx, cy, easeIn, easeOut, power, respawnOff)`
+  (#6029). Missing attributes take the Animation's values; the default EasePower is 2. The frame is
+  `FrameNum` (default 0) plus the Phase start.
+- a `Phase` walks its children with its `StartFrame`. When its first key frame starts later than the Phase
+  and differs from the previous key frame, a hold of the previous one at the Phase start is inserted
+  (`_-yo`).
+
+**One point per frame.** `_-Y61` #5299 builds one point per frame [V]:
+- frames are numbered from 1;
+- key frame i runs until the next key frame's frame; the last one wraps to the first, until
+  NumFrames + 1 (NumFrames defaults to the LevelDesc's, else 0);
+- progress is linear `(f − f0)/(f1 − f0)`, or eased by `_-A6B._-D2g` #1131 (EaseIn, EaseOut, both = in-out,
+  power 2 quadratic, otherwise power p);
+- with a centre, the platform follows an arc between axis-aligned angles (0, π/2, π, 3π/2, 2π). The radii
+  are `|x0 − x1|` and `|y0 − y1|`. It uses `_-K6l` / `_-b4l`: cos / sin of the angle reduced to [0, 2π),
+  each rounded to 1/1000;
+- each point is rounded to 1/100, then the platform X / Y offset is added [H: X / Y of the MovingPlatform
+  element, passed as the sprite position].
+
+**Time → position.** `_-V39` #6016 gives the frame
+`StartFrame + ((t − n4k)·0.05 mod (1000·n/60·SlowMult)) / period · n`. SlowMult defaults to the LevelDesc's,
+else 1. `_-I4v` #6018 blends point k and point k + 1, modulo n [V].
+
+**Lines.**
+- `DynamicCollision` children get the block's X / Y added at parse time (`_-J1j` arguments 2–3).
+- `_-D19` #6027 stores each line's offset from the platform's first point.
+- Each update, `_-Y3I` #6014 keeps the old start in `_-X1H` / `_-q1k` (the `_-X1H` of the ray-cast floor
+  exception), then puts the line at offset + position. It is called from `_-p4E._-d4u` for every platform
+  [V].
+- A block whose PlatID has no animated platform does not move. That the link is by PlatID is [H].
+
+Local check (aggregate): all 122 LevelDescs give 173 platforms and 0 errors. One file lacks a space between
+two attributes, which the game's reader accepts; the parser accepts it too.
+
 ## 8. Thrown items and projectiles (`_-p5k`)
 
 Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not powers. Each update,
@@ -334,7 +371,8 @@ target the item touched. `_-A3S` makes the line of sight ignore item-ignore line
 
 ## 9. Still open
 
-- Dynamic lines (moving platforms at time t, PR #20; `DynamicCollision` offsets) for §7.2.
+- Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
+  and curves inside a DynamicCollision block (offset of the anchor) [H].
 - The other guards at the top of `_-T5A` (`_-i4o` HoldHitEnts with `Entity._-b2C`, `_-u3H` against
   Uninterruptable `_-C5G`, `_-hQ` / `_-72e`). The order of the list follows `_-5r` [H].
 - The meaning of `_-X2G`, `_-B5B`, `_-q24`, and the exact gate on `_-L5r` per frame (§1).
