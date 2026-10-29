@@ -14,7 +14,7 @@ was executed. Velocities live in the fighter store `_-Z2G` (movement-11.00.md) u
 ## Reproduce
 
 ```text
-python -I tools/bht.py step-verify                    # 151 anchors, 9 slot types
+python -I tools/bht.py step-verify                    # 159 anchors, 9 slot types
 python -I tools/bht.py movement-verify                # gravity, jump impulses (movement-11.00.md)
 python -I tools/bht.py abc-disasm --method 2984       # Entity._-8i
 ```
@@ -123,7 +123,9 @@ power, @47–58) [V]:
 _-k4b = round((t - t % 16) / 16)                     # the start tick, @62-173
 _-82O = _-k4b + power._-a2[0]                        # @177-210; _-a2 is built from the CastTime column
                                                      # (PowerType._-A3R #6483 @11082-12715)
-r     = power._-Sp (RecoverTime), x _-01d when _-s5C # @214-252
+r     = power._-Sp (RecoverTime), x _-01d when _-s5C # @214-252; _-01d (set in _-l4X.<init> #39 @265-379):
+        # SigRecoverMod _-Y4G when flags & (512|64) == 512|64, else AirRecoverMod _-G6R for an
+        # IsAirPower (_-NT) power, else RecoverMod _-yD (Dexterity, stats-11.00.md PR #17); 1 without owner
 _-E5S = floor(_-k4b + power._-f5c (FixedRecoverTime) + r)   # @253-289, the end tick
 (+ a charge share when _-a6i and _-e5i, + _-J2L(_-Q1n) or _-wj, AntigravTime _-q12)  # @292-592
 _-54L(); _-O1K(t)                                    # @595-609: the cast impulse, on that first update
