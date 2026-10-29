@@ -136,8 +136,18 @@ arbitration above); `_-Kc._-G4s` / `_-Kc._-13t` are the handicap "damage dealt" 
 - `impulse` = `power._-W1a[phase] + power.ImpulseOnHeavy (_-4r)` (@920–949), plus a charge term
   `0.5 * _-w4x * …` (@1038–1074), times the same charge factor (@1126–1132).
 
-[H] `_-L69` / `_-W1a` are the per-phase damage and impulse vectors built from `BaseDamage`,
-`VariableImpulse`, `FixedImpulse` (stored raw as `_-f5`, `_-c6N`, `_-A2b` by #6483 @10477–10560).
+**[V] After the formula** (#1675 @1192–1644):
+```
+knock = u1x(...) + fixed + chargeExtra          fixed = power._-C7[phase] (+ charge term, capped when _-Q1u) (@951–1033)
+knock = MinimumImpulse                          when MinimumImpulse (_-A6P) != 0, impulse != 0 and knock < it (@1213–1260)
+knock *= 0.9                                    when the target has entity flag Entity._-B6B and ... (@1484–1532)
+direction.normalize(knock)                      the knockback vector (@1640–1644)
+```
+So the **fixed part is added after the damage scaling**, the variable part is scaled by `f + f²/2`.
+
+[H] `_-L69`, `_-W1a`, `_-C7` are the per-phase damage, variable-impulse and fixed-impulse vectors built
+from `BaseDamage`, `VariableImpulse`, `FixedImpulse` (stored raw as `_-f5`, `_-c6N`, `_-A2b` by #6483
+@10477–10560); `MinimumImpulse` = `_-A6P` is [V] from the column map.
 
 ## Next
 
