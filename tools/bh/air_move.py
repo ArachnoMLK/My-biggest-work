@@ -28,6 +28,9 @@ class MoveResult:
     ground: object = None             # `_-96f` after the step (the line that stopped the move, or None)
     head_stop: bool = False           # local 29: the stop came from the head or attack sweep
     ceilings: list = field(default_factory=list)   # `_-u3j`: lines found by the ceiling check
+    move: tuple = (0.0, 0.0)          # `_-611`: the vector actually moved
+    wanted: tuple = (0.0, 0.0)        # `_-U5T`: the vector asked for
+    mask: int = 3                     # local 3
 
 
 def _length(v):
@@ -99,7 +102,76 @@ def air_move(lines, team, x, y, x_step, p5s, on_ground, drop_through=False, atta
     if hit is not None:                                                # `_-96f = l17`, @8481-8865
         b = _back_off(hit, mv)
         x, y = x - b[0], y - b[1]
-    return MoveResult(x, y, hit, head_stop, ceilings)
+    return MoveResult(x, y, hit, head_stop, ceilings, mv, u, mask)
+
+
+@dataclass
+class Response:
+    x: float
+    y: float
+    p5s: float
+    v1d: float
+    kind: str                         # "ceiling", "slope", "wall", "other", or "none"
+    power_k3: bool = False            # `_-o3I._-K3 = true` (the power has `_-4A`)
+
+
+def respond(lines, team, r, p5s, v1d, power_4a=False):
+    """The part of `Entity._-8i` after the move that is transcribed (@9709-10710, @12336-12834).
+
+    Not transcribed, and reported as kind "other": bounce `_-048` (@9275-9704), game-mode lines `_-ao`,
+    the wall cling / ledge assist / sticky timers (@10776-12336) and pressure plates. In the game they come
+    first (bounce) or alongside (wall), so "wall" covers only the slide of the remaining y along the wall.
+    """
+    if hasattr(lines, "candidates"):
+        def cands(cx, cy, d):
+            return lines.candidates(cx, cy, cx + d[0], cy + d[1])
+    else:
+        def cands(cx, cy, d):
+            return lines
+    g = r.ground
+    x, y = r.x, r.y
+    if g is None:
+        return Response(x, y, p5s, v1d, "none")
+    vertical = g.sx == g.ex
+    # ceiling, @9709-9888: head stop on a flat line, or on a down-facing no-slide line
+    if r.head_stop and (g.sy == g.ey or (g.normal[1] > 0 and g.type & NO_SLIDE)):
+        if p5s < 0:
+            p5s = 0
+        return Response(x, y, p5s, v1d, "ceiling", power_4a)
+    # slope, @9892-10710: head stop on a non-vertical line, or a steep line (`_-S1A`)
+    if (r.head_stop and not vertical) or steep(g):
+        k = r.move[1] - r.wanted[1]
+        a = (g.ex - g.sx, g.ey - g.sy) if g.sy > g.ey else (g.sx - g.ex, g.sy - g.ey)
+        a = _normalize(a, k)
+        if a[0] < 0:
+            if v1d > -15.0:
+                v1d = -15.0
+        elif a[0] >= 0 and v1d < 15.0:
+            v1d = 15.0
+        rise = HEAD if r.head_stop else 0.0
+        hit, _ = _cast(cands, team, x, y - rise, a, 1)
+        x, y = x + a[0], y + a[1]
+        if hit is not None:
+            b = _normalize(a, BACK_OFF)
+            x, y = x - b[0], y - b[1]
+        return Response(x, y, p5s, v1d, "slope", r.head_stop and power_4a)
+    if vertical:                                                       # remaining y along the wall, @12336-12834
+        dy = r.wanted[1] - r.move[1]
+        feet, fv = _cast(cands, team, x, y, (0.0, dy), r.mask)
+        head, hv = _cast(cands, team, x, y - HEAD, (0.0, dy), 1)
+        if head is not None and _length(hv) < _length(fv):
+            fv, feet = (fv[0], hv[1]), head
+        y = y + fv[1]
+        if feet is not None:
+            y = y + (-BACK_OFF if r.wanted[1] > 0 else BACK_OFF)
+        return Response(x, y, p5s, v1d, "wall")
+    return Response(x, y, p5s, v1d, "other")
+
+
+def steep(line):
+    """`_-S1A` as `_-R15._-q3q` #1570 sets it: normal y < 0 and |nx / ny| >= 5/3."""
+    nx, ny = line.normal
+    return ny < 0 and abs(nx / ny) >= 1.6666666666666667
 
 
 ANCHORS = {ABC_1100: {
@@ -136,6 +208,24 @@ ANCHORS = {ABC_1100: {
         (2984, 8754, "pushdouble", "1.01"),
         (2984, 8865, "callpropvoid", "_-N5C::_-E1t, 2"),
         (2984, 8886, "initproperty", "_-r51"),
+    ],
+    "_-8i response: ceiling (P5S < 0 -> 0), slope slide along the line (|v1D| >= 15), remaining y along a wall": [
+        (2984, 9709, "getlocal", "29"),
+        (2984, 9775, "getproperty", "_-x1z"),
+        (2984, 9827, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 9933, "getproperty", "_-S1A"),
+        (2984, 9996, "getproperty", "_-A6U"),
+        (2984, 10130, "callpropvoid", "normalize, 1"),
+        (2984, 10171, "pushdouble", "-15.0"),
+        (2984, 10238, "pushdouble", "15.0"),
+        (2984, 10270, "pushdouble", "120.0"),
+        (2984, 10371, "callproperty", "_-X2e, 10"),
+        (2984, 10514, "pushdouble", "1.01"),
+        (2984, 12381, "initproperty", "y"),
+        (2984, 12502, "callproperty", "_-X2e, 10"),
+        (2984, 12604, "callproperty", "_-X2e, 10"),
+        (2984, 12822, "pushdouble", "-1.01"),
+        (2984, 12927, "initproperty", "_-O6z"),
     ],
 }}
 

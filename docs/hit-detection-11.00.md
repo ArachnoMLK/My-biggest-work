@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(410 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(426 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -391,8 +391,19 @@ above.
    off by 1.01: along −normal when the line is hard and the move was tiny (|x|, |y| ≤ `_-u4H` = 1.02),
    otherwise straight back along the move.
 
-What the step then does with `_-96f` (walls `_-r51`, landing, @8869–) is in PR #26 for walls and is not
-transcribed here.
+**After the stop** (@8869–12927, `respond`). When `_-96f` is set, the branches run in this order [V]:
+
+| # | Condition | Effect | Transcribed |
+|---|---|---|---|
+| 1 | bounce state (`_-e3e & _-B6B`, or `_-5q() && !_-e36()`) | `_-048` bounce; impact effect when the speed changed by > 50 | no |
+| 2 | head stop on a flat line, or on a down-facing no-slide line | **ceiling**: an upward `_-P5S` becomes 0; the power's `_-K3` is set when it has `_-4A` | yes |
+| 3 | head stop on a non-vertical line, or a steep line (`_-S1A`: ny < 0 and \|nx/ny\| ≥ 5/3) | **slope**: the missing y (move.y − wanted.y) is replayed along the line, the x speed `_-v1D` is pushed to at least 15 in that direction, with a hard-line sweep and a 1.01 back-off | yes |
+| 4 | game-mode line with `_-ao` | mode-specific | no |
+| 5 | vertical line | wall cling, ledge assist (probe from 5 below the top, ±2.02 / 6), sticky-wall timers (`_-y1L`, 5000 ms), slide damping `_-84Q` × 0.85 × 0.384, `_-r51` (PR #26); then **the remaining y continues along the wall** (feet and head sweeps, ±1.01 back-off) | the slide along the wall |
+| 6 | anything else (floors) | pressure plates `_-U5a` | no |
+
+At the end, `_-O6z` = `_-96f`.
+
 
 ## 8. Thrown items and projectiles (`_-p5k`)
 
