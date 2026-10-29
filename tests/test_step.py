@@ -12,10 +12,23 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import abc, step, swf  # noqa: E402
-from bh.step import fold_impulse  # noqa: E402
+from bh.step import clamp, fold_impulse, speed_cap  # noqa: E402
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
 HAVE_GAME = os.path.exists(os.path.join(GAME, "BrawlhallaAir.swf"))
+
+
+class SpeedCap(unittest.TestCase):
+    def test_cap_values(self):
+        self.assertEqual(speed_cap(), 1000.0)
+        self.assertEqual(speed_cap(power_active=True), 3000.0)
+        self.assertEqual(speed_cap(flags=524288), 1000.0 / 3)
+        self.assertEqual(speed_cap(True, 524288 | 1), 1000.0)
+
+    def test_clamp(self):
+        self.assertEqual(clamp(1200.0, 1000.0), 1000.0)
+        self.assertEqual(clamp(-1200.0, 1000.0), -1000.0)
+        self.assertEqual(clamp(1000.0, 1000.0), 1000.0)
 
 
 class Fold(unittest.TestCase):

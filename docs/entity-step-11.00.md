@@ -14,7 +14,7 @@ was executed. Velocities live in the fighter store `_-Z2G` (movement-11.00.md) u
 ## Reproduce
 
 ```text
-python -I tools/bht.py step-verify                    # 80 anchors, 9 slot types
+python -I tools/bht.py step-verify                    # 104 anchors, 9 slot types
 python -I tools/bht.py movement-verify                # gravity, jump impulses (movement-11.00.md)
 python -I tools/bht.py abc-disasm --method 2984       # Entity._-8i
 ```
@@ -52,10 +52,10 @@ if impulse != 0:
 |---|---|---|---|
 | — | Friction and acceleration on `_-v1D` | @1240–2470 | [V] see horizontal notes (PR #23) |
 | 1 | On a ground line whose `type & 2` is set, the line is dropped (`_-96f = null`); then either `_-w3i = t` (when `_-G1a()`) or the y impulse decays: `_-A4A *= _-7c` (`_-7c = 0.8` in `Entity.<init>` @124–127, `Number`, also written by `_-048` and item code) | @1792–1928 | [V] shape; [H] "drop through a soft platform" |
-| 2 | Horizontal impulse fold `_-v1D ← fold(_-v1D, _-84)` | @2790–2965 | [V] |
+| 2 | Horizontal impulse fold `_-v1D ← fold(_-v1D, _-84)`, then `_-v1D` clamped to ±`local11` (the speed cap, below) | @2790–3053 | [V] |
 | 3 | Horizontal step `local12 = _-v1D × 0.384` (`_-z2k._-Vj`) | @3086–3112 | [V] |
 | 3a | If a ground line `_-96f` is set: walk loop. Each pass points `Entity._-N3a` along the line, normalises it to `local12`, sweeps with `_-CX._-X2e` (@3290), adds `_-N3a` (as the sweep leaves it) to x and y (@3311–3408), takes the moved length off `local12` (@3426–3448) and switches `_-96f` to the line that was hit (@3466). It repeats while `local12 ≠ 0` (@4197–4213), and some branches leave the loop early (@4185, @4193). | @3114–4213 | [V] shape; [H] left-over `local12` then becomes air movement |
-| 4 | Vertical impulse fold `_-P5S ← fold(_-P5S, _-A4A)`, then `_-P5S` clamped to ±`local11` | @4217–4483 | [V]; [H] where `local11` comes from on each path |
+| 4 | Vertical impulse fold `_-P5S ← fold(_-P5S, _-A4A)`, then `_-P5S` clamped to ±`local11` | @4217–4483 | [V] |
 | 5 | Gravity `_-P5S += 3.75 × 0.384` while below the fall cap 70 / 85 | @5097–5353 | [V] movement-11.00.md |
 | 6 | Free move: `Entity._-U5T = (local12, _-P5S × 0.384)`, plus 2.02 on y when `_-96f` is set; copied to `_-611` / `_-N6L` and swept with `_-X2e` @6896 (more sweeps follow @6999–8209) | @6620–6896 | [V] shape |
 | 7 | Ring-out test `_-c5C` and `_-a3D` (ko-11.00.md, PR #25) | @14270–14517 | [V] |
@@ -69,9 +69,27 @@ The y displacement uses `_-P5S` only (@6640–6672): with the fold, a grounded j
 `A4A = −57`) gives `P5S = −57` before gravity in the same step [H: the same step runs the jump,
 which happens in the input consumer before `_-8i`].
 
+## Speed cap (`local11`)
+
+`local11` is written once, @2723–2781, and no branch jumps over that write; both clamps read it.
+`step.speed_cap` and `step.clamp` transcribe it. [V]
+
+```
+cap = 3000 if _-Kc._-c5l else 1000          # @2729-2750
+if _-e3e & Entity._-4Z: cap = cap / 3        # _-4Z = 524288 (script157.<init> @1231)
+v1D = clamp(v1D, cap)                        # @2969-3053, every tick, impulse or not
+P5S = clamp(P5S, cap)                        # @4399-4483, every tick, impulse or not
+```
+
+- `_-Kc._-c5l` is cleared at the top of `_-F5N._-u1N` #1745 and set again only when the fighter's
+  power `_-o3I` exists and `_-o3I._-82f` is true (@99–135, @297–302). [V]; [H] "an attack is
+  running", so attacks can move a fighter up to 3000 units/s instead of 1000.
+- The meaning of the `_-e3e` bit 524288 is open [H].
+- The clamp tests are `ifngt` / `ifnlt`, so a NaN velocity passes unchanged.
+
 ## Limits
 
 - Static only, and per byte order: the state branches of `_-8i` (hitstun, dodge, wall, ledge…) are
-  not enumerated, and `local11` (the y clamp) is not resolved per path.
+  not enumerated.
 - The sweep `_-X2e` and its response rules are in collision-11.00.md (PR #20); how the swept result
   is written back after @6896 is not traced here.

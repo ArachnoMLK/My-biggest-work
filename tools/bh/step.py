@@ -24,6 +24,28 @@ def fold_impulse(velocity, impulse):
     return s, None
 
 
+SPEED_CAP = 1000.0          # local 11 of #2984 @2745
+SPEED_CAP_POWER = 3000.0    # @2737, when _-Kc._-c5l (set by _-F5N._-u1N while a power runs)
+SLOW_FLAG = 524288          # Entity._-4Z (script157.<init> #3173 @1231): cap / 3 when _-e3e has it
+
+
+def speed_cap(power_active=False, flags=0):
+    """local 11 of #2984 @2723-2781: the bound for both velocity clamps (x @2969-3053, y @4399-4483)."""
+    cap = SPEED_CAP_POWER if power_active else SPEED_CAP
+    if flags & SLOW_FLAG:
+        cap = cap / 3
+    return cap
+
+
+def clamp(velocity, cap):
+    """`v > cap -> cap`, else `v < -cap -> -cap` (ifngt / ifnlt, so NaN passes unchanged)."""
+    if velocity > cap:
+        return cap
+    if velocity < -cap:
+        return -cap
+    return velocity
+
+
 ANCHORS = {ABC_1100: {
     "constants: _-7c = 0.8 (Entity.<init>), Entity._-y4Q = 62500 = 250^2": [
         (2887, 124, "pushdouble", "0.8"),
@@ -118,6 +140,36 @@ ANCHORS = {ABC_1100: {
         (2984, 14597, "pushdouble", "0.0"),
         (2984, 14599, "callpropvoid", "_-N5C::_-E1t, 2"),
         (2984, 14603, "returnvoid", ""),
+    ],
+    "speed cap: local 11 = _-Kc._-c5l ? 3000 : 1000, / 3 when _-e3e & Entity._-4Z; one write on every path": [
+        (2984, 2729, "getproperty", "_-c5l"),
+        (2984, 2737, "pushdouble", "3000.0"),
+        (2984, 2745, "pushdouble", "1000.0"),
+        (2984, 2750, "setlocal", "11"),
+        (2984, 2762, "getproperty", "_-4Z"),
+        (2984, 2777, "pushbyte", "3"),
+        (2984, 2779, "divide", ""),
+        (2984, 2781, "setlocal", "11"),
+        (3173, 1231, "pushint", "524288"),
+        (3173, 1233, "initproperty", "_-4Z"),
+    ],
+    "both clamps use local 11: x after the x fold, y after the y fold": [
+        (2984, 2986, "getlocal", "11"),
+        (2984, 3006, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 3050, "getlocal", "11"),
+        (2984, 3052, "negate", ""),
+        (2984, 4416, "getlocal", "11"),
+        (2984, 4436, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 4480, "getlocal", "11"),
+        (2984, 4482, "negate", ""),
+    ],
+    "_-c5l: false on entry of _-F5N._-u1N, true only when _-o3I is set and _-o3I._-82f": [
+        (1745, 66, "pushfalse", ""),
+        (1745, 67, "initproperty", "_-c5l"),
+        (1745, 125, "getproperty", "_-82f"),
+        (1745, 135, "returnvoid", ""),
+        (1745, 301, "pushtrue", ""),
+        (1745, 302, "initproperty", "_-c5l"),
     ],
 }}
 
