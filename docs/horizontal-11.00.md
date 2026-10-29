@@ -1,0 +1,45 @@
+# Horizontal movement (Q4/Q5, patch 11.00) — first part
+
+Pin: patch 11.00, abc `7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`.
+Everything below is in the movement method **`Entity._-8i` #2984** (`abc-disasm --method 2984`), the same
+method as the vertical chain (`docs/movement-11.00.md`). Stat names: `docs/stats-11.00.md`.
+
+`_-wn()` is true in the air [H: it selects every `Air*` stat]; `_-v1D` is the horizontal velocity, read
+and written through the numeric store (`_-N5C::_-U13` / `_-E1t`); `_-z2k._-Vj = 0.384` is the per-tick
+scale (Q4).
+
+## Maximum run speed (@519–615) [V]
+
+```
+ground  = RunSpeed    * _-Kc._-04K   (* 1.16 when _-w47 is set)
+air     = AirRunSpeed * _-Kc._-u5j
+max     = air if _-wn() else ground
+```
+[H] `_-Kc._-04K`, `_-Kc._-u5j` are per-fighter modifiers (1 normally).
+
+## Friction (@838–1340) [V]
+
+Choice of the friction value `F` (last match wins):
+1. `AirFriction` in the air, `Friction` on the ground (@838–869);
+2. within **640 ms** after `_-26T` (`_-26T + 640 >= now`; `_-26T` is also the dash timer of
+   `Entity.Jump`, Q4): `3.534` in the air, `5.655` on the ground (@802–903) — the `Speed6` values;
+3. weapon/power overrides from `_-Kc._-o3I`: `4.013` (@938–960), or `5.655` / `Friction` (@966–1036);
+4. `_-5q()`: `4.0` (@1038–1055);
+5. surface flags `_-R5q._-66U` with the velocity sign: `9.0` (moving right on a surface with bit 4 and
+   not bit 8, @1065–1146; or moving left on bit 8 and not bit 4, @1150–1231), else `3.25` (@1235).
+
+Application, once per tick (@1240–1340):
+```
+s   = +1 if vx > 0 else -1
+v   = s * vx - F * 0.384
+vx  = max(v, 0) * s
+```
+**Friction is a linear deceleration of `F × 0.384` per tick**, clamped at zero, not a multiplicative factor.
+
+## Acceleration (@1928–2052) [V]
+
+```
+accel = AirAcceleration * _-Kc._-R4I  if _-wn()  else  Acceleration * _-Kc._-E16
+accel *= 1.25 and max *= 1.25         when the mode hook _-N1k._-s3D._-H1g._-m47._-43P(now, this) is true
+```
+How `accel` and `max` are applied to `vx` from the inputs (@2066 onward) is the next step.
