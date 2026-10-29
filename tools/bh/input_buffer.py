@@ -425,6 +425,18 @@ ANCHORS = {ABC_1100: {
         (3125, 156, "callproperty", "IsDodgeLocked, 1"),
         (3125, 416, "callproperty", "Dash, 2"),
     ],
+    "_-01g: time of the first hit of a hitstun chain (set by _-L3f when 0), cleared by _-Re once !_-u5E() and t > _-46I + 32": [
+        (1670, 81, "initproperty", "_-u4B"),
+        (1670, 88, "initproperty", "_-v3y"),
+        (1670, 225, "getproperty", "_-01g"),
+        (1670, 237, "initproperty", "_-01g"),
+        (2981, 453, "getproperty", "_-01g"),
+        (2981, 469, "callproperty", "_-u5E, 0"),
+        (2981, 485, "getproperty", "_-46I"),
+        (2981, 488, "pushbyte", "32"),
+        (2981, 494, "lessthan", ""),
+        (2981, 505, "initproperty", "_-01g"),
+    ],
 }}
 
 

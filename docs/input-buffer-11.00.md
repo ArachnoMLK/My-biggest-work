@@ -11,7 +11,7 @@ eligibility rules that decide which buffered press fires are only started here.
 ## Reproduce
 
 ```text
-python -I tools/bht.py input-buffer-verify            # 291 anchors
+python -I tools/bht.py input-buffer-verify            # 301 anchors
 python -I tools/bht.py abc-disasm --method 6313       # _-i4Z._-51o, the consumer
 python -I tools/bht.py abc-disasm --method 6323       # _-i4Z._-7z, key word at a time
 ```
@@ -102,6 +102,7 @@ groups from "jump lock" to "`_-y2r`" pin every row below.
 | Late dodge: with no dodge press in the window, not move-locked, `t > 16 (n+7)` and `owner._-C2E(t, dir)`, the six ticks `t − 16(n+5) … t − 16n` are scanned for a dodge press | @1538–1734 | [V] |
 | `_-C2E(t, dir)` is false once `t > _-532 + Entity._-84e` (`_-84e = 192`), when `dir` points against `_-M3h` (Left with `!_-M3h`, Right with `_-M3h`), when `dir == 0`, or when `dir == 2` on the ground (`_-96f ≠ null`) | #3073; #3173 @812 | [V] |
 | Held dodge: with still no press, a dodge held since `_-D3F` (local 27) counts as a press when `owner._-01g ≠ 0`, `_-D3F > _-C51` and `_-D3F + 32 > owner._-01g`; the third `Dodge` argument (local 31) is then true. It is also true when a press exists and `_-g3B + 480 > t` (`_-g3B` = the previous `_-D3F`) | @1282–1384, @1742–1867, @2431 | [V]; [H] "dodge right after another dodge" |
+| `_-01g` is the time of the first hit of the current hitstun chain: the hit handler `_-26u._-L3f` #1670 sets it to `t` when it is 0 (with `_-u4B = t`, `_-v3y = stun`), and `Entity._-Re` #2981 clears it once `!_-u5E()` and `t > _-46I + 32`. So the held-dodge rule above lets a dodge held from up to 32 ms before the first hit count as a press [H] | #1670 @79–237; #2981 @448–505 | [V] writes; [H] reading |
 | Cancel window: when the owner's current move record (`_-h3i._-Z4V[_-Q42]`) exists and `_-E6P()`, local 32 is set while `_-H2b + 16 _-M4L ≤ t ≤ _-H2b + 16 _-GX` (frames → ms); local 33 when the extra test local 39 holds. Light and heavy may fire with local 32 even after an action was taken | @2009–2342, @2763–2798 | [V]; [H] `_-H2b` = start of the current move |
 | Light / heavy route: if a move runs (`_-Kc._-O2R ≠ null`) without `_-93n._-Z6M[1]` and `owner._-r51 == 0`, the press goes to `_-I35` (chain); otherwise to `_-rU` (new attack), but only when no move runs or the press is **newer than `_-Kc._-sM`**. `_-sM` is written with `_-O2R` in `_-F5N._-s1u`, so it is the start time of the current move | @2709–2959, @2996–3135; #1734 @182–189 | [V] |
 | `_-I35(t, dir, a, b, kind)` returns false while `t − _-sM ≤ 300` (unsigned) or with no move; otherwise it calls `_-Kc._-V5I(t, dir)` if the move has `_-93n._-qo`, else `_-Kc._-A3Q(t, kind)` (kind 2 light, 3 heavy) | #6335 | [V]; [H] "string / chain the next part of the move" |
