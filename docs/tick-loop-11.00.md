@@ -63,8 +63,9 @@ next pass starts; the scheduler does not run the whole table separately for each
 `_-3z`, `_-32h`, `_-s3D`). The cited method ids belong to the classes that define those
 names, each defined exactly once in this ABC: `_-s4H` #4881 and `_-O3d` #4879 are on
 `_-E1V`, `_-d3s` #1665 on `_-26u`, `_-u1O` #7128 and `_-m4d` #7130 on `_-99`
-(`abc-disasm --method N` header line). [H] The property `_-3z` holds the `_-E1V` instance,
-`_-32h` the `_-26u` instance and `_-s3D` the `_-99` instance; slot types were not checked.
+(`abc-disasm --method N` header line). [V] Q3's follow-up checked the declared slot types:
+`_-3z : _-E1V` and `_-s3D : _-99` (`prng-order-verify`, [evidence](prng-order-11.00.md)).
+[H] The property `_-32h` holds the `_-26u` instance; that slot type remains unchecked here.
 
 | Order / offsets in #3336 | Receiver and method | What is established |
 |---|---|---|
