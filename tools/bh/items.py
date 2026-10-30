@@ -24,16 +24,20 @@ ITEM_COLUMNS = {"Friction": "T2P", "AirFriction": "h5M", "Gravity": "84Q", "Thro
                 "PathLength": "G6o", "PathType": "z4P", "ForceNoHitstop": "T30", "OnlyStunnedTrigger": "N59",
                 "AllowRepeatedCollision": "A4s", "Height": "S2O", "ForceNoGeometryCollision": "p2W",
                 "Elasticity": "7c", "StickToWalls": "o1G", "AlwaysArmed": "XJ", "ConditionalStickToWalls": "o1l",
-                "ThrownInitialVelocityMult": "I2d", "ThrownHorizontalY": "x5D", "ProximityTrigger": "r58"}
+                "ThrownInitialVelocityMult": "I2d", "ThrownHorizontalY": "x5D", "ProximityTrigger": "r58",
+                "OnCollisionPower": "o3Y", "OnHit": "76N", "ExpireOnGeometryCollision": "Q3g", "Weapon": "G3X"}
 ITEM_DEFAULTS = {"T2P": 2.5, "h5M": 0.15, "84Q": 3.75, "OY": 3.75, "G6o": 0, "z4P": 0, "T30": False,
                  "N59": False, "A4s": False, "S2O": 0, "p2W": False, "7c": 0.6, "o1G": False, "XJ": False,
-                 "o1l": 0, "I2d": 1.0, "x5D": -0.1, "r58": False}
+                 "o1l": 0, "I2d": 1.0, "x5D": -0.1, "r58": False, "o3Y": None, "76N": None, "Q3g": False,
+                 "G3X": False}
 STICK_FLAGS = {"STRICT_ANGLE": 1, "FLOORS_ONLY": 2}           # ConditionalStickToWalls, split on "|"
 REST_SPEED2 = 2500      # `_-p5k._-Y3M` (script822.<init> #15249): a thrown item at or below this speed^2 rests
 STOP_SPEED = 5          # `_-u1I` @1366: on a flat floor, slower impacts stop instead of bouncing
 STRICT_COS = -0.7237379   # `_-u1I` @1187: STRICT_ANGLE sticks when cos(velocity, normal) is below this
 BOUNCY = 64             # `_-z2k._-B6P`
+LAVA_BIT = 512          # `_-z2k._-s2O`
 CHARGED_MS = 2000       # `_-F5N._-M4Q` @494: a throw charged this long sets `_-W6M` (corkscrew, slow boomerang)
+LAVA_WEAPON_MS = 267    # `_-u1I` @107: a Weapon item that hit lava after hitting someone stays in state 6 this long
 SPAWN_RISE = 30.0       # `_-M4Q` @347: the item starts 30 above the thrower's feet
 BOOMERANG_DELAY_MS = 180        # `_-p5k._-L1Y` (script822.<init> #15249)
 BOOMERANG_DELAY_WOBBLE_MS = 1800   # `_-p5k._-i4S`, when `_-W6M`
@@ -193,6 +197,34 @@ def bounce(line, lu, vy, elasticity, friction):
         wx, wy = wx * k, wy * k
     ux, uy = ux * e, uy * e
     return wx - ux, wy - uy
+
+
+def impact_special(t, line_type, item, state, io, l45, thrown_at, thrower=True):
+    """`_-p5k._-u1I` #15194 @26-711, before the stick / bounce part: a dict of what happens, or {} to go on.
+
+    - A `Weapon` item that touches lava while `_-Io` != 0 (it has hit someone) and `_-45l` = 0 goes to state 6
+      with `_-45l` = t + 267, then the impact goes on.
+    - `ExpireOnGeometryCollision` while thrown (state 1) or AlwaysArmed: the thrower spawns the item's
+      `OnCollisionPower` (`_-Kc._-q5`, 12 arguments, at the item's x and centre y; flag 33554432 once t >=
+      `_-O13` + 400) and the item expires (`_-Jl`); the impact stops there.
+    - `OnHit` = "Teleport" while thrown: the same power spawn, then the thrower is moved onto the item
+      (`_-2c`, `_-Z5r`, `_-x1M`), `_-p1Y()` unless the mode bit `_-d3Y._-Z2Y & 64`, and the item expires.
+    Without a thrower (`thrower` false), the item only expires.
+    """
+    out = {}
+    if line_type & LAVA_BIT and io != 0 and item["G3X"] and l45 == 0:
+        out.update(state=6, l45=t + LAVA_WEAPON_MS)
+    late = t >= thrown_at + THROW_GUARD_MS
+    if item["Q3g"] and (state == 1 or item["XJ"]):
+        out.update(expire=True)
+        if thrower:
+            out.update(power=item["o3Y"], late_flag=late)
+        return out
+    if item["76N"] == "Teleport" and state == 1:
+        out.update(expire=True)
+        if thrower:
+            out.update(power=item["o3Y"], late_flag=late, teleport_thrower=True)
+    return out
 
 
 def impact(lu, vy, line, item, can_stick=False):
@@ -531,7 +563,9 @@ def item_type(cells):
             r[field] = PATH_TYPES.get(v, 0)
         elif field == "o1l":
             r[field] = sum(STICK_FLAGS.get(p, 0) for p in set(v.split("|")))   # OR of distinct bits
-        elif field in ("T30", "N59", "A4s", "p2W", "o1G", "XJ", "r58"):
+        elif field in ("o3Y", "76N"):
+            r[field] = v
+        elif field in ("T30", "N59", "A4s", "p2W", "o1G", "XJ", "r58", "Q3g", "G3X"):
             r[field] = v.strip().lower() == "true"
         elif field in ("G6o", "S2O"):            # uint slots
             r[field] = int(v)
@@ -841,5 +875,33 @@ ANCHORS = {ABC_1100: {
         (4974, 2759, "initproperty", "_-r58"),
         (4963, 198, "pushdouble", "-0.1"),
         (4963, 254, "pushdouble", "1.0"),
+    ],
+    "_-u1I special impacts: Weapon on lava -> state 6 for 267 ms; ExpireOnGeometryCollision / Teleport spawn OnCollisionPower via _-q5 and expire": [
+        (15194, 36, "getproperty", "_-s2O"),
+        (15194, 53, "getproperty", "_-Io"),
+        (15194, 73, "getproperty", "_-G3X"),
+        (15194, 97, "pushbyte", "6"),
+        (15194, 107, "pushuint", "267"),
+        (15194, 122, "getproperty", "_-Q3g"),
+        (15194, 153, "getproperty", "_-XJ"),
+        (15194, 210, "getproperty", "_-o3Y"),
+        (15194, 347, "pushuint", "400"),
+        (15194, 357, "pushint", "33554432"),
+        (15194, 368, "callpropvoid", "_-q5, 12"),
+        (15194, 378, "initproperty", "_-Jl"),
+        (15194, 398, "pushstring", "'Teleport'"),
+        (15194, 636, "callpropvoid", "_-2c, 2"),
+        (15194, 643, "callpropvoid", "_-Z5r, 1"),
+        (15194, 666, "callpropvoid", "_-x1M, 3"),
+        (15194, 684, "pushbyte", "64"),
+        (15194, 698, "callpropvoid", "_-p1Y, 0"),
+        (4974, 1893, "pushstring", "'OnCollisionPower'"),
+        (4974, 1913, "initproperty", "_-o3Y"),
+        (4974, 1982, "pushstring", "'OnHit'"),
+        (4974, 2002, "initproperty", "_-76N"),
+        (4974, 1183, "pushstring", "'ExpireOnGeometryCollision'"),
+        (4974, 1200, "initproperty", "_-Q3g"),
+        (4974, 3347, "pushstring", "'Weapon'"),
+        (4974, 3363, "initproperty", "_-G3X"),
     ],
 }}

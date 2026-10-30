@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1069 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1095 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -756,8 +756,17 @@ order]:
     - On a floor that is not steep, a thrown item (state 1) with speed² <= 2500 (`_-p5k._-Y3M`) rests
       (state 0). State 2 rests once both speeds are 0 (event `_-K3s(t, 5)`).
     - A bounds test `_-c5C` can remove the item (`_-J5O`).
-11. **Impact** (`items.impact`, `_-u1I` #15194 @712–1515) [V]. The special cases before @712 are not
-    transcribed: `ExpireOnGeometryCollision` spawns a power through `_-q5`; Teleport; and a Weapon item on lava.
+11. **Impact** (`items.impact`, `_-u1I` #15194 @712–1515) [V]. The special cases come first
+    (`items.impact_special`, @26–711):
+    - a `Weapon` item (`_-G3X`) that touches lava after hitting someone (`_-Io` ≠ 0) goes to state 6 for
+      267 ms (`_-45l`);
+    - an `ExpireOnGeometryCollision` item (thrown, or AlwaysArmed) makes its thrower spawn the item's
+      `OnCollisionPower` (`_-Kc._-q5`, 12 arguments, at the item's x and centre y; flag 33554432 once 400 ms
+      have passed since the throw), then it expires (`_-Jl`);
+    - an item whose `OnHit` is "Teleport" (thrown) does the same, then moves its thrower onto itself
+      (`_-2c`, `_-Z5r`, `_-x1M`, and `_-p1Y()` unless the mode bit `_-Z2Y & 64`).
+
+    Without a thrower, such an item only expires.
     - **Stick.** The item sticks with `StickToWalls` when `_-72T` [H] and (thrown or `AlwaysArmed`).
       `ConditionalStickToWalls` STRICT_ANGLE (1) also sticks a head-on hit (cos(velocity, normal) <
       −0.7237379), and FLOORS_ONLY (2) cancels sticking unless −|nx| >= ny. A stuck item stops.
