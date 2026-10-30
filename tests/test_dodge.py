@@ -6,8 +6,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (clears_velocity, cooldown_ms, counter, facing, formula_mult, k64, kind,  # noqa: E402
-                      neutral_push, pick, speed_x, speed_y, standard_flag, timers)
+from bh.dodge import (clears_velocity, cooldown_ms, counter, dodge_over, facing, formula_mult, k64,  # noqa: E402
+                      kind, landed_cooldown, neutral_push, pick, speed_x, speed_y, standard_flag, timers)
 
 
 class Dodge(unittest.TestCase):
@@ -56,6 +56,23 @@ class Dodge(unittest.TestCase):
         self.assertEqual(pick(rows, 1, airborne=False, is_fast=False)["DodgeName"], "StandardSpot")
         self.assertEqual(pick(rows, 4, airborne=False, is_fast=True)["DodgeName"], "StandardSpot")
 
+
+    def test_landed_cooldown(self):
+        args = dict(airborne=False, r51=0, hitstun=False, a1h=False, q42=3, t=1240, i46=1000,
+                    cooldown_landed=2, uy=100, c1d=50)
+        self.assertEqual(landed_cooldown(500, **args), 182)
+        self.assertEqual(landed_cooldown(150, **args), 150)
+        self.assertEqual(landed_cooldown(500, **dict(args, t=1239)), 500)
+        self.assertEqual(landed_cooldown(500, **dict(args, airborne=True)), 500)
+        self.assertEqual(landed_cooldown(500, **dict(args, q42=0)), 500)
+
+    def test_dodge_over(self):
+        self.assertEqual(dodge_over(1000, True, 700, 300, 0), (True, True))
+        self.assertEqual(dodge_over(999, True, 700, 300, 0), (False, False))
+        self.assertEqual(dodge_over(1000, True, 700, 300, 889), (False, False))
+        self.assertEqual(dodge_over(1000, True, 700, 300, 888), (True, True))
+        self.assertEqual(dodge_over(1000, True, 0, 300, 0), (True, False))
+        self.assertEqual(dodge_over(1000, False, 700, 300, 0), (False, False))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)

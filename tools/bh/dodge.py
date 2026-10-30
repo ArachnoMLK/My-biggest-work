@@ -133,6 +133,29 @@ def k64(flag, airborne, z2v, u5j, m1u, o4k):
     return m1u * o4k
 
 
+LANDED_DELAY_MS = 240      # `Entity._-l2o` (script157.<init> #3173 @882)
+DASH_HOLD_MS = 112         # `Entity._-y4m` (script157.<init> #3173 @800)
+
+
+def landed_cooldown(y1f, airborne, r51, hitstun, a1h, q42, t, i46, cooldown_landed, uy, c1d):
+    """`Entity._-t1A(t, a)` #2992 @40-230, run each tick from `_-8i` @2659: on the ground (not `_-wn()`), off a
+    wall (`_-r51` == 0), not in hitstun (`_-5q()`), `_-a1h` clear, with a DodgeType (`_-Q42` != 0) and
+    t >= `_-46I` + 240, `_-y1F` is capped to CooldownLanded (`_-T2A`) x 16 + `_-Uy` + `_-C1d`. [H] `_-a1h`."""
+    if not airborne and r51 == 0 and not hitstun and not a1h and q42 != 0 and t >= i46 + LANDED_DELAY_MS:
+        cap = cooldown_landed * FRAME_MS + uy + c1d
+        if y1f > cap:
+            return cap
+    return y1f
+
+
+def dodge_over(t, u5e, h2b, y1f, e3):
+    """`_-t1A` @233-349: with `_-u5E()`, `_-H2b` + `_-y1F` <= t and not within 112 ms of `_-3E` (local 5,
+    `_-3E` + 112 > t), the dodge is over: `_-Kc._-MX(PowerType._-Z32)` when `_-H2b` > 0, `_-H2b` = 0, then
+    `_-51c(false, true)`. Returns (over, calls_mx). [H] `_-u5E()`, `_-3E` (written by Dash), `_-MX`, `_-51c`."""
+    over = bool(u5e) and h2b + y1f <= t and not (e3 + DASH_HOLD_MS > t)
+    return over, over and h2b > 0
+
+
 def formula_mult(formula, vx, k64, dir):
     """`_-h3i._-B15(t, formula, fighter)` #2771: the speed multiplier of a SpeedX / SpeedY formula.
 
@@ -321,5 +344,34 @@ ANCHORS = {ABC_1100: {
         (3125, 1776, "pushbyte", "1"),
         (3125, 1860, "lshift", ""),
         (3125, 1873, "initproperty", "_-6K"),
+    ],
+    "Entity._-t1A prelude: CooldownLanded cap of _-y1F after _-46I + 240; dodge over at _-H2b + _-y1F unless _-3E + 112 > t": [
+        (2984, 2659, "callpropvoid", "_-t1A, 2"),
+        (2992, 89, "callproperty", "_-wn, 0"),
+        (2992, 104, "getproperty", "_-r51"),
+        (2992, 120, "callproperty", "_-5q, 0"),
+        (2992, 135, "getproperty", "_-a1h"),
+        (2992, 148, "getproperty", "_-Q42"),
+        (2992, 165, "getproperty", "_-46I"),
+        (2992, 172, "getproperty", "_-l2o"),
+        (2992, 178, "greaterequals", ""),
+        (2992, 185, "getproperty", "_-T2A"),
+        (2992, 189, "pushbyte", "16"),
+        (2992, 220, "greaterthan", ""),
+        (2992, 230, "initproperty", "_-y1F"),
+        (2992, 236, "getproperty", "_-3E"),
+        (2992, 243, "getproperty", "_-y4m"),
+        (2992, 249, "greaterthan", ""),
+        (2992, 259, "callproperty", "_-u5E, 0"),
+        (2992, 287, "lessequals", ""),
+        (2992, 312, "greaterthan", ""),
+        (2992, 326, "getproperty", "_-Z32"),
+        (2992, 329, "callpropvoid", "_-MX, 1"),
+        (2992, 340, "initproperty", "_-H2b"),
+        (2992, 349, "callpropvoid", "_-51c, 2"),
+        (3173, 800, "pushbyte", "112"),
+        (3173, 803, "initproperty", "_-y4m"),
+        (3173, 882, "pushuint", "240"),
+        (3173, 885, "initproperty", "_-l2o"),
     ],
 }}
