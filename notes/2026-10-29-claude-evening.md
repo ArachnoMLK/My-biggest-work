@@ -24,7 +24,7 @@ PRs #16–#23 from earlier sessions are still open and mergeable.
 
 ## Next steps
 - PRNG draw order: the two R draws of `_-X6R._-b3x` (match start) are now in prng-order-11.00.md §4b (PR #30).
-- Resume here: step 1 of notes/2026-10-30-replay-sim-plan.md is done (`horizontal.py` in #30). Next: step 2 (jump: wire Entity.Jump of movement-11.00.md and the air jumps / 192 ms lock of #28 into one per-tick function), then KO bounds data, the per-tick harness and the comparison with a self-KO face. Open [H]: slow creep on gentle hard slopes; floors whose normal is not exactly −1.
+- Resume here: steps 1 and 3 of notes/2026-10-30-replay-sim-plan.md are done (`horizontal.py` in #30, `level_bounds.py` in #31). Next: step 2 (jump: Entity.Jump of movement-11.00.md + air jumps / 192 ms lock of #28 in one per-tick function), then the per-tick harness and the comparison with a self-KO face. Open [H]: slow creep on gentle hard slopes; floors whose normal is not exactly −1; one map with respawn points outside its kill box.
 - `_-JQ`: the ImpulseToPoint branch. Hit detection is done in #30, except the other guards in `_-T5A`
   (HoldHitEnts, Uninterruptable), platform rotation on lines, and the item gates (catch windows, `_-Io` / `_-x5G` bits).
 - Power timeline: what `_-82O` (cast end) and `_-E5S` (end tick) gate after the first update.

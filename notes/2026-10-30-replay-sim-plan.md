@@ -37,8 +37,9 @@ one-sided; this one can fail.
 2. **Jump.** movement-11.00.md (#16) has the impulses (Entity.Jump: dash window, grounded and dash
    impulses, `vy -= impulse`). The input → `owner.Jump(t)` path is `_-i4Z._-51o` (bit 16). Air jumps and
    the 192 ms lock are in #28. Wire them into one per-tick function.
-3. **KO bounds data.** CameraBounds from the LevelDesc and the kill values of its LevelType
-   (`LeftKill` … `SoftTopKill`) for `ko_mask`; the commit is in the same tick (phase 5 → 6).
+3. ~~KO bounds data~~ — done in #31 (`tools/bh/level_bounds.py`: CameraBounds + LevelType kills; 989 of 995
+   respawn points inside, 160 of 166 falls into the void end in a bottom KO). Open [H]: one map has 6 respawn
+   points outside its static kill box.
 4. **The harness.** One tick = platforms (`_-d4u`, carry) → per fighter: inputs (`_-1L`) → state
    dispatch (`_-k5H`: drone phases while state 3 / 4, movement in 0 / 5) → KO test. Start at t = 0 with
    the match start at 256 ms.
