@@ -24,7 +24,7 @@ PRs #16–#23 from earlier sessions are still open and mergeable.
 
 ## Next steps
 - PRNG draw order: the two R draws of `_-X6R._-b3x` (match start) are now in prng-order-11.00.md §4b (PR #30).
-- Resume here: plan steps 1 and 3 are done and step 2 is half done (ground / dash jumps in `jump.py`; air jumps @1545– of `Entity.Jump` left). Next: the air jumps, then step 4 (the per-tick harness on `integration-11.00`: platforms → inputs → state dispatch with the drone → horizontal → jump → walk / free move / landing → KO test) and step 5 (compare a self-KO tick with its face). Open [H]: slow creep on gentle hard slopes; floors whose normal is not exactly −1; one map with respawn points outside its kill box.
+- Resume here: plan (notes/2026-10-30-replay-sim-plan.md) steps 1 and 3 done, step 2 half done. Next, in `Entity.Jump` #3052: the **wall jump** @1545–2018 (taken when `_-r51` != 0 or `_-Xb` == 2: `_-31A()`, `_-96f` = null, impulse `Entity._-S4O` × k, local 11 = 48.0 — read where 48 goes, probably the push off the wall — `_-A4A` −= impulse, `_-v1D` = 0 …) and the **air jump** @2065–2146 (57 × k, or 65 × k with the second argument); then step 4 (per-tick harness on `integration-11.00`) and step 5 (a self-KO tick against its face). Open [H]: slow creep on gentle hard slopes; floors whose normal is not exactly −1; one map with respawn points outside its kill box.
 - `_-JQ`: the ImpulseToPoint branch. Hit detection is done in #30, except the other guards in `_-T5A`
   (HoldHitEnts, Uninterruptable), platform rotation on lines, and the item gates (catch windows, `_-Io` / `_-x5G` bits).
 - Power timeline: what `_-82O` (cast end) and `_-E5S` (end tick) gate after the first update.
