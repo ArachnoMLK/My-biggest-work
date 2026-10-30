@@ -177,5 +177,32 @@ class Lava(unittest.TestCase):
         self.assertTrue(lava_contact(1100, 657, "P", 0, 3, "P", 1000, power_x1n=True)[0])
         self.assertTrue(lava_contact(1100, 657, "Q", 0, 3, "P", 1000)[0])
 
+class Walk(unittest.TestCase):
+    def setUp(self):
+        from bh.air_move import ground_walk
+        self.walk = ground_walk
+        self.floor = Line(0.0, 100.0, 200.0, 100.0, 1, (0.0, -1.0))
+        self.wall = Line(150.0, 0.0, 150.0, 100.0, 1, (-1.0, 0.0))
+
+    def test_walks_along_flat_ground(self):
+        r = self.walk([self.floor], 0, 50.0, 98.99, self.floor, 10.0, 3)
+        self.assertAlmostEqual(r.x, 60.0)
+        self.assertAlmostEqual(r.y, 98.99)
+        self.assertEqual((r.left, r.stop_x, r.ground), (0.0, False, self.floor))
+        r = self.walk([self.floor], 0, 50.0, 98.99, self.floor, -10.0, 3)          # backwards
+        self.assertAlmostEqual(r.x, 40.0)
+
+    def test_wall_stops_the_walk(self):
+        r = self.walk([self.floor, self.wall], 0, 140.0, 98.99, self.floor, 20.0, 3)
+        self.assertAlmostEqual(r.x, 150.0 - 1.01)
+        self.assertEqual((r.left, r.stop_x, r.ground), (0.0, True, self.wall))
+        r = self.walk([self.floor, self.wall], 0, 140.0, 98.99, self.floor, 20.0, 3, hitstun=True)
+        self.assertFalse(r.stop_x)
+        self.assertAlmostEqual(r.left, 20.0 - 10.0)
+
+    def test_no_ground_no_walk(self):
+        r = self.walk([self.floor], 0, 5.0, 5.0, None, 10.0, 3)
+        self.assertEqual((r.x, r.y, r.left), (5.0, 5.0, 10.0))
+
 if __name__ == "__main__":
     unittest.main()

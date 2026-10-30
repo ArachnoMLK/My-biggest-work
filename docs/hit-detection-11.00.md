@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(917 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(941 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -570,6 +570,21 @@ Wall details (`wall_contact`) [V]:
   - On a no-slide wall, `_-v1D` = 0.
   - Otherwise, with no power and not `_-M5t`, `_-v1D` = ±10 toward the wall.
 
+
+**Ground walk** (`ground_walk`, `Entity._-8i` @3114–4217) [V]. On a ground line, the x step `local12`
+(= `_-v1D` × 0.384) is walked along the line before the free move. Each pass:
+1. `_-N3a` points along the line (end − start), normalised to `local12`; a negative step walks backwards.
+2. A sweep runs with the current line ignored (mask `local3`). The fighter moves by what it leaves, and that
+   length is taken off `local12`.
+3. A **non-vertical hit line** becomes `_-96f` (pushed to `_-u3j`, 1.01 back-off), and the walk goes on along
+   it: this is how slopes and joined segments are followed.
+4. A **wall** ends the walk:
+   - in hitstun (`_-5q()`), `local12` is kept and becomes the x of the free move;
+   - otherwise `_-v1D` = 0 and `local12` = 0. For a game-mode line this happens only when `_-ao(t, false)`
+     returns false; a pressure plate also calls `_-U5a`.
+5. With **no hit**, the walk ends. If `_-A4A` is 0, a 50-unit probe goes down with no line ignored. When it
+   finds another line within 10, it adds 50 to `_-A4A` (a push down to follow the step), but only if that
+   line or the ground is not flat, or their heights differ by 1 or more.
 
 **Landing and gravity on the ground** (`ground_reset`, `gravity_applies`) [V]:
 - At the **start** of the next step (@290–408), the ground line `_-96f` left by the previous move counts as a
