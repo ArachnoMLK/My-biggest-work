@@ -6,7 +6,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.items import ITEM_DEFAULTS, expired, item_type, sweep_mask, target_gate, velocity  # noqa: E402
+from bh.items import ITEM_DEFAULTS, expired, item_type, sweep, sweep_mask, target_gate, velocity  # noqa: E402
+from bh.raycast import Line  # noqa: E402
 
 
 class Ground:
@@ -88,6 +89,31 @@ class Gates(unittest.TestCase):
         boom = dict(ITEM_DEFAULTS, z4P=1)
         self.assertEqual(target_gate(cand(u4b=900), boom, 1500, 1000, 1.0, 0.0, 0, 4), (True, 0))   # re-armed
         self.assertEqual(target_gate(cand(u4b=1200), boom, 1500, 1000, 1.0, 0.0, 0, 4), (False, 4))
+
+class Sweep(unittest.TestCase):
+    FLOOR = Line(-100.0, 50.0, 100.0, 50.0, 1, (0.0, -1.0))
+
+    def test_lands_on_floor(self):
+        x, y, g, head = sweep([self.FLOOR], 0, 0.0, 0.0, (0.0, 60.0), 3, 20)
+        self.assertIs(g, self.FLOOR)
+        self.assertFalse(head)
+        self.assertAlmostEqual(y, 50.0 - 1.01)
+
+    def test_free_and_no_geometry(self):
+        self.assertEqual(sweep([self.FLOOR], 0, 0.0, 0.0, (0.0, 10.0), 3, 20)[:3], (0.0, 10.0, None))
+        self.assertEqual(sweep([self.FLOOR], 0, 0.0, 0.0, (0.0, 60.0), 3, 20, no_geometry=True)[:3],
+                         (0.0, 60.0, None))
+
+    def test_item_ignore_lines_are_skipped(self):
+        ign = Line(-100.0, 50.0, 100.0, 50.0, 1 | 32, (0.0, -1.0))
+        self.assertIsNone(sweep([ign], 0, 0.0, 0.0, (0.0, 60.0), 3, 20)[2])
+
+    def test_top_cast_stops_on_a_wall(self):
+        wall = Line(10.0, -30.0, 10.0, -5.0, 1, (-1.0, 0.0))      # only the top (y - 20) reaches it
+        x, y, g, head = sweep([wall], 0, 0.0, 0.0, (20.0, 0.0), 3, 20)
+        self.assertIs(g, wall)
+        self.assertTrue(head)
+        self.assertAlmostEqual(x, 10.0 - 1.01)
 
 if __name__ == "__main__":
     unittest.main()

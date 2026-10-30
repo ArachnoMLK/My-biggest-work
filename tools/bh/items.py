@@ -4,19 +4,24 @@ See docs/hit-detection-11.00.md, section 8.1. Arithmetic in bytecode order; [V] 
 the ground walk loop along a line (@1268-1732, the same shape as the fighter's), the path behaviours
 (`PathType`, @1901-4344) and the map sweeps after the move vector (@4700-). Static evidence only.
 """
+import math
+
 from .movement import ABC_1100
+from .raycast import ray_cast
 
 STEP = 0.384            # `_-z2k._-Vj`
 DEFAULT_CAP = 350.0     # `_-93n._-Z5d` when 0; `ItemType.<init>` sets 0 and no parser column writes it
 GROUND_PUSH = 1.01      # `_-p5k._-x3M` (script822.<init> #15249): the move gets 2 x this on a ground line
+SMALL = 1.02            # `_-p5k._-u4H` = `Entity._-u4H` (_-y2E.init #15351 @80326-80338)
+ITEM_IGNORE = 32        # `_-z2k._-M4J`: lines that items pass through
 SOFT_THROW_MS = 64      # @818-834: soft lines are ignored this long after a throw from a soft platform
 
 # `ItemType.static._-z2u` #4974 column -> field; defaults from `ItemType.<init>` #4963
 ITEM_COLUMNS = {"Friction": "T2P", "AirFriction": "h5M", "Gravity": "84Q", "ThrownGravity": "OY",
                 "PathLength": "G6o", "PathType": "z4P", "ForceNoHitstop": "T30", "OnlyStunnedTrigger": "N59",
-                "AllowRepeatedCollision": "A4s"}
+                "AllowRepeatedCollision": "A4s", "Height": "S2O", "ForceNoGeometryCollision": "p2W"}
 ITEM_DEFAULTS = {"T2P": 2.5, "h5M": 0.15, "84Q": 3.75, "OY": 3.75, "G6o": 0, "z4P": 0, "T30": False,
-                 "N59": False, "A4s": False}
+                 "N59": False, "A4s": False, "S2O": 0, "p2W": False}
 BOOMERANG_REARM_MS = 500    # `_-p5k._-K3V` (script822.<init> #15249)
 THROW_GUARD_MS = 400        # `_-h20` @866-880
 PATH_TYPES = {"BoomerangHoming": 1, "Linear": 2, "Rocket": 3, "RocketHoming": 4, "Crawl": 5}   # else 0
@@ -99,6 +104,51 @@ def target_gate(c, item, t, thrown_at, lu, vy, io, x5g):
     return True, x5g
 
 
+def _length(v):
+    return math.sqrt(v[0] * v[0] + v[1] * v[1])
+
+
+def _back_off(line, mv):
+    """@5135-5418 / @6033-6290: along -normal for a hard line and a tiny move (|x|, |y| <= 1.02), else along
+    the move; length `_-x3M` = 1.01."""
+    tiny = line.type & 1 and -SMALL <= mv[0] <= SMALL and -SMALL <= mv[1] <= SMALL
+    v = (-line.normal[0], -line.normal[1]) if tiny else mv
+    n = _length(v)
+    return (0.0, 0.0) if n == 0 else (v[0] * GROUND_PUSH / n, v[1] * GROUND_PUSH / n)
+
+
+def sweep(lines, team, x, y, move, mask, height, no_geometry=False):
+    """`_-p5k._-8i` @4683-6357: the map sweeps of an item. Returns (x, y, ground `_-96f`, head_stop).
+
+    `no_geometry` is ForceNoGeometryCollision (`_-p2W`) in state 1: no sweep at all. Otherwise a feet cast
+    along the move (mask, item-ignore lines excluded) and a top cast from `height` above (hard only); the
+    top one wins when shorter and its line is not a flat floor (normal y != -1). The item moves by the
+    shortened vector, its `_-96f` becomes the hit line, and it backs off 1.01 from it. The ceiling cast of
+    @5474-5544 is a `callpropvoid` whose result is never stored (`local37` stays null), so items have no
+    ceiling re-cast.
+    """
+    if hasattr(lines, "candidates"):
+        def cands(cx, cy, d):
+            return lines.candidates(cx, cy, cx + d[0], cy + d[1])
+    else:
+        def cands(cx, cy, d):
+            return lines
+    if no_geometry:
+        return x + move[0], y + move[1], None, False
+    hit = ray_cast(cands(x, y, move), team, x, y, move[0], move[1], mask, 0, ITEM_IGNORE)
+    mv = move if hit is None else hit.remaining
+    line = None if hit is None else hit.line
+    top = ray_cast(cands(x, y - height, move), team, x, y - height, move[0], move[1], 1, 0, ITEM_IGNORE)
+    head_stop = False
+    if top is not None and _length(top.remaining) < _length(mv) and top.line.normal[1] != -1:
+        mv, line, head_stop = top.remaining, top.line, True
+    x, y = x + mv[0], y + mv[1]
+    if line is not None:
+        b = _back_off(line, mv)
+        x, y = x - b[0], y - b[1]
+    return x, y, line, head_stop
+
+
 def expired(t, thrown_at, path_length):
     """@1832-1882: `_-5k()` (the item is removed) once t - `_-O13` > PathLength, when PathLength != 0."""
     return path_length != 0 and t - thrown_at > path_length
@@ -113,9 +163,9 @@ def item_type(cells):
             continue
         if field == "z4P":
             r[field] = PATH_TYPES.get(v, 0)
-        elif field in ("T30", "N59", "A4s"):
+        elif field in ("T30", "N59", "A4s", "p2W"):
             r[field] = v.strip().lower() == "true"
-        elif field == "G6o":
+        elif field in ("G6o", "S2O"):            # uint slots
             r[field] = int(v)
         else:
             r[field] = float(v)
@@ -209,5 +259,27 @@ ANCHORS = {ABC_1100: {
         (4974, 2058, "initproperty", "_-N59"),
         (4974, 233, "pushstring", "'AllowRepeatedCollision'"),
         (4974, 250, "initproperty", "_-A4s"),
+    ],
+    "_-p5k._-8i sweeps: none under ForceNoGeometryCollision; feet + top (Height) casts excluding item-ignore; ceiling result dropped": [
+        (15192, 4705, "getproperty", "_-p2W"),
+        (15192, 4813, "getlocal", "6"),
+        (15192, 4822, "getproperty", "_-M4J"),
+        (15192, 4830, "callproperty", "_-X2e, 13"),
+        (15192, 4884, "getproperty", "_-S2O"),
+        (15192, 4918, "pushbyte", "1"),
+        (15192, 4936, "callproperty", "_-X2e, 13"),
+        (15192, 5005, "pushbyte", "-1"),
+        (15192, 5174, "getproperty", "_-u4H"),
+        (15192, 5377, "getproperty", "_-x3M"),
+        (15192, 5544, "callpropvoid", "_-X2e, 13"),
+        (15192, 5555, "ifeq", "381"),
+        (15192, 6015, "initproperty", "_-96f"),
+        (15192, 6290, "callpropvoid", "normalize, 1"),
+        (4974, 1261, "pushstring", "'ForceNoGeometryCollision'"),
+        (4974, 1277, "initproperty", "_-p2W"),
+        (4974, 1393, "pushstring", "'Height'"),
+        (4974, 1411, "initproperty", "_-S2O"),
+        (15351, 80334, "getproperty", "_-u4H"),
+        (15351, 80338, "initproperty", "_-u4H"),
     ],
 }}
