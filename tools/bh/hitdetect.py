@@ -9,7 +9,7 @@ The functions transcribe the arithmetic in bytecode order (AS3 Numbers are IEEE 
 floats). Field names are the obfuscated ones; column names come from the power and hurtbox parsers.
 Anchors are (method id, offset, opname, operand text as printed by `abc-disasm`). Static evidence only.
 """
-from . import air_move, entity_states, level_collision, platforms, power_data, power_timeline, raycast, spawn_bot, anim_frames, items, horizontal, jump, match_start, respawn_points, dodge
+from . import air_move, entity_states, level_collision, platforms, power_data, power_timeline, raycast, spawn_bot, anim_frames, items, horizontal, jump, match_start, respawn_points, dodge, power_pick
 from .movement import ABC_1100, check, listing
 
 # PowerType.static._-A3R #6483 @8709-9845: TargetMethod string -> `_-g4i`. A leading "SmashRelease" sets
@@ -617,6 +617,7 @@ ANCHORS[ABC_1100].update(jump.ANCHORS[ABC_1100])
 ANCHORS[ABC_1100].update(respawn_points.ANCHORS[ABC_1100])
 ANCHORS[ABC_1100].update(match_start.ANCHORS[ABC_1100])
 ANCHORS[ABC_1100].update(dodge.ANCHORS[ABC_1100])
+ANCHORS[ABC_1100].update(power_pick.ANCHORS[ABC_1100])
 
 
 def verify(abc, sha):

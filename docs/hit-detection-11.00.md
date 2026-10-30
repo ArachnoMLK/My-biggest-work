@@ -1086,6 +1086,17 @@ So `_-wn()` is **in the air** (the DodgeTypes mask 2 is 'Air') [V].
 
 Still open for the dodge: the meaning of `_-u5E()` and the latch; the `_-O5C` branch of `_-rU` @213-384.
 
+### 10.3 Slot -> power: `_-F5N._-42t` #1726 ([`tools/bh/power_pick.py`](../tools/bh/power_pick.py))
+
+`_-F5N._-C5S(t, slot, a3, a4, a5, a6)` #1700 calls `_-42t(t, slot, a3 && a6)`; from `_-i4Z._-rU` a3 / a6 are
+locals 32 / 33 of the input buffer, so the third argument is the **gravity cancel** (§10.2).
+
+| Step | Bytecode | Status |
+|---|---|---|
+| Weapon = the held item's ItemType `_-O2R._-93n`, else unarmed `ItemType._-m4V`; with `_-K1V` it becomes `ItemType._-iJ`. Slots 13-20 read the fighter's emote table `_-b14` | @83-470 | [V]; emote slots not transcribed |
+| Slot 11 (neutral signature): `mSpecialPower1` when the weapon's `_-E49` is `mBaseWeapon1`, else `mSpecialPower2` for `mBaseWeapon2`, else unarmed `PowerType._-r7._-r1e`; in ZOMBIE mode a missing name takes `_-Z6M[8]`. Other slots: `_-Z6M[slot]`, then slot 7 / 8 take `mSpecialPower1/2_Forward` / `_Down` of the matching base weapon when set | @473-892 | [V] `power_pick.power_name` |
+| Lookup `PowerType._-p4G(name)`; team flag 64: `name_TESTFEATURE` when it exists; then ExhaustedVersion under `_-UT`, **GCVersion under the gravity cancel**, OriginOverrideIfInMode under `_-b3A` > 1, MomentumVersion when \|vx\| >= 60 toward the facing | @894-1331 | [V] `power_pick.redirect`; [H] `_-UT`, `_-b3A` |
+
 ## 11. Still open
 
 - Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
