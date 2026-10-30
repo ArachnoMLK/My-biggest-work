@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 1471 | 0 |
+| `hit-detection-verify` | 1491 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 325 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 326 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -192,15 +192,15 @@ player), the start placement (`one_v_one`: shuffle, first / last Initial candida
 the replay's `_-w35` = 1024 (no instant bit) and the drone phases until it lets go. On the synthetic map of the
 tests, with the default scoring durations:
 
-| `_-J1Y` (gives `_-44x`) | Let go at | State | `_-P5S` |
+| `_-44x` | Let go at | State | `_-P5S` |
 |---|---|---|---|
-| set | 6000 ms (272 + 5700, rounded up to the steps) | 0 | 30 |
-| clear | 4992 ms (272 + 4700, idem) | 5 | 70 |
+| set (the replay case) | 6000 ms (272 + 5700, rounded up to the steps) | 0 | 30 |
+| clear (not reached in a replay) | 4992 ms (272 + 4700, idem) | 5 | 70 |
 
-[H] Which case a replay is in: `_-J1Y` is set only by game-mode classes (`_-C20._-S4o`, `_-od._-b6O`), a
-snapshot read (`_-B5T`) and `_-X6R._-sW`, which has no typed caller; it is cleared after the match start. The
-KO gap check assumed the clear case (4700 ms). Also [H]: the drone's first tick runs in the match-start step,
-and the fighter's position before the drone when `_-44x` is clear.
+`_-44x` is set [V]: tick phase 5 runs `Entity._-k5H` on every fighter, and it sets `_-44x` in state 2, where
+players wait from replay start (spawn_bot.py `SPAWNED_AT_MATCH_START`; `_-J1Y` only comes from the BRAWLBALL /
+TAG rules). `_-k5H` also ticks the drone first, so the drone's first tick is in the match-start step [V]. The
+KO gap check now uses the 5700 ms first trip. [H] the `_-vs` gate of the normal update holds.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 
@@ -218,7 +218,7 @@ Local result (756 patch 11.00 replays, aggregate only):
 | Gaps shorter than the predicted drone time | **0** |
 | Smallest margin | 172 ms |
 | Replays with a first KO | 688 |
-| First KOs before match start (272 ms: `_-n4k` = 16, match_start.py) + the first drone trip (4700 ms by default) | **0** (smallest margin 3,252 ms, a loose bound) |
+| First KOs before match start (272 ms: `_-n4k` = 16, match_start.py) + the first drone trip (5700 ms by default: `_-44x` is set, spawn_bot.py) | **0** (smallest margin 2,252 ms, a loose bound) |
 
 This is a one-sided check. The replays allow the transcribed drone time, but they do not show it is exact:
 the margin also contains the time needed to be knocked out again. It is the first comparison of a

@@ -23,7 +23,8 @@ respawn of ko-11.00.md §5 / spawn_bot.py are not chained yet). Nothing here has
 (`_-n4k` = 16), the fighters in `_-5r` order (increasing entity id), R at that tick, the start placement
 (`one_v_one`), then `Drone.place` with the replay's `_-w35` (1024) and the drone phases until the fighter is
 let go (state 0, `_-P5S` = the drop speed). Its glue is [H]: the drone's first tick runs in the match-start
-step, `_-J1Y` (so `_-44x`) is a parameter, no game-mode test, no `_-S3h`, and the fighters are independent.
+step only through `_-k5H` (now [V], spawn_bot.py), the `_-vs` gate holds, no game-mode test, no `_-S3h`, and the
+fighters are independent.
 """
 from dataclasses import dataclass, field
 
@@ -36,7 +37,7 @@ from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, s
                    squat_start, wall_jump)
 from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
 from .smoke import FALL_CAP, GRAVITY, STEP, TICK_MS
-from .spawn_bot import IDLE, REPLAY_W35, Drone, scoring_rules, timing_flags
+from .spawn_bot import IDLE, REPLAY_W35, SPAWNED_AT_MATCH_START, Drone, scoring_rules, timing_flags
 from .step import clamp, fold_impulse, speed_cap
 
 DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFriction": 1.2,
@@ -194,12 +195,13 @@ def from_records(records, t0=0):
     return inputs
 
 
-def match_start(entities, seed, points, camera, cells=None, team_type=0, j1y=False, start_xy=(0.0, 0.0),
+def match_start(entities, seed, points, camera, cells=None, team_type=0, spawned=SPAWNED_AT_MATCH_START,
+                start_xy=(0.0, 0.0),
                 standalone=False, max_ticks=1000):
     """Start of a plain 1v1 replay. `entities`: replay.parse "entities" (the two players); `points`:
-    respawn_points.parse_respawns; `camera`: (x, y, width); `cells`: the replay's ScoringType cells; `j1y`:
-    `_-X6R._-J1Y`, which gives `_-44x` (open [H]: its writers are game-mode classes and an untyped `_-sW`);
-    `start_xy`: the fighter's position before the drone when `_-44x` is clear [H].
+    respawn_points.parse_respawns; `camera`: (x, y, width); `cells`: the replay's ScoringType cells; `spawned`:
+    `_-44x` (set by `_-k5H` in state 2, spawn_bot.py); `start_xy`: the position before the drone when it is
+    clear [H].
     Returns [(entity, Fighter or None, t let go, state)] in `_-5r` order (None: no point or never let go)."""
     n4k = time_base(step_times(0, STEP_MS))
     t0 = match_start_step(n4k)
@@ -208,7 +210,7 @@ def match_start(entities, seed, points, camera, cells=None, team_type=0, j1y=Fal
     rules = scoring_rules(cells or {}, n4k=n4k)
     by_id = {}
     for e, point in placed:
-        f = {"x": start_xy[0], "y": start_xy[1], "state": 3, "vy": 0.0, "spawned": bool(j1y)}
+        f = {"x": start_xy[0], "y": start_xy[1], "state": 3, "vy": 0.0, "spawned": bool(spawned)}
         d = Drone(f)
         d.place(t0, None if point is None else (point["x"], point["y"]), standalone, REPLAY_W35, False, camera)
         t, ready = t0, False

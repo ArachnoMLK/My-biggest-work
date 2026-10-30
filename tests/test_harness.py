@@ -99,9 +99,9 @@ class MatchStart(unittest.TestCase):
     XML = ('<LevelDesc><Respawn Initial="true" X="-200" Y="100" /><Respawn Initial="true" X="200" Y="100" />'
            '<Respawn X="0" Y="0" /></LevelDesc>')
 
-    def run_start(self, j1y):
+    def run_start(self, spawned):
         return harness.match_start([{"id": 9}, {"id": 4}], 12345, parse_respawns(self.XML), (-500, -300, 1000),
-                                   j1y=j1y)
+                                   spawned=spawned)
 
     def test_spawned_drone_lets_go_in_state_0(self):
         out = self.run_start(True)
