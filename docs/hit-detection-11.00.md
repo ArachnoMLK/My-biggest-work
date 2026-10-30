@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(644 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(699 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -108,6 +108,59 @@ have the CastTime length:
 | use totals `t` | 214 |
 | use alternation `\|` | 1 |
 
+### 1.3 Animation frame of a power (`_-l4X._-54L` #86, [`tools/bh/anim_frames.py`](../tools/bh/anim_frames.py))
+
+The start set-up `_-f14` #59 calls `_-54L` once. It builds `_-cA`, a sparse table from ticks since cast to
+an animation frame [V]. Each update, `_-o4b` #45 reads `_-cA[tick − _-k4b]`. When that entry exists and is
+> 0, it becomes `_-c2l`, the frame that picks the target's hurtbox row (§4). Between entries, `_-c2l` keeps
+its value [V].
+
+**Inputs** [V]:
+- **Key frames** `_-942`. Each entry is `frame << 16 | step` (`PowerType._-g1x` #6462). The step is read by
+  `_-y2b` and the frame by `_-P5A` (bits 16–27). An end key also has `0xF0000000` set, and `_-P5A` then adds
+  0.99. The keys come from CastTime markers (`_-A3R` @11337–11696). With s = index of the entry's first step:
+  - "D@F" gives (s, F);
+  - "D:R@F" gives (s, F);
+  - "D:R@F-G" gives (s, F), then the end key (s + R, G).
+
+  A key with step < 0 or frame <= 0 is skipped.
+- **CastAnim** "FLAGS:Name". The name goes to `_-94J._-HT`, and the flags are letters: "L" sets `_-6b`,
+  "R" `_-9v`, "F" `_-JL`. With "L", and when the fighter's animation of that name exists (`_-pr._-04T()._-Y3`),
+  the cast part loops between the animation's `_-T6` and `_-W1n`. Those are the 2nd and 3rd header u32 of
+  the `.anm` animation (`_-y1v.static._-B5I` #147 → `<init>` #138). PR #19 names the 3rd one
+  "recovery_start" [H]. This use shows it is where the loop wraps.
+- **"Keep the animation"** = `_-V6B._-W28` or no CastAnim name. The start frame `_-D6j`, when not set, is
+  `_-c2l + 0.384 + 1` in that case, otherwise 1. `_-cA[0] = floor(_-D6j − 1)`.
+- **Timing:** CastTime `_-a2` and its total `_-wj`. `_-wj` adds each entry's D (max 1 after the first entry)
+  plus R. Also used: RecoverTime `_-Sp`, FixedRecoverTime `_-f5c`, the power's RecoverMod `_-01d` with its
+  gate `_-s5C`, and the end `_-E5S − _-k4b` (PR #26). `_-z2k._-Vj` = **0.384** frames per tick, i.e.
+  24 frames per second over a 16 ms tick (script61.<init> #1227).
+
+**Algorithm** [V, bytecode order]:
+1. For each key i (step k_i, frame F_i), count the ticks from the previous key's step + 1 to k_i:
+   - a CastTime step of 0 or 1 counts 1, except step 0 of the first key;
+   - a longer step counts its duration;
+   - once past the end of CastTime, the recovery counts once: `floor(_-Sp × _-01d)` (under `_-s5C`) or
+     `_-Sp`, plus `_-f5c`.
+
+   With "keep the animation", the first key at step 0 counts one more tick.
+2. The frame then moves linearly from the previous key frame − 1 to F_i − 1 over those ticks. A value within
+   1e-5 below an integer is snapped up to it. An entry is written only where the integer part changes.
+   Each range starts one tick after the previous one ends (the first one at tick 1), except that with
+   "keep the animation" the first range starts at tick 0 and ends one tick earlier.
+   For an end key (fractional frame) that is the last key, the fractional value itself is stored at the
+   range end.
+3. After the last key (or from tick 1 without keys, or tick 0 with "keep"), the frame advances by 0.384 per
+   tick up to the end. After `_-wj + _-f5c` the rate becomes 0.384 / `_-01d`, under `_-s5C` and a non-zero
+   `_-Sp`. With the "L" loop, a frame above `_-W1n` is put back to `_-T6` while the tick is <= `_-wj`.
+
+[H] The table holds frame − 1 for key frames, and `_-P6e` (§4) maps a frame to a 1-based row. Whether the
+two indexings agree needs a check on real data.
+
+Local check (aggregate counts only): the tables of all 3,768 powers build with 0 errors; 1,997 have key
+frames, 903 an end key, and 687 have the CastAnim "L" flag. A CastTime duration that `parseInt` cannot read
+is null, and a null pushed into the `Vector.<uint>` reads 0 [V].
+
 ## 2. Hit area of one frame (`_-L5r` #65)
 
 The power's per-frame lists are read at the frame index [V]:
@@ -198,7 +251,7 @@ It must also pass a `_-s3D._-H1g._-sZ._-r1o` exclusion [V; meaning H].
 3. otherwise `DEFAULT`. Soccer, Volley Battle and Horde use `SoccerBall`, `VolleyBall` and `Horde` for
    some entities.
 
-**Which row.** The animation frame is `_-o3I._-c2l` of the active power, or 0. The row is
+**Which row.** The animation frame is `_-o3I._-c2l` of the active power (§1.3), or 0. The row is
 `_-P6e[frame] − 1`, where `_-P6e` maps a frame to a row number (1-based) built from the **Frames** column
 (1-based Flash frames, "a" or "a-b") [V].
 
@@ -629,7 +682,7 @@ map collision only run in states 0 and 5**.
 
 | Phase | `_-F3O` | long case | `_-Ac` and not flag 2 | otherwise |
 |---|---|---|---|---|
-| 1 `_-H6B` | static `SpawnBot._-s1I` [value not read] | 2000 | 1500 | `_-o2N` |
+| 1 `_-H6B` | `SpawnBot._-s1I` = 1000 (script641.<init>) | 2000 | 1500 | `_-o2N` |
 | 2 `_-L26` | 2000 | 3000 | 2500 | `_-j57` |
 | 3 `_-d3X` | — | — | 700 | `_-C18` |
 
@@ -663,7 +716,7 @@ Chained powers start from `_-h1T` through the same `_-J5R`.
 - The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
 - Items: the per-target gates of §8 step 5, the item's own motion and map collision (`_-p5k._-8i` uses
   `_-X2e`), and the other spawners `_-F5N._-33h` (15 callers) and `_-p5k._-u1I`.
-- Respawn drone (§10.1): the idle and phase-4 handlers (`_-q15`, `_-Ck`), the value of `SpawnBot._-s1I`, the
+- Respawn drone (§10.1): the idle and phase-4 handlers (`_-q15`, `_-Ck`), the
   scoring-type durations (`_-o2N`, `_-j57`, `_-C18`) and who calls `Respawn` after a KO [H].
 - Nothing has been checked against a running game. The next step towards the KO oracle
   (oracle-ko.md) is one scripted exchange: a hit, its knockback, then a ring-out.

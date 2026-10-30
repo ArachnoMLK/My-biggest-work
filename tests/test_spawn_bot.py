@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.spawn_bot import (CARRY, COME_DOWN, DROP, IDLE, F_MODE, F_SPAWNED, F_TIMED, Drone,  # noqa: E402
                           carry_ms, come_down_ms, drop_anim_scale, drop_ms, timing_flags)
 
-RULES = {"F3O": False, "s1I": 11, "Ac": False, "K2V": True, "o2N": 100, "j57": 200, "C18": 50,
+RULES = {"F3O": False, "Ac": False, "K2V": True, "o2N": 100, "j57": 200, "C18": 50,
          "timed_until": None, "n4k": 0}
 
 
@@ -42,7 +42,7 @@ class Durations(unittest.TestCase):
         self.assertEqual((come_down_ms(0, r), carry_ms(0, r), drop_ms(0, r)), (1500, 2500, 700))
         self.assertEqual(drop_ms(F_MODE, r), 50)
         r = dict(RULES, F3O=True)
-        self.assertEqual((come_down_ms(0, r), carry_ms(0, r)), (11, 2000))
+        self.assertEqual((come_down_ms(0, r), carry_ms(0, r)), (1000, 2000))
         self.assertEqual(drop_anim_scale(700), 1.0)
         self.assertEqual(drop_anim_scale(350), 2.0)
 

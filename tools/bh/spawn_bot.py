@@ -24,6 +24,7 @@ F_TIMED = 4        # `_-H1g._-S3h` exists and its `_-w1s` >= t
 INSTANT_MASK = 32768 | 16   # `_-N1k._-w35` bits that skip the drone outside a standalone client
 DROP_SPEED = 30.0           # `_-P5S` (vertical speed, see movement.py) when the drone lets go
 DROP_SPEED_FAST = 70.0      # in the other team-type case, with `_-F5c` set
+SPAWNBOT_S1I = 1000         # `SpawnBot._-s1I`, set in script641.<init> #11876
 DEFAULT_DROP_MS = 700       # the drop duration that scales the drop animation (700 / duration)
 
 
@@ -48,7 +49,7 @@ def _long_case(flags, mask, rules):
 def come_down_ms(flags, rules):
     """`_-X6R._-H6B` #6793: duration of phase 1. `rules` holds the scoring-type fields and match flags."""
     if rules["F3O"]:
-        return rules["s1I"]          # static `SpawnBot._-s1I`; its trait value is not read here [H]
+        return SPAWNBOT_S1I          # static `SpawnBot._-s1I`
     if _long_case(flags, F_SPAWNED, rules):
         return 2000
     if rules["Ac"] and not flags & F_MODE:
@@ -251,6 +252,8 @@ ANCHORS = {ABC_1100: {
         (6791, 24, "getproperty", "_-44x"),
         (6791, 128, "getproperty", "_-w1s"),
         (6793, 23, "getproperty", "_-s1I"),
+        (11876, 96, "pushuint", "1000"),
+        (11876, 99, "initproperty", "_-s1I"),
         (6793, 112, "pushuint", "6000"),
         (6793, 164, "pushuint", "2000"),
         (6793, 191, "pushuint", "1500"),
