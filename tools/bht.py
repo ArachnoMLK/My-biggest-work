@@ -15,6 +15,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
+from bh import callgraph as callgraphmod  # noqa: E402
 from bh import hitdetect as hitdetectmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
@@ -170,6 +171,28 @@ def cmd_abc_disasm(a):
         print(f"method #{m}  {owner.get(m, '?')}")
         print(abcmod.disassemble(abc, m))
         print()
+
+
+def cmd_abc_reach(a):
+    """Typed call graph: the references to --name reachable from --roots (receiver text and path)."""
+    abc = open_abc(a)
+    g = callgraphmod.Graph(abc)
+    stop = set()
+    for cname in a.stop_classes or []:
+        todo = [g.classes[cname]] if cname in g.classes else []
+        while todo:
+            ci = todo.pop()
+            stop |= {m for m, c in g.method_class.items() if c == ci}
+            todo += g.subclasses.get(ci, [])
+    prev = g.reach(a.roots, stop)
+    print(f"{len(prev)} methods reachable from {a.roots}")
+    for m in sorted(prev):
+        if m in stop:
+            continue
+        for off, op, name, _, rtext, args, _ in g.walk(m):
+            if name == a.name and (a.receiver is None or a.receiver in rtext or any(a.receiver in x for x in args)):
+                print(f"#{m} {g.owner.get(m, '?')} @{off} {op} {name} [{rtext}]")
+                print("    <- " + " <- ".join(g.path(prev, m)[1:8]))
 
 
 def cmd_abc_refs(a):
@@ -470,6 +493,10 @@ def main():
     add("abc-disasm", cmd_abc_disasm, abc, (["--method"], {"type": int}), (["--class"], {"dest": "cls"}))
     add("abc-find", cmd_abc_find, abc, (["value"], {}), (["--member"], {"action": "store_true", "help": "value is a member name"}))
     add("abc-refs", cmd_abc_refs, abc, (["--method"], {"type": int, "required": True}))
+    add("abc-reach", cmd_abc_reach, abc, (["--roots"], {"type": int, "nargs": "+", "required": True}),
+        (["--name"], {"required": True, "help": "member name to report, e.g. _-f4c"}),
+        (["--receiver"], {"help": "keep only references whose receiver or an argument text contains this"}),
+        (["--stop-classes"], {"nargs": "*", "help": "classes (and subclasses) whose methods are not entered"}))
     add("abc-strings", cmd_abc_strings, abc, (["pattern"], {}))
     add("movement-verify", cmd_movement_verify, abc)
     add("hit-detection-verify", cmd_hit_detection_verify, abc)
