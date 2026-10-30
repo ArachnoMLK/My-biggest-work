@@ -16,7 +16,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
-from bh import anm as anmmod, collision as collisionmod, commands as commandsmod, input_buffer as inputbufmod, ko as komod  # noqa: E402
+from bh import anm as anmmod, collision as collisionmod, commands as commandsmod, hitdetect as hitdetectmod, input_buffer as inputbufmod, ko as komod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import oracle as oraclemod  # noqa: E402
 from bh import knockback as knockbackmod  # noqa: E402
@@ -296,6 +296,28 @@ def cmd_collision_verify(a):
     for name, value in collisionmod.TYPES.items():
         bits = [f for f, b in collisionmod.FLAGS.items() if value & b]
         print(f"  {name:<27} {value:4d}  {' | '.join(bits)}")
+
+
+def cmd_hit_detection_verify(a):
+    """Check the pinned shape of hit detection (hit area, hurtbox, capsule test); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in hitdetectmod.ANCHORS:
+        print(f"no hit detection anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in hitdetectmod.ANCHORS)})")
+        sys.exit(2)
+    bad = hitdetectmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    print(f"ABC {sha[:8]}...  anchors {hitdetectmod.count(sha)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in hitdetectmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/hit-detection-11.00.md)")
 
 
 def cmd_prng_order_verify(a):
@@ -642,6 +664,7 @@ def main():
     add("anm-info", cmd_anm_info, game, (["--file"], {}), (["--anim"], {"help": "animation name to print"}),
         (["--verbose"], {"action": "store_true"}))
     add("collision-verify", cmd_collision_verify, abc)
+    add("hit-detection-verify", cmd_hit_detection_verify, abc)
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
