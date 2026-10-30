@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(728 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(760 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -475,6 +475,25 @@ else 1. `_-I4v` #6018 blends point k and point k + 1, modulo n [V].
 
 Local check (aggregate): all 122 LevelDescs give 173 platforms and 0 errors. One file lacks a space between
 two attributes, which the game's reader accepts; the parser accepts it too.
+
+**Carry of the entities that touch a moving line** (`carry_offset`, `carry`; `_-p4E._-d4u` #7436 @1082–1961) [V].
+In step 1 of the tick, once every platform has moved its lines, each entity is carried. Entities in state 3,
+7 or 8 are skipped (lookupswitch @1042).
+- **Which lines.** `_-u3j` lists the lines the entity touched during its last step. It is cleared at the
+  step start (@3057–3082) and filled by the ground walk, the ceiling checks and the walls. At the step end,
+  the ground line `_-96f` goes into `_-O6z` and, if not already there, into `_-u3j` (@12918–13024).
+- **Offset `_-s2h`.** Only dynamic lines count (`_-O2N`). Each one adds its displacement since `_-Y3I`. In x
+  that is `start + _-e2l − _-t5b − _-E2x`, which equals `start − _-X1H` because `_-E2x` = old start +
+  `_-e2l` − `_-t5b`. The y part is added only for a line that is not vertical.
+- **Lava push.** On a lava line whose power has a push (`_-p4E._-k4L` #7443: `_-is` / `_-96U` non-zero),
+  the offset is set to that push instead.
+- **Sweeps.** Two sweeps, from the feet and then from 120 above. Both ignore the entity's `_-96f`, use the
+  hard | soft mask and options 4, and go along the offset. A hit line stops the carry 1.01 off it:
+  - a vertical line on x, when its x is inside the swept range (`_-A6B._-f6f` #1059 = clamp);
+  - a horizontal line on y (a soft one only from above);
+  - a sloped line by adding 1.01 along its normal to the full offset.
+
+  The entity is then placed at the result (@1933–1961).
 
 ### 7.4 Free move against the map ([`tools/bh/air_move.py`](../tools/bh/air_move.py))
 
