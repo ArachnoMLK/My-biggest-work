@@ -37,6 +37,32 @@ from .prng import Well512, js_mod, seed_from_header, shuffle, to_u32
 from .respawn_points import candidates
 
 G5X_DEFAULT_N = 37
+STEP_MS = 16
+MATCH_START_DELAY_MS = 256
+
+
+def step_times(done, target):
+    """Step times of one `_-01I` call in a replay: done = `_-73m`, target = `_-94N` (ms)."""
+    done -= done % STEP_MS
+    target -= target % STEP_MS
+    n = (target - done) // STEP_MS if target > done else 0
+    return [done + STEP_MS * k for k in range(1, n + 1)]
+
+
+def time_base(steps, n4k=0):
+    """`_-n4k` after the given step times: the first step time while it is 0."""
+    for t in steps:
+        if n4k == 0:
+            n4k = t
+    return n4k
+
+
+def match_start_step(n4k):
+    """First step time t (a multiple of 16 after `_-n4k`) with t >= `_-n4k` + 256."""
+    t = n4k
+    while t < n4k + MATCH_START_DELAY_MS:
+        t += STEP_MS
+    return t
 
 
 def r_at_match_start(seed, n_players):
@@ -147,5 +173,42 @@ ANCHORS = {ABC_1100: {
         (7132, 47, "constructprop", "_-q2i, 1"),
         (2991, 89, "lookupswitch", "35, 151, 35, 105, 118, 118, 151, 1204, 1352, 1352, 1576"),
         (2991, 1618, "callpropvoid", "_-81Z, 1"),
+    ],
+    "_-n4k time base: _-01I replay clocks _-94N / _-73m rounded to 16; floor((target - done) / 16) steps at done + 16 k; _-n4k == 0 -> _-Y6a(t) sets _-n4k = t": [
+        (3336, 384, "pushint", "1024"),
+        (3336, 388, "pushint", "2048"),
+        (3336, 392, "pushint", "8192"),
+        (3336, 426, "getproperty", "_-94N"),
+        (3336, 454, "getproperty", "_-73m"),
+        (3336, 477, "modulo", ""),
+        (3336, 489, "modulo", ""),
+        (3336, 1871, "divide", ""),
+        (3336, 1872, "callproperty", "floor, 1"),
+        (3336, 1878, "setlocal", "16"),
+        (3336, 1910, "pushbyte", "16"),
+        (3336, 1912, "add_i", ""),
+        (3336, 1929, "getproperty", "_-n4k"),
+        (3336, 1934, "equals", ""),
+        (3336, 1945, "callpropvoid", "_-Y6a, 1"),
+        (3545, 156, "getlocal_1", ""),
+        (3545, 157, "initproperty", "_-n4k"),
+    ],
+    "_-n4k resets and replay clock: _-91N zeroes _-n4k / _-94N / _-73m; _-T12 zeroes _-94N / _-73m / _-717; _-L5y _-73m = _-94N, clamp to _-n4k, frame step 16; rollback _-717 > done": [
+        (3559, 606, "pushbyte", "0"),
+        (3559, 608, "initproperty", "_-n4k"),
+        (3559, 641, "initproperty", "_-94N"),
+        (3559, 651, "initproperty", "_-73m"),
+        (3624, 183, "initproperty", "_-94N"),
+        (3624, 193, "initproperty", "_-73m"),
+        (3624, 247, "initproperty", "_-717"),
+        (3310, 317, "getproperty", "_-94N"),
+        (3310, 321, "initproperty", "_-73m"),
+        (3310, 1178, "getproperty", "_-n4k"),
+        (3310, 1181, "initproperty", "_-94N"),
+        (3310, 2006, "pushbyte", "16"),
+        (3310, 2008, "initproperty", "_-94N"),
+        (3336, 1697, "getproperty", "_-717"),
+        (3336, 1700, "greaterthan", ""),
+        (3336, 1821, "setlocal", "5"),
     ],
 }}

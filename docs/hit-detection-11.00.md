@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1411 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1444 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -928,6 +928,12 @@ map collision only run in states 0 and 5**.
 - **R at that tick** (match_start.py, prng-order-11.00.md §4c) [V; H: completeness]: in a STOCK / TIMED
   replay, R is seeded at replay start and drawn once per player when its `Entity` is built (`_-F5N.<init>`:
   `_-56C` = R % 2); nothing else draws R before the match-start tick.
+- **Time base `_-n4k`** (match_start.py: `step_times`, `time_base`, `match_start_step`) [V; H: no seek or
+  rollback first]. In a replay `_-h3U._-01I` #3336 steps from the done time `_-73m` to the target `_-94N`, both
+  rounded down to 16 ms, one step every 16 ms (t = done + 16 k). On a step where `_-n4k` is 0, `_-Y6a(t)` #3545
+  sets `_-n4k` = t. `_-91N` and replay start `_-T12` zero the clocks; the replay clock `_-L5y` #3310 copies
+  `_-94N` into `_-73m` before moving it and never rewinds below `_-n4k`. So a replay played from its start has
+  `_-n4k` = 16 and its match-start step at t = 272 ms (not 256).
 - **Respawn point** (`_-X6R._-K5c` #6778, `respawn_index`). `_-G5X` holds the respawn point counters, so
   the two draws above pick where the rotation starts [V]. Each respawn takes the candidate list from `_-x22`
   and adds 1 to a counter:
