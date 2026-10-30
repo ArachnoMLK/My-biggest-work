@@ -508,6 +508,22 @@ def cmd_replay_start_check(a):
     print("both fighters in lockstep, no hits; not compared with the replays' KOs yet; nothing is published (tools/bh/replay_setup.py)")
 
 
+def cmd_ko_compare(a):
+    """Plan step 5: predicted first KO vs the replay's KO face, first KO with no attack by the opponent (aggregate counts only)."""
+    from bh import ko_compare as kocomparemod
+    swz = replaysetupmod.Swz(a.swz or os.path.join(WORK, "swz"))
+    reps = []
+    for p in glob.glob(os.path.join(a.dir, "*.replay")):
+        try:
+            with open(p, "rb") as f:
+                reps.append(replaymod.parse(f.read()))
+        except Exception:
+            continue
+    for k, v in sorted(kocomparemod.check(reps, swz, ticks=a.ticks).items()):
+        print(f"  {k:<48} {v}")
+    print("two-sided: harness first KO vs the replay's own KO face; nothing is published (tools/bh/ko_compare.py)")
+
+
 def cmd_smoke_fall(a):
     """One fighter, no input, falls from every respawn point of the local LevelDescs (aggregate counts only)."""
     import glob
@@ -815,6 +831,8 @@ def main():
     add("input-buffer-verify", cmd_input_buffer_verify, abc)
     add("knockback-verify", cmd_knockback_verify, abc)
     add("replay-start-check", cmd_replay_start_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
+        (["--swz"], {"help": "swz-dump folder (default work/swz)"}), (["--ticks"], {"type": int, "default": 6000}))
+    add("ko-compare", cmd_ko_compare, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "folder of .replay files"}),
         (["--swz"], {"help": "swz-dump folder (default work/swz)"}), (["--ticks"], {"type": int, "default": 6000}))
     add("ko-gap-check", cmd_ko_gap_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
         (["--swz"], {"help": "swz-dump folder (default work/swz)"}))

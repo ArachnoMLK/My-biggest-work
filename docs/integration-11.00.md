@@ -254,3 +254,22 @@ This is a one-sided check. The replays allow the transcribed drone time, but the
 the margin also contains the time needed to be knocked out again. It is the first comparison of a
 transcribed piece with the replays' own records.
 
+
+## Plan step 5: first two-sided check (`ko-compare`, [`tools/bh/ko_compare.py`](../tools/bh/ko_compare.py))
+
+The harness's first predicted KO of a victim is compared with the replay's own KO face (`oracle.ko_ticks`).
+Face time and harness time share one clock: a replay has `_-w35` = 1024, a bit of `ko.NO_BASE_BITS`, so
+`ko.ko_time_base` is 0 [V in ko.py / spawn_bot.py]. Only the match's **first** KO is used, and only when the
+opponent pressed no LightAttack (128), HeavyAttack (64) or PickUpThrow (512) before it, so that no hit can
+explain it [H: `replay.parse` does not keep the KO type, this input filter stands in for "self-KO"]. Cases
+where the victim pressed a key the harness does not model (attacks, DodgeDash 256, taunts) are counted apart.
+
+Local run (aggregate only, format 271): 68 replays without a KO, 454 not 1v1, **233 skipped because the
+opponent attacked before the first KO**, and **1 candidate**, predicted early by more than a tick; its victim
+used DodgeDash before the KO, which the harness does not move. 0 candidates with a victim that only walked
+and jumped.
+
+So the filter is too strict to test the movement alone: in a 1v1 almost every first KO follows an attack.
+The check can only bite once the harness models what the players actually do before a KO. Two ways on,
+in roadmap order: (a) DodgeDash movement in the harness (the one unmodelled key of the one candidate), then
+(b) the hit detection of #30 wired into `harness.play`, so that the filter can be dropped. [H] until run.
