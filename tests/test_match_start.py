@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.match_start import one_v_one, r_at_match_start  # noqa: E402
+from bh.match_start import match_start_step, one_v_one, r_at_match_start, step_times, time_base  # noqa: E402
 from bh.prng import Well512, shuffle  # noqa: E402
 from bh.respawn_points import parse_respawns  # noqa: E402
 
@@ -43,6 +43,22 @@ class MatchStart(unittest.TestCase):
         ref = Well512(4294967291)
         self.assertEqual(c56, [ref.next_u32() % 2, ref.next_u32() % 2])
         self.assertEqual(rng.getstate(), ref.getstate())
+
+class TimeBase(unittest.TestCase):
+    def test_step_times_rounded_to_16(self):
+        self.assertEqual(step_times(0, 50), [16, 32, 48])
+        self.assertEqual(step_times(37, 70), [48, 64])   # done 32, target 64
+        self.assertEqual(step_times(64, 64), [])
+        self.assertEqual(step_times(80, 40), [])
+
+    def test_time_base_is_first_step_while_zero(self):
+        self.assertEqual(time_base(step_times(0, 100)), 16)
+        self.assertEqual(time_base([48, 64], n4k=16), 16)
+        self.assertEqual(time_base([]), 0)
+
+    def test_match_start_step(self):
+        self.assertEqual(match_start_step(16), 272)
+        self.assertEqual(match_start_step(time_base(step_times(0, 16))), 272)
 
 
 if __name__ == "__main__":
