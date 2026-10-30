@@ -331,6 +331,67 @@ def respond(lines, team, r, p5s, v1d, power_4a=False, wall_state=None):
     return Response(x, y, p5s, v1d, "other")
 
 
+@dataclass
+class WalkResult:
+    x: float
+    y: float
+    ground: object            # `_-96f` after the walk
+    left: float               # local 12 left over (becomes the x part of the free move, @6620)
+    stop_x: bool = False      # `_-v1D` = 0 (a wall stopped the walk)
+    a4a: float = 0.0          # `_-A4A` after the step-down probe
+    touched: list = field(default_factory=list)   # lines pushed to `_-u3j`
+
+
+def ground_walk(lines, team, x, y, ground, x_step, mask, hitstun=False, a4a=0.0, ao=None):
+    """`Entity._-8i` #2984 @3114-4217: walk the x step `local12` along the ground line `_-96f`.
+
+    Each pass points `_-N3a` along the line (end - start), normalised to `local12` (a negative length walks
+    backwards), sweeps with the current line ignored (mask `local3`), moves by what the sweep leaves and
+    takes that length off `local12`. A non-vertical hit line becomes `_-96f` (added to `_-u3j`, 1.01
+    back-off) and the walk goes on along it. A vertical one ends the walk: unless the fighter is in hitstun
+    (`_-5q()`, then `local12` is kept), `_-v1D` = 0 (for a game-mode line only when `ao(line)`, `_-ao(t,
+    false)`, returns false) and `local12` = 0. With no hit the walk ends; if `_-A4A` is 0, a 50-unit probe
+    down (no line ignored) that finds another line within 10 adds 50 to `_-A4A` when that line or the ground
+    is not flat, or their heights differ by 1 or more.
+    """
+    if hasattr(lines, "candidates"):
+        def cands(cx, cy, d):
+            return lines.candidates(cx, cy, cx + d[0], cy + d[1])
+    else:
+        def cands(cx, cy, d):
+            return lines
+    r = WalkResult(x, y, ground, x_step, a4a=a4a)
+    while r.ground is not None and r.left != 0:
+        g = r.ground
+        d = _normalize((g.ex - g.sx, g.ey - g.sy), r.left)
+        hit = ray_cast(cands(r.x, r.y, d), team, r.x, r.y, d[0], d[1], mask, 0, 0, g)
+        if hit is not None:
+            d = hit.remaining
+        r.x, r.y = r.x + d[0], r.y + d[1]
+        n = _length(d)
+        r.left = r.left + n if r.left < 0 else r.left - n
+        if hit is None:                                                # @3859-4185: step-down probe
+            if r.a4a == 0:
+                probe = ray_cast(cands(r.x, r.y, (0.0, 50.0)), team, r.x, r.y, 0.0, 50.0, mask, 0, 0)
+                if probe is not None and probe.line is not g and probe.remaining[1] <= 10.0:
+                    dy = probe.line.sy - g.sy
+                    if probe.line.sy != probe.line.ey or g.sy != g.ey or dy >= 1 or dy <= -1:
+                        r.a4a += 50.0
+            break
+        r.ground = hit.line
+        r.touched.append(hit.line)
+        b = _normalize(d, BACK_OFF)
+        r.x, r.y = r.x - b[0], r.y - b[1]
+        if hit.line.sx == hit.line.ex:                                 # @3655-3851: a wall ends the walk
+            if hitstun:
+                break
+            if not hit.line.type & 128 or not (ao and ao(hit.line)):
+                r.stop_x = True
+            r.left = 0.0
+            break
+    return r
+
+
 def ground_reset(ground, hitstun, b6b_bit, power_564, p5s):
     """`Entity._-8i` #2984 @290-408, at the start of the step: the landing on the ground line `_-96f` kept
     from the previous step. Returns (p5s, on_ground `_-G1T`).
@@ -522,6 +583,32 @@ ANCHORS = {ABC_1100: {
         (2984, 3722, "callproperty", "_-ao, 2"),
         (2984, 9331, "callproperty", "_-ao, 2"),
         (2984, 10747, "callproperty", "_-ao, 2"),
+    ],
+    "_-8i ground walk: _-N3a along _-96f normalised to local12, sweep ignoring _-96f, walk on a new line, wall stops (_-v1D = 0), step-down probe 50 / 10": [
+        (2984, 3138, "getproperty", "_-N3a"),
+        (2984, 3147, "getproperty", "_-f1i"),
+        (2984, 3203, "callpropvoid", "normalize, 1"),
+        (2984, 3274, "getproperty", "_-96f"),
+        (2984, 3287, "getlocal_3", ""),
+        (2984, 3290, "callproperty", "_-X2e, 10"),
+        (2984, 3419, "getproperty", "length"),
+        (2984, 3466, "initproperty", "_-96f"),
+        (2984, 3481, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+        (2984, 3540, "pushdouble", "1.01"),
+        (2984, 3670, "getproperty", "_-f1i"),
+        (2984, 3680, "callproperty", "_-5q, 0"),
+        (2984, 3722, "callproperty", "_-ao, 2"),
+        (2984, 3747, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 3768, "getproperty", "_-S1b"),
+        (2984, 3849, "setlocal", "12"),
+        (2984, 3869, "getproperty", "_-A4A"),
+        (2984, 3904, "pushdouble", "50.0"),
+        (2984, 3992, "callproperty", "_-X2e, 10"),
+        (2984, 4047, "pushdouble", "10.0"),
+        (2984, 4119, "pushbyte", "1"),
+        (2984, 4130, "pushbyte", "-1"),
+        (2984, 4161, "pushdouble", "50.0"),
+        (2984, 4213, "iftrue", "-1084"),
     ],
 }}
 
