@@ -353,6 +353,29 @@ def gravity_applies(e6p, ground, y1l, t, cancel_gravity, gravity):
             and gravity != 0)
 
 
+LAVA = 512             # `_-z2k._-s2O`
+GAME_MODE_LINE = 128   # `_-z2k._-J6w`: lines that call `Entity._-ao`
+LAVA_REPEAT_MS = 240   # `Entity._-ao` @883-895
+
+
+def lava_contact(t, line_type, power_name, last_attacker, self_id, last_power, last_tick, power_x1n=False):
+    """`Entity._-ao` #3116 @621-997 (outside the RING scoring type): contact with a lava line.
+
+    `_-ao(t, flag)` runs whenever the ground line has the game-mode bit 128 (`_-8i` @3722 during the ground
+    walk, @9331 and @10747 after the move, @13080). For a lava line (type & 512) the line's power
+    (`PowerType._-p4G(line._-S14)`) hits the fighter through `OnHit` (17 arguments, the knockback chain of
+    #29), credited to `_-W6D` when 0 < `_-W6D` < 16 (the last attacker), else to the fighter's own `_-11`.
+    The same power (`_-K1e` = its `_-H4O`) cannot hit again before `_-k2j` + 240 ms unless it has `_-x1N`.
+    Returns (hit, credited id, new `_-k2j`).
+    """
+    if not line_type & LAVA:
+        return False, None, last_tick
+    credited = last_attacker if last_attacker != 0 and last_attacker < 16 else self_id
+    if not power_x1n and last_power == power_name and t < last_tick + LAVA_REPEAT_MS:
+        return False, credited, last_tick
+    return True, credited, t
+
+
 def steep(line):
     """`_-S1A` as `_-R15._-q3q` #1570 sets it: normal y < 0 and |nx / ny| >= 5/3."""
     nx, ny = line.normal
@@ -483,6 +506,22 @@ ANCHORS = {ABC_1100: {
         (2984, 5265, "getproperty", "_-84Q"),
         (2984, 5296, "ifnlt", "160"),
         (2984, 5340, "getproperty", "_-84Q"),
+    ],
+    "_-ao lava: type & _-s2O -> line power _-p4G(_-S14) OnHit, credited to _-W6D (< 16) or _-11; repeat after 240 ms": [
+        (3116, 629, "getproperty", "_-s2O"),
+        (3116, 646, "getproperty", "_-W6D"),
+        (3116, 667, "pushbyte", "16"),
+        (3116, 692, "getproperty", "_-11"),
+        (3116, 703, "getproperty", "_-S14"),
+        (3116, 707, "callproperty", "_-p4G, 1"),
+        (3116, 854, "getproperty", "_-x1N"),
+        (3116, 890, "pushuint", "240"),
+        (3116, 907, "initproperty", "_-k2j"),
+        (3116, 990, "callpropvoid", "OnHit, 17"),
+        (2984, 3704, "getproperty", "_-J6w"),
+        (2984, 3722, "callproperty", "_-ao, 2"),
+        (2984, 9331, "callproperty", "_-ao, 2"),
+        (2984, 10747, "callproperty", "_-ao, 2"),
     ],
 }}
 
