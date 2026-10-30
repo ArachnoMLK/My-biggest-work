@@ -15,6 +15,14 @@ In a replay [V]: replay start `_-h3U._-T12` #3624 sets `_-w35` = 1024 (@116-123)
 2048 only once the target time passes `_-331._-G5C` + 2500 (@4315-4370, the end of the replay [H]). Neither has
 a bit of INSTANT_MASK, so the drone flies in from the camera edge, unless `DevSettings.IsStandaloneClient()`
 #2563: dev flag 3 set and dev flag 27 clear. [H] The shipped client has dev flag 3 clear.
+
+`_-44x` at the match start [V; H: the `_-vs` gate of the normal update holds]: tick phase 5 of `_-01I` #3336
+calls `Entity._-k5H(t)` on every entity of `_-5r` (@2725-2759), and `_-k5H` #2991 sets `_-44x` = true in
+state 2 (lookupswitch @89 -> @194-199) and in state 9 (@1665-1670). A player waits in state 2 from replay start,
+so `_-44x` is set when the match start (phase 4 of the 272 ms step) calls `_-P3o`. `_-X6R._-J1Y` does not
+matter here: it is set only by the BRAWLBALL and TAG rules (`_-C20._-S4o` from `_-f40`, `_-od._-b6O`; built
+in `_-99._-76j`), a snapshot read `_-B5T`, and `_-X6R._-sW`, which nothing references. The same `_-k5H` ticks
+the drone first (`_-k5S._-i1H(t)`, @45-66), so its first tick is in phase 5 of the match-start step.
 """
 from .movement import ABC_1100
 from .platforms import ease
@@ -28,6 +36,7 @@ F_TIMED = 4        # `_-H1g._-S3h` exists and its `_-w1s` >= t
 
 INSTANT_MASK = 32768 | 16   # `_-N1k._-w35` bits that skip the drone outside a standalone client
 REPLAY_W35 = 1024           # `_-w35` from replay start `_-T12`
+SPAWNED_AT_MATCH_START = True   # `_-44x`, from `_-k5H` in state 2 on the steps before
 REPLAY_END_W35 = 2048       # `_-w35` after the replay's end (`_-331._-G5C` + 2500)
 DROP_SPEED = 30.0           # `_-P5S` (vertical speed, see movement.py) when the drone lets go
 DROP_SPEED_FAST = 70.0      # in the other team-type case, with `_-F5c` set
@@ -335,5 +344,27 @@ ANCHORS = {ABC_1100: {
         (2563, 18, "pushbyte", "27"),
         (2563, 26, "not", ""),
         (2563, 32, "pushfalse", ""),
+    ],
+    "_-44x at the match start: phase 5 _-k5H on every _-5r entity; _-k5H ticks the drone first; state 2 / 9 -> _-44x = true; _-J1Y writers only BRAWLBALL / TAG rules": [
+        (3336, 2736, "getproperty", "_-5r"),
+        (3336, 2751, "callpropvoid", "_-k5H, 1"),
+        (2991, 48, "getproperty", "_-k5S"),
+        (2991, 66, "callpropvoid", "_-i1H, 1"),
+        (2991, 75, "callpropvoid", "_-1L, 1"),
+        (2991, 89, "lookupswitch", "35, 151, 35, 105, 118, 118, 151, 1204, 1352, 1352, 1576"),
+        (2991, 198, "pushtrue", ""),
+        (2991, 199, "initproperty", "_-44x"),
+        (2991, 1669, "pushtrue", ""),
+        (2991, 1670, "initproperty", "_-44x"),
+        (7133, 104, "getproperty", "BRAWLBALL"),
+        (7133, 125, "constructprop", "_-C20, 1"),
+        (7133, 583, "getproperty", "TAG"),
+        (7133, 604, "constructprop", "_-od, 1"),
+        (6991, 161, "callpropvoid", "_-S4o, 3"),
+        (6993, 458, "initproperty", "_-J1Y"),
+        (7219, 208, "initproperty", "_-J1Y"),
+        (6783, 6, "initproperty", "_-J1Y"),
+        (6786, 41, "initproperty", "_-J1Y"),
+        (6777, 168, "initproperty", "_-J1Y"),
     ],
 }}
