@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 1809 | 0 |
+| `hit-detection-verify` | 1868 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 364 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 370 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -273,3 +273,12 @@ So the filter is too strict to test the movement alone: in a 1v1 almost every fi
 The check can only bite once the harness models what the players actually do before a KO. Two ways on,
 in roadmap order: (a) DodgeDash movement in the harness (the one unmodelled key of the one candidate), then
 (b) the hit detection of #30 wired into `harness.play`, so that the filter can be dropped. [H] until run.
+
+**(a) wired** (`harness.dodge` / `harness.dodge_tick`, DodgeTypes.xml through `replay_setup.Swz`): a fresh
+DodgeDash press runs `dodge.gates` → `pick` → the commit before `_-8i`, and `_-t1A` runs at @2659 (landed
+cooldown, cooldown end, the push of each dodge tick, the exit speed); friction and gravity are off while
+`_-E6P()`. Glue [H]: no power, no move lock, no dash (`Dash` false), no chase dodge (`_-26R` false), `_-VE` = 0,
+`_-M3h` false, power multipliers 1, Set "Default". Rerun (aggregate only, format 271): 68 without a KO, 460 not
+1v1, 236 skipped (opponent attacked first), and the **1 candidate is now predicted late** instead of early: the
+dodge moves its victim, but the KO is not reproduced yet (its dash and chase dodge are still missing). Next:
+(b), the hit detection in `harness.play`.

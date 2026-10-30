@@ -15,7 +15,9 @@ Plan step 4 (notes/2026-10-30-replay-sim-plan.md). It chains the transcribed pie
    test (@14270-14370: `_-c5C(x, y, _-5q(), !_-wn() || _-r51 != 0)`, a non-zero mask stored in `_-a3D`;
    ko.py, bounds from level_bounds.py), then `_-84` = `_-A4A` = 0 (@14563-14599).
 
-Every piece is [V] in its own module; the glue is [H]: no power, no hitstun, no bounce, the `_-532` jump lock and the air-jump count are not updated by any transcribed
+The dodge (`dodge` for `Entity.Dodge` before `_-8i`, `dodge_tick` for `_-t1A` @2659; friction and gravity off
+while dodging) runs when `dodge_rows` are given. Every piece is [V] in its own module; the glue is [H]: no
+power, no hitstun, no bounce, no dash, no chase dodge, the `_-532` jump lock and the air-jump count are not updated by any transcribed
 writer yet, the friction is applied on every tick, and a KO only records the mask (the KO commit and the
 respawn of ko-11.00.md §5 / spawn_bot.py are not chained yet). Nothing here has been compared with the running game.
 
@@ -29,6 +31,9 @@ fighters are independent.
 from dataclasses import dataclass, field
 
 from .air_move import WallState, air_move, gravity_applies, ground_reset, ground_walk, respond, steep, wall_contact
+from .dodge import (c2e, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
+                    gates, is_dodge_locked, k64, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x,
+                    speed_y, standard_flag, timers)
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import state_at
@@ -46,6 +51,7 @@ DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFrict
                  "Acceleration": 3.0, "AirAcceleration": 2.0}   # synthetic defaults; real ones from stats.py
 AIR_JUMPS = 2       # [H] `_-56T()`: not read yet
 MOVE_LEFT, MOVE_RIGHT, JUMP = 4, 8, 16   # replay.INPUT_BITS: bit i = 1 << i
+DODGE_DASH, DIR_MASK = 256, 15            # the dodge key; Dodge's dir = keys & 15 (#6313 @2427)
 
 
 @dataclass
@@ -68,6 +74,23 @@ class Fighter:
     wn: bool = True           # `_-wn()`: airborne after the previous move
     g1t: bool = False         # `_-G1T`
     y1l: int = 0              # `_-y1L`
+    dodge: dict = None        # the DodgeTypes row of the last dodge (`_-Q42`)
+    h2b: int = 0              # `_-H2b`, dodge start
+    uy: int = 0               # `_-Uy`
+    c1d: int = 0              # `_-C1d`
+    y1f: int = 0              # `_-y1F`
+    o5c: int = 0              # `_-O5C`, dodge dir
+    w14: int = 0              # `_-14W`
+    e6p: bool = False         # `_-E6P()`: dodging
+    u5e: bool = False         # `_-u5E()`: dodge cooldown running
+    a1h: bool = False         # `_-a1h`
+    t5l: float = 1.0          # `_-T5L`
+    wl: float = 1.0           # `_-WL`
+    l4a: bool = False         # `_-l4A`
+    g5e: bool = False         # `_-g5E`
+    facing_left: bool = False  # `_-n3h`
+    i46: int = 0              # `_-46I`, last hit (no hits here)
+    e3: int = 0               # `_-3E`
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -102,22 +125,105 @@ def jump(f, t, left, right, third_arg=False):
     return None
 
 
-def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None):
+def dodge(f, t, dir, rows):
+    """`Entity.Dodge(t, dir)` (dodge.py) on the harness fighter: `gates`, `pick`, then the commit writes. Returns
+    the DodgeName or None. [H] glue: no power, no move lock, no area / `_-C54` lock, `_-x2C` = 0, no chase dodge
+    (`_-26R` false), no dash (`Dash` false: a refused ground side dodge does nothing), `_-VE` = 0, `_-M3h` false,
+    the power multipliers `_-Kc._-u5j` / `_-04K` = 1, Set "Default", the `_-6K` counter not kept."""
+    airborne = f.ground is None
+    c = c2e(t, dir, f.lock_start, False, not airborne)
+
+    def locked(flag):
+        return is_dodge_locked(False, f.u5e, flag, f.e6p, False, f.r51, False, f.xb, False, 0)
+
+    g = gates(t, dir, c, f.i46, airborne, locked(False), locked(c), f.h2b, f.w14, f.y1f, False, f.o5c, False,
+              False, not airborne, 0, f.lock_start, f.facing_left, None)
+    if g is None:
+        return None
+    d = g["dir"]
+    row = pick(rows, d, airborne, g["is_fast"])
+    if row is None:
+        return None
+    if g["w14"] is not None:
+        f.w14 = g["w14"]
+    if g["clear_vx"]:
+        f.v1d = 0.0
+    f.e6p, f.dodge, f.h2b, f.o5c, f.l4a = True, row, t, d, False
+    f.facing_left = facing(d, f.facing_left)
+    run, air_run = f.stats["RunSpeed"], f.stats["AirRunSpeed"]
+    k = k64(standard_flag(t, airborne, f.i5a, f.air_used), airborne, air_run, 1.0, run, 1.0)
+    f.t5l = speed_x(formula_mult(row.get("SpeedXFormula"), f.v1d, k, d), row.get("SpeedXMult", 1.0),
+                    row.get("SpeedXMaxMult", 0.0), d, f.v1d, air_run)
+    f.wl = speed_y(formula_mult(row.get("SpeedYFormula"), f.v1d, k, d), row.get("SpeedYMult", 1.0),
+                   row.get("SpeedYMaxMult", 0.0), d, f.p5s)
+    if row.get("IsFast") and row.get("SpeedXMult", 0.0) != 0:
+        f.v1d = neutral_push(k, d)
+    z4s = cooldown_ms(row.get("Cooldown", 0), row.get("CooldownGround", 0), airborne or f.r51 != 0)
+    tm = timers(t, row.get("Duration", 0), row.get("Recover", 0), row.get("IsFast"), z4s, g["chain_end"])
+    f.uy, f.c1d, f.y1f = tm["_-Uy"], tm["_-C1d"], tm["_-y1F"]
+    if clears_velocity(d, airborne):
+        f.v1d = f.p5s = 0.0
+    return row.get("DodgeName")
+
+
+def dodge_tick(f, t, a, held):
+    """`Entity._-t1A(t, a)` (dodge.py), run by `_-8i` @2659 with a = the step's max speed: the landed cooldown, the
+    cooldown end, then while dodging the push of each tick or, at the timer end, the exit speed."""
+    row = f.dodge
+    if row is None:
+        return
+    airborne = f.ground is None
+    f.y1f = landed_cooldown(f.y1f, airborne, f.r51, False, f.a1h, row.get("DodgeID", 0), t, f.i46,
+                            row.get("CooldownLanded", 0), f.uy, f.c1d)
+    if dodge_over(t, f.u5e, f.h2b, f.y1f, f.e3)[0]:
+        f.h2b = 0
+        f.u5e, f.a1h, _ = flags_51c(False, True, f.a1h, 0)
+    if not f.e6p:
+        return
+    mv = moves(row.get("kind", 0), row.get("where", 0))
+    if f.h2b + f.uy + f.c1d <= t:
+        f.e6p = False                                           # `_-w5G(false)`
+        if not f.u5e:
+            f.v1d, f.p5s, cv = exit_velocity(f.v1d, f.p5s, a, mv, held, f.l4a, f.g5e, f.t5l, row.get("ExitX", 1.0),
+                                             row.get("ExitBackX", 1.0), row.get("ExitY", 1.0),
+                                             row.get("ExitBackY", 1.0))
+            if cv is not None:
+                f.facing_left = cv
+            f.u5e, f.a1h, _ = flags_51c(True, False, f.a1h, 0)
+            f.t5l = f.wl = 1.0
+    elif t >= f.h2b:
+        p = push(t, f.h2b, 0, mv, f.t5l, f.wl, row.get("AccelXMult", 1.0), row.get("AccelYMult", 1.0),
+                 row.get("AccelXFormula"), row.get("AccelYFormula"), f.uy, f.c1d, f.o5c)
+        if p is not None:
+            f.v1d = f.p5s = 0.0
+            f.h84, f.a4a = p
+        f.l4a, f.g5e = side_latch(f.l4a, f.g5e, held)
+
+
+def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None, dodge_press=False, keys=0,
+         dodge_rows=None):
     """One 16 ms tick at time t. `bounds` is (camera rectangle, kill dict) for the ring-out test, or None.
-    Returns the list of events of this tick."""
+    `dodge_press` with `dodge_rows` (dodge.parse_types) tries `Entity.Dodge(t, keys & 15)` first (#6313 tries the
+    dodge before the jump). Returns the list of events of this tick."""
     events = []
+    if dodge_press and dodge_rows:
+        name = dodge(f, t, keys & DIR_MASK, dodge_rows)
+        if name is not None:
+            events.append(("dodge", name))
     if jump_press:
         events.append(("press", jump(f, t, left, right)))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
     vmax = _vmax(f)
-    fr = friction_value(t, airborne, f.stats["Friction"], f.stats["AirFriction"], f.dash_timer, vx=f.v1d)
-    f.v1d = apply_friction(f.v1d, fr)
+    if not f.e6p:                                               # friction only when !`_-E6P()` [H: local 8]
+        fr = friction_value(t, airborne, f.stats["Friction"], f.stats["AirFriction"], f.dash_timer, vx=f.v1d)
+        f.v1d = apply_friction(f.v1d, fr)
     if left != right:
         a, vm = acceleration(airborne, f.stats["Acceleration"], f.stats["AirAcceleration"], vmax=vmax)
         if airborne and (f.v1d > 0) == left and f.v1d != 0:
             a *= reversal_factor(f.v1d)
         f.v1d = apply_acceleration(f.v1d, left, a, vm)
+    dodge_tick(f, t, vmax, keys & DIR_MASK)                     # `_-t1A` @2659
     if squat_due(t, f.xb, f.i5a):                               # `_-A2X`
         f.p5s, f.i5a = 0.0, 0
         events.append(("release", jump(f, t, left, right, third_arg=True)))
@@ -135,7 +241,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     f.p5s, _ = fold_impulse(f.p5s, f.a4a)
     f.p5s = clamp(f.p5s, cap)
     g_term = 0.0
-    if gravity_applies(False, f.ground, f.y1l, t, False, GRAVITY) and f.p5s < FALL_CAP:
+    if gravity_applies(f.e6p, f.ground, f.y1l, t, False, GRAVITY) and f.p5s < FALL_CAP:
         g_term = GRAVITY * STEP
         f.p5s += g_term
     m = air_move(grid, team, f.x, f.y, x_step, f.p5s, f.ground is not None)
@@ -236,7 +342,7 @@ def ko_reset(f):
 
 
 def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id, cells=None, lives=3,
-         lives_mode=True, team_type=0, standalone=False, ticks=6000):
+         lives_mode=True, team_type=0, standalone=False, ticks=6000, dodge_rows=None):
     """Both fighters of a plain 1v1 replay in lockstep from the match-start step. Per tick, in `_-5r` order:
     phase 5 (`_-k5H`: the drone first, then movement in states 0 / 5, which clears `_-44x`), then phase 6
     (`_-eR`: a ring-out mask -> KO commit at t, lives - 1, then `Respawn`: state 7 when eliminated, else the
@@ -271,7 +377,8 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 records = inputs_by_id.get(p["e"]["id"], [])
                 keys, before = state_at(records, t), state_at(records, t - STEP_MS)
                 tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT),
-                     bool(keys & JUMP and not before & JUMP), 0, bounds)
+                     bool(keys & JUMP and not before & JUMP), 0, bounds,
+                     bool(keys & DODGE_DASH and not before & DODGE_DASH), keys, dodge_rows)
         for p in players:                                   # phase 6
             f, body = p["f"], p["body"]
             if f is None or body["state"] not in (0, 5) or not f.a3d:

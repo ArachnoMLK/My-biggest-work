@@ -82,6 +82,27 @@ class Harness(unittest.TestCase):
         self.assertLess(tr[i][2], tr[i - 1][2])                         # and up
         self.assertIsNone(f.ground)                                     # a wall never stays in _-96f
 
+    def test_air_side_dodge_pushes_then_exits(self):
+        row = {"DodgeName": "side", "DodgeID": 2, "Set": "Default", "kind": 1, "where": 3, "IsFast": False,
+               "Duration": 4, "Recover": 2, "SpeedXMult": 1.0, "SpeedXMaxMult": 0.0, "SpeedYMult": 1.0,
+               "SpeedYMaxMult": 0.0, "AccelXMult": 0.5, "AccelYMult": 0.0, "Cooldown": 10, "CooldownGround": 5,
+               "CooldownLanded": 3, "ExitX": 0.5, "ExitBackX": 0.25, "ExitY": 0.5, "ExitBackY": 0.25}
+        rows = [row, dict(row, DodgeName="StandardSpot", DodgeID=1, kind=0)]
+        f, grid = harness.Fighter(0.0, -400.0), smoke.map_grid(FLAT)
+        ev = harness.tick(f, 1000, grid, False, True, False, 0, None, True, 8, rows)
+        self.assertEqual(ev[0], ("dodge", "side"))
+        self.assertTrue(f.e6p)
+        self.assertEqual((f.h2b, f.uy, f.c1d, f.y1f), (1000, 64, 32, 256))
+        y = f.y
+        for t in range(1016, 1096, 16):                      # timer end at 1000 + 64 + 32
+            harness.tick(f, t, grid, False, True, False, 0, None, False, 8, rows)
+            self.assertTrue(f.e6p)
+            self.assertEqual((f.v1d, f.p5s, f.y), (30.0, 0.0, y))   # 60 x 1 x 0.5, no gravity while dodging
+        harness.tick(f, 1096, grid, False, True, False, 0, None, False, 8, rows)
+        self.assertFalse(f.e6p)
+        self.assertTrue(f.u5e)
+        self.assertEqual((f.t5l, f.wl), (1.0, 1.0))
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)

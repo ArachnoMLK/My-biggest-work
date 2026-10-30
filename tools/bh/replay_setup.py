@@ -15,7 +15,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
-from . import harness, stats
+from . import dodge, harness, stats
 from .level_bounds import camera_bounds, level_kills
 from .respawn_points import parse_respawns
 from .smoke import map_grid
@@ -69,6 +69,8 @@ class Swz:
         self.names = hero_names(_read(os.path.join(game, "HeroTypes.xml")))
         self.stances = stats.parse_stances(_read(os.path.join(game, "RuneTypes.xml")))
         self.stat_types = stats.parse_stat_types(_read(os.path.join(game, "StatTypes.xml")))
+        path = os.path.join(game, "DodgeTypes.xml")
+        self.dodge_rows = dodge.parse_types(_read(path))[0] if os.path.exists(path) else None
         self.scoring = {}
         for t in ET.fromstring(_read(os.path.join(game, "ScoringTypes.xml"))):
             cells = {c.tag: (c.text or "") for c in t}
@@ -112,4 +114,4 @@ def run(rep, swz, ticks=6000):
     lives = rep["settings"].get("starting_lives", 0)
     return harness.play(rep["entities"], rep["random_seed"], s["points"], s["drone_camera"], s["grid"],
                         (s["cam"], s["kill"]), s["stats"], rep["inputs"], s["cells"], lives=lives,
-                        lives_mode=lives > 0, ticks=ticks)
+                        lives_mode=lives > 0, ticks=ticks, dodge_rows=swz.dodge_rows)
