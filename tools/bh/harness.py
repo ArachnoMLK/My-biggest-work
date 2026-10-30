@@ -8,18 +8,20 @@ Plan step 4 (notes/2026-10-30-replay-sim-plan.md). It chains the transcribed pie
 2. `_-8i`: step-start landing (`ground_reset`), friction then acceleration on `_-v1D` (horizontal.py,
    @519-2659), the squat release (@2674, `_-A2X` -> `Jump(t, false, true)`), the x impulse fold and clamp
    (@2790-3053), the ground walk (@3114-4213), the y impulse fold and clamp (@4217-4483), gravity
-   (@5097-5353), the free move (@6620-), the landing delay of a pending jump (@13427-13510), the ring-out
+   (@5097-5353), the free move (@6620-), `_-r51` saved and cleared (@8869-8886), the response to the stop
+   line (air_move.respond: ceiling, slope, wall contact and slide, @8890-12834), the stop line dropped
+   from `_-96f` when its normal does not point up or it is steep (@13029-13127), `_-wn()` = airborne
+   (@13169), the landing delay of a pending jump (@13427-13510), the ring-out
    test (@14270-14370: `_-c5C(x, y, _-5q(), !_-wn() || _-r51 != 0)`, a non-zero mask stored in `_-a3D`;
    ko.py, bounds from level_bounds.py), then `_-84` = `_-A4A` = 0 (@14563-14599).
 
-Every piece is [V] in its own module; the glue is [H]: no power, no hitstun, no wall contact (`_-r51` stays
-0 unless set by the caller), the `_-532` jump lock and the air-jump count are not updated by any transcribed
+Every piece is [V] in its own module; the glue is [H]: no power, no hitstun, no bounce, the `_-532` jump lock and the air-jump count are not updated by any transcribed
 writer yet, the friction is applied on every tick, and a KO only records the mask (the KO commit and the
 respawn of ko-11.00.md §5 / spawn_bot.py are not chained yet). Nothing here has been compared with the running game.
 """
 from dataclasses import dataclass, field
 
-from .air_move import air_move, gravity_applies, ground_reset, ground_walk
+from .air_move import WallState, air_move, gravity_applies, ground_reset, ground_walk, respond, steep, wall_contact
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .ko import ko_mask
@@ -50,6 +52,9 @@ class Fighter:
     air_used: int = 0         # `_-P5Y()`
     air_allowed: int = AIR_JUMPS
     a3d: int = 0              # `Entity._-a3D`, the last non-zero ring-out mask
+    wn: bool = True           # `_-wn()`: airborne after the previous move
+    g1t: bool = False         # `_-G1T`
+    y1l: int = 0              # `_-y1L`
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -116,10 +121,27 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             f.v1d = 0.0
     f.p5s, _ = fold_impulse(f.p5s, f.a4a)
     f.p5s = clamp(f.p5s, cap)
-    if gravity_applies(False, f.ground, 0, t, False, GRAVITY) and f.p5s < FALL_CAP:
-        f.p5s += GRAVITY * STEP
+    g_term = 0.0
+    if gravity_applies(False, f.ground, f.y1l, t, False, GRAVITY) and f.p5s < FALL_CAP:
+        g_term = GRAVITY * STEP
+        f.p5s += g_term
     m = air_move(grid, team, f.x, f.y, x_step, f.p5s, f.ground is not None)
     f.x, f.y, f.ground = m.x, m.y, m.ground
+    r51_before, f.r51 = f.r51, 0                                # @8869-8886
+    if m.ground is not None:
+        ws = None
+        if m.ground.sx == m.ground.ex:
+            ws = WallState(t, f.wn, False, r51_before, f.g1t, f.y1l, f84q=GRAVITY, gravity=g_term)
+            r51 = wall_contact(grid, team, m.x, m.y, m.ground, f.p5s, f.v1d, ws)[4]
+            if r51 is not None:
+                f.r51 = r51
+                events.append(("wall", r51))
+        r = respond(grid, team, m, f.p5s, f.v1d, wall_state=ws)
+        f.x, f.y, f.p5s, f.v1d = r.x, r.y, r.p5s, r.v1d
+        g = f.ground
+        if g.normal is not None and (g.normal[1] >= 0 or steep(g)):   # @13029-13127
+            f.ground = None
+    f.wn = f.ground is None                                     # @13169
     landed = was_airborne and f.ground is not None
     if landed:
         f.i5a = squat_on_landing(f.xb, f.i5a, True)

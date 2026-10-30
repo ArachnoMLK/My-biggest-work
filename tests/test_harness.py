@@ -66,6 +66,20 @@ class Harness(unittest.TestCase):
         self.assertGreater(f.y, 700.0)                                  # past bottom + BottomKill
         self.assertGreater(f.x, 50.0)                                   # off the right edge
 
+    def test_wall_contact_and_wall_jump(self):
+        block = ('<HardCollision X1="200" X2="260" Y="-300" /><HardCollision X="260" Y1="-300" Y2="500" />'
+                 '<HardCollision X1="260" X2="200" Y="500" /><HardCollision X="200" Y1="500" Y2="-300" />')
+        grid = smoke.map_grid(FLAT.replace('<Respawn X="0"', block + '<Respawn X="0"'))
+        f = harness.Fighter(0.0, 0.0)
+        tr = harness.run(f, grid, lambda i: (False, 60 < i < 150, i in (70, 85, 150)), 160)
+        kinds = [e for _, e in f.events if e[0] != "wall"]
+        self.assertEqual(kinds[-2:], [("press", "squat"), ("release", "wall")])
+        self.assertIn(("wall", 2), [e for _, e in f.events])            # the wall is right of the feet
+        i = [t for t, _, _, _ in tr].index(f.events[-1][0])
+        self.assertLess(tr[i][1], tr[i - 1][1])                         # pushed away from the wall
+        self.assertLess(tr[i][2], tr[i - 1][2])                         # and up
+        self.assertIsNone(f.ground)                                     # a wall never stays in _-96f
+
 
 if __name__ == "__main__":
     unittest.main()
