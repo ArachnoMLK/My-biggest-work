@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.power_pick import power_name, redirect  # noqa: E402
+from bh.power_pick import hero_powers, item_slots, power_name, redirect  # noqa: E402
 
 HERO = {"mBaseWeapon1": 4, "mBaseWeapon2": 5, "mSpecialPower1": "N1", "mSpecialPower2": "N2",
         "mSpecialPower1_Forward": "S1", "mSpecialPower2_Down": "D2"}
@@ -25,6 +25,17 @@ class PowerPick(unittest.TestCase):
         self.assertIsNone(power_name(11, HERO, {"id": 9, "slots": w1["slots"]}))
         self.assertEqual(power_name(11, HERO, {"id": 9, "slots": w1["slots"]}, zombie=True), "a8")
         self.assertIsNone(power_name(14, HERO, w1))
+
+    def test_loaders(self):
+        items = item_slots("itemTypes\nItemName,ItemID,PowerType_Combo1,PowerType_Smash_Neutral\nSword,4,SwJab,\n")
+        self.assertEqual(items["Sword"]["slots"][1], "SwJab")
+        self.assertIsNone(items["Sword"]["slots"][11])
+        self.assertEqual(len(items["Sword"]["slots"]), 21)
+        heroes = hero_powers("<HeroTypes><HeroType><HeroID>3</HeroID><BaseWeapon1>Sword</BaseWeapon1>"
+                             "<SpecialPower1>X</SpecialPower1></HeroType></HeroTypes>")
+        self.assertEqual((heroes[3]["mBaseWeapon1"], heroes[3]["mSpecialPower1"], heroes[3]["mBaseWeapon2"]),
+                         ("Sword", "X", None))
+        self.assertEqual(power_name(11, heroes[3], items["Sword"]), "X")
 
     def test_redirect(self):
         table = {"P": {"PowerName": "P", "GCVersion": "PG", "MomentumVersion": "PM"},

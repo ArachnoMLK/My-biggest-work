@@ -6,12 +6,55 @@ cancel. The weapon is the held item's ItemType (`_-O2R._-93n`, unarmed `ItemType
 `ItemType._-iJ` when it has `_-K1V`. Slots 13-20 read a per-fighter emote table and are not transcribed.
 [V] unless marked [H].
 """
+import csv
+import io
+import xml.etree.ElementTree as ET
+
 from .movement import ABC_1100
 
 NEUTRAL_SIG, SIDE_SIG, DOWN_SIG = 11, 7, 8   # @494 / @681 / @790
 ZOMBIE_FALLBACK = 8                          # @638: in ZOMBIE mode a missing neutral signature takes slot 8
 EMOTE_SLOTS = range(13, 21)                  # @167-182
 MOMENTUM_SPEED = 60.0                        # @1302: MomentumVersion needs |vx| >= 60 toward the facing
+
+
+SLOT_COUNT = 21                              # ItemType.<init> #4963 @370: `_-Z6M` = new Vector.<String>(21, fixed)
+ITEM_SLOT_COLUMNS = {"PowerType_Combo1": 1, "PowerType_Forward": 2, "PowerType_Down": 3, "PowerType_Aerial": 4,
+                     "PowerType_Aerial_Forward": 5, "PowerType_Aerial_Down": 6, "PowerType_Smash_Forward": 7,
+                     "PowerType_Smash_Down": 8, "PowerType_Smash_Aerial_Up": 9, "PowerType_Smash_Aerial_Down": 10,
+                     "PowerType_Smash_Neutral": 11}  # ItemType._-z2u #4974 @2331-2736
+HERO_COLUMNS = ("BaseWeapon1", "BaseWeapon2", "SpecialPower1", "SpecialPower2", "SpecialPower1_Forward",
+                "SpecialPower2_Forward", "SpecialPower1_Down", "SpecialPower2_Down")
+
+
+def item_slots(csv_text):
+    """itemTypes.csv (row 0 the table name, row 1 the header) -> {ItemName: {"id": ItemName, "slots": `_-Z6M`}}.
+    `_-E49` is the ItemType's first constructor argument (#4963 @384), the name; empty cells stay None."""
+    rows = list(csv.reader(io.StringIO(csv_text)))
+    head = rows[1]
+    out = {}
+    for r in rows[2:]:
+        cells = dict(zip(head, r))
+        name = cells.get("ItemName")
+        if not name:
+            continue
+        slots = [None] * SLOT_COUNT
+        for col, i in ITEM_SLOT_COLUMNS.items():
+            slots[i] = cells.get(col) or None
+        out[name] = {"id": name, "slots": slots}
+    return out
+
+
+def hero_powers(herotypes_xml):
+    """HeroTypes.xml -> {HeroID: {"mBaseWeapon1": ..., "mSpecialPower1_Forward": ...}} for `power_name`.
+    [H] the HeroType parser is not read: the columns are taken to fill the fields of the same name with "m"."""
+    out = {}
+    for h in ET.fromstring(herotypes_xml):
+        hid = h.findtext("HeroID")
+        if not hid:
+            continue
+        out[int(hid)] = {"m" + c: (h.findtext(c) or None) for c in HERO_COLUMNS}
+    return out
 
 
 def power_name(slot, hero, weapon, zombie=False):
@@ -94,6 +137,17 @@ ANCHORS = {ABC_1100: {
         (1726, 790, "pushbyte", "8"),
         (1726, 817, "getproperty", "mSpecialPower1_Down"),
         (1726, 868, "getproperty", "mSpecialPower2_Down"),
+        (4963, 370, "pushbyte", "21"),
+        (4963, 376, "initproperty", "_-Z6M"),
+        (4963, 385, "initproperty", "_-E49"),
+        (4974, 2333, "pushstring", "'PowerType_Aerial'"),
+        (4974, 2346, "pushbyte", "4"),
+        (4974, 2444, "pushstring", "'PowerType_Combo1'"),
+        (4974, 2458, "pushbyte", "1"),
+        (4974, 2519, "pushstring", "'PowerType_Forward'"),
+        (4974, 2532, "pushbyte", "2"),
+        (4974, 2705, "pushstring", "'PowerType_Smash_Neutral'"),
+        (4974, 2718, "pushbyte", "11"),
     ],
     "_-F5N._-42t redirects: _TESTFEATURE (flag 64); ExhaustedVersion under _-UT; GCVersion under gc; OriginOverrideIfInMode under _-b3A > 1; MomentumVersion at |vx| >= 60": [
         (1726, 899, "callproperty", "_-p4G, 1"),
