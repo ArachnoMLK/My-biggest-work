@@ -68,13 +68,15 @@ class Fall(unittest.TestCase):
         from bh import items
         xml = FLAT.replace('<Respawn X="0" Y="0" />', '<ItemSpawn X="-10" Y="0" W="20" H="10" /><ItemInitSpawn X="5" Y="2" />')
         self.assertEqual(smoke.item_spawns(xml), [(0.0, 5.0), (5.0, 2.0)])
-        ticks, err, still, slope = smoke.item_fall(smoke.map_grid(xml), 0.0, 5.0, items.ITEM_DEFAULTS)
-        self.assertGreater(ticks, 1)
-        self.assertAlmostEqual(err, 0.0)
-        self.assertTrue(still)
-        self.assertFalse(slope)
+        r = smoke.item_fall(smoke.map_grid(xml), 0.0, 5.0, items.ITEM_DEFAULTS)
+        self.assertGreater(r["contact"], 1)
+        self.assertAlmostEqual(r["err"], 0.0)
+        self.assertGreater(r["bounces"], 0)                      # it lands faster than 5: it bounces first
+        self.assertIsNotNone(r["settled"])
+        self.assertTrue(r["still"])
         c = smoke.run_items([xml], items.ITEM_DEFAULTS)
-        self.assertEqual((c["spawn_points"], c["contact"], c["on_line_1e-6"], c["still_60"]), (2, 2, 2, 2))
+        self.assertEqual((c["spawn_points"], c["contact"], c["on_line_1e-6"], c["settled"], c["still_60"]),
+                         (2, 2, 2, 2, 2))
 
     def test_run_counts(self):
         c = smoke.run([FLAT, EMPTY, MOVING], max_ticks=200)

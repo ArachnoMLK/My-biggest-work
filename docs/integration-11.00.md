@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 871 | 0 |
+| `hit-detection-verify` | 917 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 257 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 262 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -80,18 +80,24 @@ needed to tell. Next: the KO oracle of #27.
 ### Items
 
 `smoke-fall` also drops an item of the default ItemType, at rest and not thrown, from the centre of every
-`ItemSpawn` box and every `ItemInitSpawn` point. It uses `items.velocity` + `items.sweep` (PR #30) on the
-static lines. After the contact, the item rests 60 more ticks.
+`ItemSpawn` box and every `ItemInitSpawn` point. It runs `items.velocity`, `items.sweep` and
+`items.after_sweep` (impact: bounce or stop; PR #30) on the static lines. Once the item has stopped, it
+rests 60 more ticks.
 
 | | |
 |---|---|
 | Item spawn points | 823 |
 | Contact | 682, **all on the line within 1e-6** |
-| Still for 60 ticks | 680; the 2 others are on slopes, where gravity keeps acting (no rest unless normal y = −1) |
+| Stopped (both speeds 0) | 623, after up to 349 ticks of bounces; all 623 stay still for 60 ticks |
+| Never stopped | 59: they micro-bounce on flat floors whose normal y is −0.9999999999999999, not −1; 58 of them still stay in place |
 | No contact | 141: 129 on maps with moving platforms (left out here), 12 with no line below them at all |
 
-[H] What an item does with its vertical speed when it lands (the part after the sweeps, @6362–) is not
-transcribed; the test sets it to 0 on contact.
+**Rounding finding [V].** A flat line's normal is (0, w) scaled by `Point.normalize(1)`, i.e. times
+1 / length. For some widths (e.g. 1700) this gives −0.9999999999999999 instead of −1. The impact test
+`normal y != -1` (`_-u1I` @1359) then never lets the item stop, and the rest test of `items.velocity` never
+holds. If the game computes the normal the same way, items on those floors bounce imperceptibly forever.
+[H] That depends on the player's `Point.normalize` doing `x *= thickness / length`, which a real game
+should confirm.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 
