@@ -6,10 +6,10 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms,  # noqa: E402
-                      counter, dash, dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, gates, k64, kind,
-                      landed_cooldown, moves, neutral_push, parse_types, pick, push, side_latch, speed_x, speed_y, standard_flag,
-                      timers)
+from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms, counter,  # noqa: E402
+                      dash, dodge_over, ease, exit_speed, exit_velocity, facing, flags_51c, formula_mult,
+                      gates, is_dodge_locked, k64, kind, landed_cooldown, moves, neutral_push, parse_types,
+                      pick, push, side_latch, speed_x, speed_y, standard_flag, timers)
 
 
 class Dodge(unittest.TestCase):
@@ -203,6 +203,19 @@ class Dodge(unittest.TestCase):
         self.assertEqual((a["kind"], a["where"], a["IsFast"], a["Duration"], a["ExitX"], a["SpeedXFormula"]),
                          (3, 2, True, 5, 0.5, "NONE"))
         self.assertEqual(pick(rows, 0, airborne=False, is_fast=False)["DodgeName"], "StandardSpot")
+
+    def test_is_dodge_locked(self):
+        k = dict(move_locked=False, u5e=False, flag=False, e6p=False, power=False, r51=0, area=False, xb=0,
+                 c54=False, x2c=0)
+        self.assertFalse(is_dodge_locked(**k))
+        self.assertTrue(is_dodge_locked(**dict(k, u5e=True)))
+        self.assertFalse(is_dodge_locked(**dict(k, u5e=True, flag=True)))
+        self.assertTrue(is_dodge_locked(**dict(k, x2c=9)))
+        self.assertTrue(is_dodge_locked(**dict(k, e6p=True)))
+
+    def test_flags_51c(self):
+        self.assertEqual(flags_51c(False, True, True, 7), (False, False, 0))
+        self.assertEqual(flags_51c(True, False, True, 7), (True, True, 7))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)

@@ -1059,6 +1059,7 @@ a gravity cancel. Inside Dodge:
 
 | Step | Bytecode | Status |
 |---|---|---|
+| Flags: `_-E6P()` = the `_-y1o` flag, written by `_-w5G` #2899 (true at the commit @1080, false at the timer end): **dodging**; `_-u5E()` = the `_-l4c` flag, written by `_-E5I` #2900 through `_-51c(a, b)` #3027 (u5E = a, `_-Kc._-53P` = 0, `_-a1h` = false unless a, `_-6K` = 0 with b): **cooldown running** (set at the exit, cleared by `dodge_over`). `IsDodgeLocked(t, flag)` #3075: `IsMoveLocked(t)`, u5E without flag, E6P, a running power, a wall, the `_-I1f._-12J` area test, `_-Xb` or `_-C54(t)` lock; else `_-x2C` >= 9 | #2941, #2942, #2899, #2900, #3027, #3075 | [V] `dodge.flags_51c`, `is_dodge_locked`; [H] `_-12J`, `_-x2C` |
 | Gates: `_-C2E(t, dir)` (local 4); hit locks local 11 = `_-46I` + 64 > t, local 12 = in the air and `_-46I` + 96 > t; local 13 = neither, with Left / Right + Drop; `IsDodgeLocked(t)` false → go | @18-170 | [V] `dodge.gates` |
 | Chained dodge: with local 4, `_-H2b` != `_-14W`, `_-H2b` != 0 and not `IsDodgeLocked(t, local 4)`, local 5 = `_-H2b` + `_-y1F` and `_-14W` = t; else `_-26R(t)` sets local 7 and local 9 = `_-O5C`; either way go | @174-303 | [V] `dodge.gates`; [H] local 7 is the **chase dodge** |
 | Dash try and refusals: local 14 = neither hit lock and not (go with local 4 or local 7); with 13 or 14 and a side / Drop: `Dash(t, dir)` when not `_-350(t)`, true → return false; else with 14 on the ground → false; not go → false | @305-477 | [V] `dodge.gates` |

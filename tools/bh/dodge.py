@@ -446,6 +446,26 @@ def attack_air_offset(airborne, jump_flag, cancel, y1u):
     return off, False
 
 
+LOCK_X2C = 9               # IsDodgeLocked #3075 @216: `_-x2C` >= 9 locks when nothing else does
+
+
+def is_dodge_locked(move_locked, u5e, flag, e6p, power, r51, area, xb, c54, x2c):
+    """`Entity.IsDodgeLocked(t, flag=false)` #3075: true when `IsMoveLocked(t)`, `_-u5E()` (cooldown running) and
+    not flag, `_-E6P()` (dodging), a power runs (`_-Kc._-o3I`), on a wall (`_-r51`), the `_-N1k._-I1f._-12J(1,
+    _-M43, _-E3d, _-25G)` area test, a pending jump (`_-Xb`) or `_-C54(t)`; else `_-x2C` >= 9. Each test is
+    made only while the earlier ones are false. [H] `_-12J`, `_-x2C`."""
+    if move_locked or (u5e and not flag) or e6p or power or r51 != 0 or area or xb != 0 or c54:
+        return True
+    return x2c >= LOCK_X2C
+
+
+def flags_51c(a, b, a1h, k6):
+    """`Entity._-51c(a, b)` #3027: `_-E5I(a)` (so `_-u5E()` = a, the cooldown flag `_-l4c`), `_-Kc._-53P` = 0,
+    `_-a1h` = false unless a, `_-6K` = 0 with b. `_-E6P()` is the other flag, `_-y1o`, written by `_-w5G`
+    (#2899): true at the dodge commit (#3125 @1080), false at the timer end. Returns (u5e, a1h, k6)."""
+    return a, (a1h if a else False), (0 if b else k6)
+
+
 HIT_LOCK_MS, HIT_LOCK_AIR_MS = 64, 96   # Dodge @57-101: `_-46I` + 64 (local 11), in the air `_-46I` + 96 (local 12)
 
 
@@ -931,5 +951,28 @@ ANCHORS = {ABC_1100: {
         (2768, 1539, "initproperty", "_-Z6"),
         (2768, 1557, "setproperty", "[rt]"),
         (2768, 1570, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+    ],
+    "Dodge flags: E6P = _-y1o (_-w5G, true at commit @1080), u5E = _-l4c (_-E5I via _-51c); IsDodgeLocked #3075 tests, _-x2C >= 9": [
+        (2941, 5, "getproperty", "_-y1o"),
+        (2942, 5, "getproperty", "_-l4c"),
+        (2899, 14, "initproperty", "_-y1o"),
+        (2900, 14, "initproperty", "_-l4c"),
+        (3027, 6, "callpropvoid", "_-E5I, 1"),
+        (3027, 18, "initproperty", "_-53P"),
+        (3027, 32, "initproperty", "_-a1h"),
+        (3027, 46, "initproperty", "_-6K"),
+        (3125, 1079, "pushtrue", ""),
+        (3125, 1080, "callpropvoid", "_-w5G, 1"),
+        (3125, 1961, "initproperty", "_-l4A"),
+        (3075, 14, "callproperty", "IsMoveLocked, 1"),
+        (3075, 30, "callproperty", "_-u5E, 0"),
+        (3075, 54, "callproperty", "_-E6P, 0"),
+        (3075, 72, "getproperty", "_-o3I"),
+        (3075, 92, "getproperty", "_-r51"),
+        (3075, 163, "callproperty", "_-12J, 4"),
+        (3075, 178, "getproperty", "_-Xb"),
+        (3075, 198, "callproperty", "_-C54, 1"),
+        (3075, 213, "getproperty", "_-x2C"),
+        (3075, 216, "pushbyte", "9"),
     ],
 }}
