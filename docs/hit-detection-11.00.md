@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(699 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(714 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -551,6 +551,16 @@ Wall details (`wall_contact`) [V]:
   - On a no-slide wall, `_-v1D` = 0.
   - Otherwise, with no power and not `_-M5t`, `_-v1D` = ±10 toward the wall.
 
+
+**Landing and gravity on the ground** (`ground_reset`, `gravity_applies`) [V]:
+- At the **start** of the next step (@290–408), the ground line `_-96f` left by the previous move counts as a
+  landing. This holds only when `_-5q()` (hitstun [H]) is false and the `_-e3e` bit `_-B6B` is clear. `_-P5S`
+  becomes 0, unless the power holds `_-564` and `_-P5S` <= 0 (a rise is kept). The flag `_-G1T` (on the
+  ground) is set. Then the power's `_-C3x()` runs, unless `_-r51` is set and `_-x2C` >= 9 (@411–467).
+- Gravity (@5172–5353) is added only when `_-E6P()` is false, **there is no ground line**, there is no
+  `_-y1L` hold (`_-y1L` = 0 or <= t), the power has no CancelGravity (`_-q1G`) and `_-84Q` is non-zero. So a
+  fighter standing on a line gets no gravity; its move is only the 2.02 ground push, which the sweep stops
+  on the line again.
 
 ## 8. Thrown items and projectiles (`_-p5k`)
 
