@@ -98,5 +98,19 @@ class Phases(unittest.TestCase):
         self.assertEqual(f["state"], 5)
 
 
+class Scoring(unittest.TestCase):
+    def test_defaults_and_cells(self):
+        from bh.spawn_bot import respawn_ms, scoring_rules
+        r = scoring_rules({})
+        self.assertEqual((r["o2N"], r["j57"], r["C18"], r["K2V"], r["Ac"]), (1500, 2500, 700, False, False))
+        self.assertEqual(respawn_ms(F_SPAWNED, r), 2000 + 3000 + 700)      # long case: spawned, no K2V
+        self.assertEqual(respawn_ms(0, r), 1500 + 2500 + 700)
+        r = scoring_rules({"FetchDuration": "100", "RespawnDuration": "200", "DropDuration": "30",
+                           "RespawnTimesForRounds": "true"})
+        self.assertEqual(respawn_ms(F_SPAWNED, r), 330)
+        r = scoring_rules({"RespawnTimesOnlyForSpecialEntities": "TRUE"})
+        self.assertEqual(respawn_ms(F_MODE, r), 1500 + 2500 + 700)
+        self.assertEqual(respawn_ms(0, dict(r, K2V=True)), 1500 + 2500 + 700)
+
 if __name__ == "__main__":
     unittest.main()
