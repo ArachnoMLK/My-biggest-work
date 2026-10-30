@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from .level_collision import as3_round, element_lines
 from .movement import ABC_1100, check, listing
+from .raycast import ray_cast
 
 PI2, PI1_2, PI3_2 = math.pi * 2, math.pi * 0.5, math.pi * 1.5   # `_-y2E.init` #15351 @11998-12050
 DEFAULT_EASE_POWER = 2                                         # `_-139._-N1f`
@@ -264,6 +265,64 @@ def move(lines, pos):
         ln.sx, ln.sy, ln.ex, ln.ey = bx + pos[0], by + pos[1], ex + pos[0], ey + pos[1]
 
 
+def clamp(a, b, c):
+    """`_-A6B.static._-f6f` #1059: c clamped between a and b (either order)."""
+    lo, hi = (a, b) if a <= b else (b, a)
+    return lo if c < lo else hi if c > hi else c
+
+
+def carry_offset(lines, conveyor=None):
+    """`_-p4E._-d4u` #7436 @1082-1368: `_-s2h`, the carry of an entity from the lines it touched (`_-u3j`).
+
+    Only dynamic lines count (`_-O2N`; here: lines bound by `bind`). A lava line whose power has a push
+    (`_-p4E._-k4L` #7443: `_-is` / `_-96U` non-zero) sets the carry to that push instead; `conveyor(line)`
+    returns it or None. Otherwise each moved line adds its displacement since `move` (start - `_-X1H`; the
+    `_-e2l` - `_-t5b` terms cancel), the y part only for a line that is not vertical.
+    """
+    cx = cy = 0.0
+    for ln in lines:
+        if ln is None or getattr(ln, "base", None) is None:
+            continue
+        push = conveyor(ln) if conveyor else None
+        if push is not None:
+            cx, cy = push
+            continue
+        if ln.sx != ln.x1h:
+            cx += ln.sx - ln.x1h
+        if ln.sy != ln.q1k and ln.sx != ln.ex:
+            cy += ln.sy - ln.q1k
+    return cx, cy
+
+
+def carry(cands, team, x, y, d, ground):
+    """`_-d4u` @1407-1961: move an entity by the carry `d`, with two sweeps (feet, then 120 above) that
+    ignore its ground line `_-96f` (mask hard | soft, options 4). A hit line stops the carry 1.01 off it:
+    a vertical line on x (when its x is inside the swept range), a horizontal line on y (soft lines only
+    from above), a sloped line by pushing 1.01 along its normal. Returns the new (x, y).
+    `cands(x, y, dx, dy)` gives the candidate lines. Entities in state 3, 7 or 8 are not carried (lookupswitch @1042)."""
+    if d == (0.0, 0.0) or d == (0, 0):
+        return x, y
+    tx, ty = x + d[0], y + d[1]
+    sy = y
+    for _ in range(2):
+        hit = ray_cast(cands(x, sy, d[0], d[1]), team, x, sy, d[0], d[1], 1 | 2, 4, 0, ground)
+        sy -= 120.0
+        if hit is not None:
+            ln = hit.line
+            if ln.sx == ln.ex:
+                if clamp(x, tx, ln.sx) == ln.sx:
+                    tx = ln.sx + ln.normal[0] * 1.01
+            elif ln.sy == ln.ey:
+                if (not ln.type & 2 or y < ln.sy) and clamp(y, ty, ln.sy) == ln.sy:
+                    ty = ln.sy + ln.normal[1] * 1.01
+            else:
+                n = math.hypot(*ln.normal)
+                k = 1.01 / n if n else 0.0
+                tx, ty = x + d[0] + ln.normal[0] * k, y + d[1] + ln.normal[1] * k
+            d = (tx - x, ty - y)
+    return tx, ty
+
+
 ANCHORS = {ABC_1100: {
     "_-Jb: KeyFrame via _-71C (hold of the previous frame at a Phase start), Phase StartFrame recursion": [
         (5298, 86, "pushstring", "'KeyFrame'"),
@@ -327,6 +386,44 @@ ANCHORS = {ABC_1100: {
         (6014, 337, "initproperty", "_-P2s"),
         (7436, 253, "callproperty", "_-Y3I, 1"),
         (5293, 1664, "callpropvoid", "_-J1j, 5"),
+    ],
+    "_-d4u carry: _-u3j dynamic lines (_-O2N), _-k4L lava push, start - _-X1H (y if not vertical); states 3, 7, 8 skipped": [
+        (7436, 1042, "lookupswitch", "32, 32, 32, 32, 36, 32, 32, 32, 36, 36"),
+        (7436, 1130, "getproperty", "_-u3j"),
+        (7436, 1206, "getproperty", "_-O2N"),
+        (7436, 1228, "callproperty", "_-k4L, 2"),
+        (7436, 1248, "getproperty", "_-X1H"),
+        (7436, 1272, "getproperty", "_-e2l"),
+        (7436, 1278, "getproperty", "_-t5b"),
+        (7436, 1284, "getproperty", "_-E2x"),
+        (7436, 1301, "getproperty", "_-q1k"),
+        (7436, 1314, "getproperty", "_-f1i"),
+        (6014, 182, "initproperty", "_-X1H"),
+        (6014, 216, "initproperty", "_-E2x"),
+        (7443, 8, "getproperty", "_-s2O"),
+        (7443, 43, "getproperty", "_-is"),
+        (7443, 54, "getproperty", "_-96U"),
+    ],
+    "_-d4u carry sweeps: feet then -120, ignore _-96f, mask 3 options 4; snap 1.01 off the hit line; f6f = clamp": [
+        (7436, 1553, "getproperty", "_-96f"),
+        (7436, 1572, "bitor", ""),
+        (7436, 1573, "pushbyte", "4"),
+        (7436, 1576, "callproperty", "_-X2e, 10"),
+        (7436, 1591, "pushdouble", "120.0"),
+        (7436, 1636, "callproperty", "_-f6f, 3"),
+        (7436, 1662, "pushdouble", "1.01"),
+        (7436, 1694, "pushbyte", "2"),
+        (7436, 1825, "callpropvoid", "normalize, 1"),
+        (7436, 1929, "iflt", "-436"),
+        (7436, 1945, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (1059, 2, "ifngt", "26"),
+    ],
+    "_-8i: _-u3j cleared at the step start; the ground line ends in _-O6z and _-u3j (carried next tick)": [
+        (2984, 3060, "getproperty", "_-u3j"),
+        (2984, 3082, "initproperty", "length"),
+        (2984, 12927, "initproperty", "_-O6z"),
+        (2984, 12999, "callproperty", "http://adobe.com/AS3/2006/builtin::indexOf, 1"),
+        (2984, 13024, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
     ],
 }}
 

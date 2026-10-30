@@ -71,5 +71,32 @@ class Level(unittest.TestCase):
         self.assertEqual(p.points[0], (10.0, 0.0))
 
 
+class Carry(unittest.TestCase):
+    def test_clamp(self):
+        from bh.platforms import clamp
+        self.assertEqual((clamp(0, 10, 5), clamp(0, 10, -1), clamp(10, 0, 11), clamp(10, 0, 3)), (5, 0, 10, 3))
+
+    def test_offset_of_moved_lines(self):
+        from bh.platforms import bind, carry_offset, move
+        from bh.raycast import Line
+        floor = Line(0.0, 100.0, 50.0, 100.0, 1, (0.0, -1.0))
+        wall = Line(50.0, 100.0, 50.0, 150.0, 1, (1.0, 0.0))
+        static = Line(0.0, 0.0, 9.0, 0.0, 1, (0.0, -1.0))
+        bind([floor, wall], (0.0, 0.0))
+        move([floor, wall], (3.0, -2.0))
+        self.assertEqual(carry_offset([floor]), (3.0, -2.0))
+        self.assertEqual(carry_offset([wall]), (3.0, 0.0))          # vertical: no y part
+        self.assertEqual(carry_offset([static, None]), (0.0, 0.0))  # not dynamic
+        self.assertEqual(carry_offset([floor], conveyor=lambda ln: (7.0, 0.0)), (7.0, 0.0))
+
+    def test_carry_stops_at_a_wall(self):
+        from bh.platforms import carry
+        from bh.raycast import Line
+        wall = Line(10.0, -200.0, 10.0, 50.0, 1, (-1.0, 0.0))
+        self.assertEqual(carry(lambda *a: [], 0, 0.0, 0.0, (4.0, 0.0), None), (4.0, 0.0))
+        x, y = carry(lambda *a: [wall], 0, 0.0, 0.0, (20.0, 0.0), None)
+        self.assertAlmostEqual(x, 10.0 - 1.01)
+        self.assertEqual(y, 0.0)
+
 if __name__ == "__main__":
     unittest.main()
