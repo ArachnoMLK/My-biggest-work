@@ -347,3 +347,5 @@ exit now writes `_-f6R` = t + PostDodge × 16 off a wall) and [H] the `_-322` / 
 Then `_-532` = t at each power start (`Entity._-c1r`, input-buffer-11.00.md §6), which feeds the jump lock and
 `_-C2E`: 226 early, 11 late, 5 within 1 s (the near-exact case turns early), life 13.3 s; kept since the rule is [V].
 Then the last widening, `_-322` = the landing time (`_-8i` @13446): window 9 for 64 ms after a landing; no change.
+Then the power and hitstun friction rules of `friction_value` (KeepGroundFriction `_-y25`; [H] `_-o3I._-7E` false;
+4.0 in hitstun below the decay speed): no change.

@@ -328,7 +328,12 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     if t < f.stun_until and f.v1d * f.v1d + f.p5s * f.p5s >= 2500.0:   # @713-760: `_-V12` instead of friction
         f.v1d, f.p5s, f.j1m, f.d4x = knockback_decay(f.v1d, f.p5s, f.j1m, f.d4x, f.stats.get("Recovery", 4.0))
     elif not f.e6p:                                             # friction only when !`_-E6P()` [H: local 8]
-        fr = friction_value(t, airborne, f.stats["Friction"], f.stats["AirFriction"], f.dash_timer, vx=f.v1d)
+        pw = None
+        if f.power is not None:                                 # [H] `_-o3I._-7E` false
+            keep = str(f.power.get("row", {}).get("KeepGroundFriction", "")).upper() == "TRUE"
+            pw = {"7E": False, "y25": keep}
+        fr = friction_value(t, airborne, f.stats["Friction"], f.stats["AirFriction"], f.dash_timer, power=pw,
+                            hitstun=t < f.stun_until, vx=f.v1d)
         f.v1d = apply_friction(f.v1d, fr)
     if left != right:
         a, vm = acceleration(airborne, f.stats["Acceleration"], f.stats["AirAcceleration"], vmax=vmax)
