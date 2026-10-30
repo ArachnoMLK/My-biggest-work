@@ -57,6 +57,8 @@ also defines unused-looking static copies: `Entity._-E6v = 57`, `_-LG = 57`, `_-
   and the jump resets `_-P5S` to 0. brawlhalla-sim calls the pair "vertical velocity"; on 11.00 it
   looks like *impulse velocity* (`_-A4A`) plus *gravity velocity* (`_-P5S`), summed somewhere into the
   y position. Where the two are combined and multiplied by 0.384 is not traced yet.
+  **Update:** `_-A4A` is a one-tick impulse folded into `_-P5S` and reset to 0 at the end of every
+  `_-8i` step; the y displacement is `_-P5S × 0.384`. See [entity-step-11.00.md](entity-step-11.00.md) (`step-verify`).
 - [V] `_-z2k._-Vj` (0.384) is also the time step of the **animation player** `_-w2._-b2k` #11717
   (called from `Entity._-10` #2990 @1415–1432 with `0.384`, `1.1 × 0.384` or `0.384 × 1.23`
   depending on state). 0.384 = 16 ms × 24 frames/s, so it is "animation frames per tick". [H] the
