@@ -3,7 +3,7 @@
 See docs/hit-detection-11.00.md §10.2. `_-i4Z._-51o` #6313 @2418-2433 calls `owner.Dodge(t, keys & 15, held)`
 on a buffered DodgeDash (256) press (input-buffer-11.00.md, PR #28). This module transcribes the writes made
 once Dodge has decided to dodge (@1024-2288). The gates before it (@0-1022: `IsDodgeLocked`, the chained
-dodge `_-26R`, `Dash`, the ground `_-96f`) are only pinned, not transcribed. The motion during the dodge is
+dodge `_-26R`, `Dash`, the ground `_-96f`) are in `gates`. The motion during the dodge is
 in the dodge state of `Entity._-8i` and is not transcribed yet.
 
 Names: `dir` is Dodge's second argument (`keys & 15`: Up 1, Drop 2, Left 4, Right 8). `_-wn()` is called
@@ -11,6 +11,8 @@ Names: `dir` is Dodge's second argument (`keys & 15`: Up 1, Drop 2, Left 4, Righ
 `_-h3i._-26O(dir, airborne, local 8, team flag 64, local 10)`, a row of DodgeTypes.xml (`_-h3i._-i32`).
 [V] unless marked [H].
 """
+import xml.etree.ElementTree as ET
+
 from .movement import ABC_1100
 
 FRAME_MS = 16              # @1491 / @1507: `mDuration` and `_-53o` are in frames, x 16
@@ -116,6 +118,46 @@ def pick(rows, dir, airborne, is_fast, test_set=False):
         if r["Set"] == want_set and r["kind"] == k and r["where"] & mask and bool(r["IsFast"]) == bool(is_fast):
             return r
     return next((r for r in rows if r.get("DodgeName") == FALLBACK), None)
+
+
+UINT_COLUMNS = ("CancelLimit", "CancelStart", "Cooldown", "CooldownGround", "CooldownLanded", "DodgeID",
+                "Duration", "FromBackDashDelay", "FromDashDelay", "PostDodge", "Recover", "StartInvuln",
+                "ToDashDelay")                                   # `_-N2e._-vD` -> convert_u
+FLOAT_COLUMNS = ("AccelXMult", "AccelYMult", "ExitBackX", "ExitBackY", "ExitX", "ExitY", "SpeedXMaxMult",
+                 "SpeedXMult", "SpeedYMaxMult", "SpeedYMult")  # `_-N2e._-U13` -> convert_d
+DIRECTIONS = {"Neutral": 0, "Side": KIND_SIDE, "Up": KIND_UP, "Down": KIND_DOWN,
+              "SideUp": KIND_SIDE | KIND_UP, "SideDown": KIND_SIDE | KIND_DOWN}
+AIR_TYPES = {"Ground": WHERE_GROUND, "Air": WHERE_AIR, "Both": WHERE_BOTH}
+
+
+def parse_types(xml_text):
+    """DodgeTypes.xml as `_-h3i._-i32` #2767 / `_-I6L` #2768 load it: one row per DodgeType child, in file
+    order [H: `_-ET()` iterates in document order]. Unsigned columns are ints, the Mult / Exit columns floats,
+    IsFast is TRUE / FALSE (`_-Qr`, [H] case-insensitive), the rest strings; Direction -> "kind", AirType ->
+    "where". A row with DodgeID 0 (the Template) is dropped (@1450-1462); "StandardSpot" is the fallback
+    `_-Z6`. Returns (rows = `_-w14`, {DodgeID: row} = `_-Z4V`, a later duplicate id wins)."""
+    rows, by_id = [], {}
+    for node in ET.fromstring(xml_text):
+        r = {"DodgeName": node.get("DodgeName")}
+        for c in node:
+            text = (c.text or "").strip()
+            if c.tag in UINT_COLUMNS:
+                r[c.tag] = int(float(text)) & 0xFFFFFFFF if text else 0
+            elif c.tag in FLOAT_COLUMNS:
+                r[c.tag] = float(text) if text else 0.0
+            elif c.tag == "IsFast":
+                r[c.tag] = text.upper() == "TRUE"
+            else:
+                r[c.tag] = text
+        if "Direction" in r:
+            r["kind"] = DIRECTIONS[r["Direction"]]
+        if "AirType" in r:
+            r["where"] = AIR_TYPES[r["AirType"]]
+        if not r.get("DodgeID"):
+            continue
+        by_id[r["DodgeID"]] = r
+        rows.append(r)
+    return rows, by_id
 
 
 STANDARD_WINDOW_MS = 64    # `_-h3i._-M4C` (script148.<init> #2774 @186-189)
@@ -404,6 +446,91 @@ def attack_air_offset(airborne, jump_flag, cancel, y1u):
     return off, False
 
 
+LOCK_X2C = 9               # IsDodgeLocked #3075 @216: `_-x2C` >= 9 locks when nothing else does
+
+
+def is_dodge_locked(move_locked, u5e, flag, e6p, power, r51, area, xb, c54, x2c):
+    """`Entity.IsDodgeLocked(t, flag=false)` #3075: true when `IsMoveLocked(t)`, `_-u5E()` (cooldown running) and
+    not flag, `_-E6P()` (dodging), a power runs (`_-Kc._-o3I`), on a wall (`_-r51`), the `_-N1k._-I1f._-12J(1,
+    _-M43, _-E3d, _-25G)` area test, a pending jump (`_-Xb`) or `_-C54(t)`; else `_-x2C` >= 9. Each test is
+    made only while the earlier ones are false. [H] `_-12J`, `_-x2C`."""
+    if move_locked or (u5e and not flag) or e6p or power or r51 != 0 or area or xb != 0 or c54:
+        return True
+    return x2c >= LOCK_X2C
+
+
+def flags_51c(a, b, a1h, k6):
+    """`Entity._-51c(a, b)` #3027: `_-E5I(a)` (so `_-u5E()` = a, the cooldown flag `_-l4c`), `_-Kc._-53P` = 0,
+    `_-a1h` = false unless a, `_-6K` = 0 with b. `_-E6P()` is the other flag, `_-y1o`, written by `_-w5G`
+    (#2899): true at the dodge commit (#3125 @1080), false at the timer end. Returns (u5e, a1h, k6)."""
+    return a, (a1h if a else False), (0 if b else k6)
+
+
+HIT_LOCK_MS, HIT_LOCK_AIR_MS = 64, 96   # Dodge @57-101: `_-46I` + 64 (local 11), in the air `_-46I` + 96 (local 12)
+
+
+def gates(t, dir, c2e, i46, airborne, locked, locked_chain, h2b, w14, y1f, r26, o5c, d350, dash_ok, grounded,
+          ve, d532, n3h, chase_h2l):
+    """`Entity.Dodge(t, dir, held)` #3125 @0-1022: what happens before the DodgeType is picked.
+
+    Callee results are passed in; each is read only where the bytecode calls it: locked = `IsDodgeLocked(t)`,
+    locked_chain = `IsDodgeLocked(t, c2e)` (chain test), r26 = `_-26R(t)` (when not chained), d350 = `_-350(t)`
+    and dash_ok = `Dash(t, dir)` (dash try). c2e = `_-C2E(t, dir)` (local 4); chase_h2l is the current DodgeType's
+    direction kind (`_-Q42` row `_-h2L`, None without one). Returns None for `return false`, else a dict:
+    `dir` (a ground dodge after the hit lock becomes 0), `is_fast` (local 8, the IsFast column wanted by
+    `pick`), `chain_end` (local 5, for `timers`), `chained` (local 7, the chase dodge), `chase_dir` (local 9),
+    `w14` (`_-14W` = t or None), `e28` (`_-Kc._-53P` = `_-Kc._-e28`), `clear_vx` (`_-v1D` = 0).
+
+    Order: local 11 = `_-46I` + 64 > t, local 12 = airborne and `_-46I` + 96 > t; local 13 = neither, with dir
+    Left+Drop or Right+Drop. Not locked: go. Else with c2e, `_-H2b` != `_-14W`, `_-H2b` != 0 and not
+    locked_chain: chain_end = `_-H2b` + `_-y1F`, `_-14W` = t, go. Else with r26: chained, chase_dir = `_-O5C`, go.
+    local 14 = neither 11 nor 12, and not (go with c2e or chained). With 13 or 14 and a side / Drop in dir:
+    not d350 and dash_ok -> false; else with 14 on the ground -> false. Not go -> false. Then (the `_-6K` clear
+    is `counter`): local 15 = dir != 0 without both Left and Right in chase_dir | dir. Chained with 15 ->
+    is_fast; else c2e and (airborne, `_-VE` <= `_-532`, or dir not Up / Drop alone) -> is_fast and e28; else on
+    the ground without 11: a chained side dodge without 15 clears vx, and dir = 0. Chained with an Up / Down
+    current type: is_fast is cleared by `_-VE` > `_-H2b`, by a side against the facing `_-n3h`, or by Up type
+    with Drop / Down type with Up. [H] meanings of `_-C2E`, `IsDodgeLocked`, `_-26R`, `_-VE`, `_-e28`."""
+    l11 = i46 + HIT_LOCK_MS > t
+    l12 = airborne and i46 + HIT_LOCK_AIR_MS > t
+    l13 = not l11 and not l12 and dir in (LEFT | DROP, RIGHT | DROP)
+    go = chained = False
+    chain_end = chase_dir = 0
+    w = None
+    if not locked:
+        go = True
+    elif c2e and h2b != w14 and h2b != 0 and not locked_chain:
+        chain_end, w, go = h2b + y1f, t, True
+    elif r26:
+        chained, chase_dir, go = True, o5c, True
+    l14 = not l11 and not l12 and not (go and (c2e or chained))
+    if l13 or l14:
+        if dir & (LEFT | RIGHT | DROP):
+            if not d350 and dash_ok:
+                return None
+            if l14 and grounded:
+                return None
+    if not go:
+        return None
+    both = chase_dir | dir
+    l15 = dir != 0 and (not both & LEFT or not both & RIGHT)
+    is_fast = e28 = clear_vx = False
+    if chained and l15:
+        is_fast = True
+    elif c2e and (airborne or ve <= d532 or (dir != UP and dir != DROP)):
+        is_fast = e28 = True
+    elif not airborne and not l11:
+        if chained and not l15 and dir & (LEFT | RIGHT):
+            clear_vx = True
+        dir = 0
+    if chained and chase_h2l is not None and chase_h2l & (KIND_UP | KIND_DOWN):
+        if (ve > h2b or (not n3h and dir & LEFT) or (n3h and dir & RIGHT)
+                or (chase_h2l == KIND_UP and dir == DROP) or (chase_h2l == KIND_DOWN and dir == UP)):
+            is_fast = False
+    return {"dir": dir, "is_fast": is_fast, "chain_end": chain_end, "chained": chained, "chase_dir": chase_dir,
+            "w14": w, "e28": e28, "clear_vx": clear_vx}
+
+
 def formula_mult(formula, vx, k64, dir):
     """`_-h3i._-B15(t, formula, fighter)` #2771: the speed multiplier of a SpeedX / SpeedY formula.
 
@@ -467,6 +594,27 @@ ANCHORS = {ABC_1100: {
         (3125, 252, "getproperty", "_-y1F"),
         (3125, 279, "callproperty", "_-26R, 1"),
         (3125, 416, "callproperty", "Dash, 2"),
+        (3125, 132, "equals", ""),
+        (3125, 195, "getproperty", "_-14W"),
+        (3125, 264, "initproperty", "_-14W"),
+        (3125, 295, "getproperty", "_-O5C"),
+        (3125, 398, "callproperty", "_-350, 1"),
+        (3125, 452, "getproperty", "_-96f"),
+        (3125, 468, "returnvalue", ""),
+        (3125, 477, "returnvalue", ""),
+        (3125, 555, "pushbyte", "8"),
+        (3125, 584, "setlocal", "8"),
+        (3125, 617, "getproperty", "_-VE"),
+        (3125, 625, "getproperty", "_-532"),
+        (3125, 677, "getproperty", "_-e28"),
+        (3125, 681, "initproperty", "_-53P"),
+        (3125, 762, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (3125, 769, "setlocal_2", ""),
+        (3125, 842, "getproperty", "_-h2L"),
+        (3125, 875, "getproperty", "_-H2b"),
+        (3125, 898, "getproperty", "_-n3h"),
+        (3125, 963, "getproperty", "_-h2L"),
+        (3125, 1022, "setlocal", "8"),
     ],
     "Entity.Dodge commit: DodgeType _-h3i._-26O(dir, _-wn(), l8, team flag 64, l10); _-H2b = t; _-O5C = dir; _-n3h from Left / Right / _-r35()": [
         (3125, 1052, "pushbyte", "64"),
@@ -792,5 +940,39 @@ ANCHORS = {ABC_1100: {
         (3041, 334, "initproperty", "_-y1F"),
         (3041, 389, "pushbyte", "2"),
         (3041, 393, "initproperty", "_-I2g"),
+    ],
+    "DodgeTypes.xml load: _-i32 iterates the children into _-I6L; DodgeID 0 dropped; _-Z4V[id]; StandardSpot -> _-Z6; _-w14 push": [
+        (2767, 21, "initproperty", "_-w14"),
+        (2767, 67, "callpropvoid", "_-I6L, 2"),
+        (2768, 54, "callproperty", "get, 1"),
+        (2768, 1451, "getproperty", "_-B3q"),
+        (2768, 1462, "returnvoid", ""),
+        (2768, 1526, "pushstring", "'StandardSpot'"),
+        (2768, 1539, "initproperty", "_-Z6"),
+        (2768, 1557, "setproperty", "[rt]"),
+        (2768, 1570, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+    ],
+    "Dodge flags: E6P = _-y1o (_-w5G, true at commit @1080), u5E = _-l4c (_-E5I via _-51c); IsDodgeLocked #3075 tests, _-x2C >= 9": [
+        (2941, 5, "getproperty", "_-y1o"),
+        (2942, 5, "getproperty", "_-l4c"),
+        (2899, 14, "initproperty", "_-y1o"),
+        (2900, 14, "initproperty", "_-l4c"),
+        (3027, 6, "callpropvoid", "_-E5I, 1"),
+        (3027, 18, "initproperty", "_-53P"),
+        (3027, 32, "initproperty", "_-a1h"),
+        (3027, 46, "initproperty", "_-6K"),
+        (3125, 1079, "pushtrue", ""),
+        (3125, 1080, "callpropvoid", "_-w5G, 1"),
+        (3125, 1961, "initproperty", "_-l4A"),
+        (3075, 14, "callproperty", "IsMoveLocked, 1"),
+        (3075, 30, "callproperty", "_-u5E, 0"),
+        (3075, 54, "callproperty", "_-E6P, 0"),
+        (3075, 72, "getproperty", "_-o3I"),
+        (3075, 92, "getproperty", "_-r51"),
+        (3075, 163, "callproperty", "_-12J, 4"),
+        (3075, 178, "getproperty", "_-Xb"),
+        (3075, 198, "callproperty", "_-C54, 1"),
+        (3075, 213, "getproperty", "_-x2C"),
+        (3075, 216, "pushbyte", "9"),
     ],
 }}

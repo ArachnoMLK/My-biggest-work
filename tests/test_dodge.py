@@ -6,10 +6,10 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms,  # noqa: E402
-                      counter, dash, dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, k64, kind,
-                      landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x, speed_y, standard_flag,
-                      timers)
+from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms, counter,  # noqa: E402
+                      dash, dodge_over, ease, exit_speed, exit_velocity, facing, flags_51c, formula_mult,
+                      gates, is_dodge_locked, k64, kind, landed_cooldown, moves, neutral_push, parse_types,
+                      pick, push, side_latch, speed_x, speed_y, standard_flag, timers)
 
 
 class Dodge(unittest.TestCase):
@@ -164,6 +164,58 @@ class Dodge(unittest.TestCase):
         self.assertEqual(cancel_end(80.0, 0.0, **dict(k, ax_mult=2.0, o5c=8))["_-v1D"], 60.0)
         w = cancel_end(0.0, 0.0, **dict(k, gc=True))
         self.assertEqual((w["_-a1h"], w["_-y1F"], w["power_I2g_or_2"]), (True, 256, True))
+
+    def test_gates(self):
+        k = dict(t=1000, dir=8, c2e=True, i46=0, airborne=True, locked=False, locked_chain=False, h2b=0, w14=0,
+                 y1f=0, r26=False, o5c=0, d350=False, dash_ok=False, grounded=False, ve=0, d532=0, n3h=False,
+                 chase_h2l=None)
+        g = gates(**k)
+        self.assertEqual((g["dir"], g["is_fast"], g["e28"], g["chained"]), (8, True, True, False))
+        self.assertIsNotNone(gates(**dict(k, dash_ok=True)))
+        self.assertIsNone(gates(**dict(k, dash_ok=True, c2e=False)))
+        self.assertIsNotNone(gates(**dict(k, dash_ok=True, d350=True, c2e=False)))
+        self.assertIsNone(gates(**dict(k, c2e=False, grounded=True)))
+        self.assertIsNone(gates(**dict(k, locked=True)))
+        g = gates(**dict(k, locked=True, h2b=900, w14=800, y1f=400))
+        self.assertEqual((g["chain_end"], g["w14"]), (1300, 1000))
+        g = gates(**dict(k, locked=True, r26=True, o5c=4, c2e=False))
+        self.assertEqual((g["chained"], g["chase_dir"], g["is_fast"]), (True, 4, False))
+        g = gates(**dict(k, locked=True, r26=True, o5c=8, c2e=False))
+        self.assertTrue(g["is_fast"])
+        g = gates(**dict(k, c2e=False, airborne=False, grounded=True, dir=1, i46=0))
+        self.assertEqual((g["dir"], g["is_fast"]), (0, False))       # a ground up dodge becomes a spot dodge
+        g = gates(**dict(k, c2e=False, airborne=False, grounded=True, dir=1, i46=950))
+        self.assertEqual((g["dir"], g["is_fast"]), (1, False))
+        g = gates(**dict(k, locked=True, r26=True, o5c=8, c2e=False, chase_h2l=2, n3h=True))
+        self.assertFalse(g["is_fast"])
+
+    def test_parse_types(self):
+        xml = ("<DodgeTypes><DodgeType DodgeName='Template'><DodgeID>0</DodgeID><Set>Default</Set>"
+               "<Direction>Neutral</Direction><AirType>Both</AirType><IsFast>FALSE</IsFast></DodgeType>"
+               "<DodgeType DodgeName='A'><DodgeID>3</DodgeID><Set>Default</Set><Direction>SideUp</Direction>"
+               "<AirType>Air</AirType><IsFast>TRUE</IsFast><Duration>5</Duration><ExitX>0.5</ExitX>"
+               "<SpeedXFormula>NONE</SpeedXFormula></DodgeType>"
+               "<DodgeType DodgeName='StandardSpot'><DodgeID>1</DodgeID><Set>Default</Set>"
+               "<Direction>Neutral</Direction><AirType>Both</AirType><IsFast>FALSE</IsFast></DodgeType></DodgeTypes>")
+        rows, by_id = parse_types(xml)
+        self.assertEqual([r["DodgeName"] for r in rows], ["A", "StandardSpot"])
+        a = by_id[3]
+        self.assertEqual((a["kind"], a["where"], a["IsFast"], a["Duration"], a["ExitX"], a["SpeedXFormula"]),
+                         (3, 2, True, 5, 0.5, "NONE"))
+        self.assertEqual(pick(rows, 0, airborne=False, is_fast=False)["DodgeName"], "StandardSpot")
+
+    def test_is_dodge_locked(self):
+        k = dict(move_locked=False, u5e=False, flag=False, e6p=False, power=False, r51=0, area=False, xb=0,
+                 c54=False, x2c=0)
+        self.assertFalse(is_dodge_locked(**k))
+        self.assertTrue(is_dodge_locked(**dict(k, u5e=True)))
+        self.assertFalse(is_dodge_locked(**dict(k, u5e=True, flag=True)))
+        self.assertTrue(is_dodge_locked(**dict(k, x2c=9)))
+        self.assertTrue(is_dodge_locked(**dict(k, e6p=True)))
+
+    def test_flags_51c(self):
+        self.assertEqual(flags_51c(False, True, True, 7), (False, False, 0))
+        self.assertEqual(flags_51c(True, False, True, 7), (True, True, 7))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)
