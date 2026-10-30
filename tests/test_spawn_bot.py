@@ -8,7 +8,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.spawn_bot import (CARRY, COME_DOWN, DROP, IDLE, F_MODE, F_SPAWNED, F_TIMED, Drone,  # noqa: E402
                           carry_ms, come_down_ms, drop_anim_scale, drop_ms, timing_flags,
-                          REPLAY_END_W35, REPLAY_W35)
+                          REPLAY_END_W35, REPLAY_W35, SPAWNED_AT_MATCH_START)
 
 RULES = {"F3O": False, "Ac": False, "K2V": True, "o2N": 100, "j57": 200, "C18": 50,
          "timed_until": None, "n4k": 0}
@@ -63,6 +63,12 @@ class Phases(unittest.TestCase):
             self.assertEqual((f["state"], f["x"], f["y"], d.phase), (3, 100, -200, COME_DOWN))
         self.assertTrue(Drone.standalone({3}))
         self.assertFalse(Drone.standalone({3, 27}))
+
+    def test_match_start_fighter_is_spawned_and_flies_in(self):
+        f = dict(fighter(), spawned=SPAWNED_AT_MATCH_START)
+        d = Drone(f)
+        d.place(272, (20.0, 30.0), standalone=False, w35=REPLAY_W35, f3o=False, camera=(0, 0, 100))
+        self.assertEqual((f["x"], f["y"], d.phase), (0, -200, COME_DOWN))   # left edge: 20 < 0 + 50
 
     def test_not_spawned_keeps_fighter(self):
         f = dict(fighter(), spawned=False)

@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1471 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1491 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -976,6 +976,12 @@ map collision only run in states 0 and 5**.
     client]: replay start `_-T12` sets `_-w35` = 1024, and `_-01I` sets 2048 only past `_-331._-G5C` + 2500
     (the replay's end [H]); neither has an instant bit. "Standalone" is `DevSettings.IsStandaloneClient()`
     #2563 = dev flag 3 set and 27 clear. So in a replay the drone flies in from the camera edge.
+  - **`_-44x` at the match start** (spawn_bot.py `SPAWNED_AT_MATCH_START`) [V; H: the `_-vs` gate holds]:
+    tick phase 5 calls `Entity._-k5H` on every entity of `_-5r`, and `_-k5H` sets `_-44x` = true in state 2
+    (and 9). Players wait in state 2 from replay start, so they are "spawned" when the match start places
+    them: put off camera, first trip 2000 + 3000 + 700 ms with the defaults, let go in state 0. `_-J1Y` only
+    comes from the BRAWLBALL / TAG rules, a snapshot read and the unreferenced `_-X6R._-sW`. `_-k5H` ticks
+    the drone first (`_-i1H`), so its first tick is in phase 5 of the match-start step.
 - **Per tick `SpawnBot._-i1H` #11858**: a lookupswitch on the phase `_-T1X`: 0 `_-q15` (idle), 1 `_-82`, 2 `_-31s`,
   3 `_-m1O`, 4 `_-Ck`. While the phase is 2 the fighter is moved onto the drone afterwards (`_-x1M(_-J2c, _-b3h)`).
   `_-Y6i(p)` sets the phase and clears its start time `_-A6k` [V].
