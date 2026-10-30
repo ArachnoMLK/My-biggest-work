@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(851 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(871 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -659,6 +659,19 @@ order]:
    normal y = −1). It is `ThrownGravity` while thrown (`_-r5B` ≠ 0, `_-o2O` false), else `Gravity` (both
    3.75 by default), times 0.384. The cap is applied before gravity, not after.
 8. **Move vector.** It is (x step, `_-33c` × 0.384), plus 2 × `_-p5k._-x3M` = 2.02 on a ground line.
+
+9. **Map sweeps** (`items.sweep`, @4683–6357) [V]. In state 1 with `ForceNoGeometryCollision` (`_-p2W`)
+   there are none: the item moves freely. Otherwise there are two casts, both excluding item-ignore lines
+   (`_-z2k._-M4J` = 32):
+   - a feet cast along the move vector, with the mask below;
+   - a top cast from `Height` (`_-S2O`, uint, default 0) above, hard lines only. It wins when it is
+     shorter and its line is not a flat floor (normal y ≠ −1).
+
+   The item moves by the shortened vector, `_-96f` becomes the hit line, and the item backs off 1.01
+   (`_-x3M`). The back-off goes along −normal for a hard line and a tiny move (|x|, |y| <= 1.02,
+   `_-p5k._-u4H` = `Entity._-u4H`), otherwise along the move. The ceiling cast @5474–5544 is a
+   `callpropvoid`, so its result is dropped and `local37` stays null: **items have no ceiling re-cast**.
+   What follows the sweeps (@6362–, state 6, bounce `_-048`) is not transcribed.
 
 **Mask.** The sweeps use hard | soft, or hard only in three cases:
 - for 64 ms after a throw by a fighter standing on a soft line (state 1);
