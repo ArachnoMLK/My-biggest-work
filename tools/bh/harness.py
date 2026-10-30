@@ -9,17 +9,20 @@ Plan step 4 (notes/2026-10-30-replay-sim-plan.md). It chains the transcribed pie
    @519-2659), the squat release (@2674, `_-A2X` -> `Jump(t, false, true)`), the x impulse fold and clamp
    (@2790-3053), the ground walk (@3114-4213), the y impulse fold and clamp (@4217-4483), gravity
    (@5097-5353), the free move (@6620-), the landing delay of a pending jump (@13427-13510), the ring-out
-   test (@14270-14517), then `_-84` = `_-A4A` = 0 (@14563-14599).
+   test (@14270-14370: `_-c5C(x, y, _-5q(), !_-wn() || _-r51 != 0)`, a non-zero mask stored in `_-a3D`;
+   ko.py, bounds from level_bounds.py), then `_-84` = `_-A4A` = 0 (@14563-14599).
 
 Every piece is [V] in its own module; the glue is [H]: no power, no hitstun, no wall contact (`_-r51` stays
 0 unless set by the caller), the `_-532` jump lock and the air-jump count are not updated by any transcribed
-writer yet, and the friction is applied on every tick. Nothing here has been compared with the running game.
+writer yet, the friction is applied on every tick, and a KO only records the mask (the KO commit and the
+respawn of ko-11.00.md §5 / spawn_bot.py are not chained yet). Nothing here has been compared with the running game.
 """
 from dataclasses import dataclass, field
 
 from .air_move import air_move, gravity_applies, ground_reset, ground_walk
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
+from .ko import ko_mask
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
                    squat_start, wall_jump)
 from .smoke import FALL_CAP, GRAVITY, STEP, TICK_MS
@@ -46,6 +49,7 @@ class Fighter:
     lock_start: int = 0       # `_-532`
     air_used: int = 0         # `_-P5Y()`
     air_allowed: int = AIR_JUMPS
+    a3d: int = 0              # `Entity._-a3D`, the last non-zero ring-out mask
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -80,8 +84,9 @@ def jump(f, t, left, right, third_arg=False):
     return None
 
 
-def tick(f, t, grid, left=False, right=False, jump_press=False, team=0):
-    """One 16 ms tick at time t. Returns the list of events of this tick."""
+def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None):
+    """One 16 ms tick at time t. `bounds` is (camera rectangle, kill dict) for the ring-out test, or None.
+    Returns the list of events of this tick."""
     events = []
     if jump_press:
         events.append(("press", jump(f, t, left, right)))
@@ -120,17 +125,24 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0):
         f.i5a = squat_on_landing(f.xb, f.i5a, True)
         f.air_used = 0                                          # [H] where `_-k1j(0)` runs is not read
         events.append(("land", f.y))
+    if bounds is not None:
+        mask = ko_mask(f.x, f.y, bounds[0], bounds[1], False, f.ground is not None or f.r51 != 0)
+        if mask:
+            f.a3d = mask
+            events.append(("ko", mask))
     f.h84 = f.a4a = 0.0
     f.events.extend((t, e) for e in events)
     return events
 
 
-def run(f, grid, inputs, ticks, t0=0, team=0):
+def run(f, grid, inputs, ticks, t0=0, team=0, bounds=None, stop_on_ko=False):
     """`inputs(tick)` -> (left, right, jump_press). Returns the list of (t, x, y, airborne)."""
     out = []
     for i in range(1, ticks + 1):
         t = t0 + TICK_MS * i
         left, right, press = inputs(i)
-        tick(f, t, grid, left, right, press, team)
+        ev = tick(f, t, grid, left, right, press, team, bounds)
         out.append((t, f.x, f.y, f.ground is None))
+        if stop_on_ko and any(e[0] == "ko" for e in ev):
+            break
     return out

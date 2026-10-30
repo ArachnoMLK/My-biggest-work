@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 303 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 304 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -165,12 +165,16 @@ Plan step 4. One fighter, inputs left / right / jump, a static map. One tick at 
 
 Every piece is [V] in its own module; the glue is [H]. Not modelled yet: powers, hitstun, the wall contact
 (`_-r51`), the `_-532` lock and the air-jump counter writers (the harness resets the count on landing [H]),
-the facing flip of the wall jump, the ring-out test inside the tick (ko.py is ready; the KO bounds come from
-level_bounds.py), and real legend stats (synthetic defaults; stats.py gives the real ones).
+the facing flip of the wall jump, the KO commit and respawn after a ring-out, and real legend stats
+(synthetic defaults; the caller can pass `stats.fighter_stats` values).
+
+The ring-out test runs after the move, as `_-8i` @14270–14370 calls it: `ko_mask(x, y, cam, kill, _-5q(),
+!_-wn() || _-r51 != 0)` with `_-5q()` false (no hitstun yet); a non-zero mask is kept in `a3d` (`_-a3D`).
 
 On the synthetic flat map of `tests/test_harness.py`: the fighter lands at 500 − 1.01; a jump press leaves
 the ground 32 ms later with a first rise of (57 − 1.44) × 0.384; two air jumps follow, a third press does
-nothing; walking right reaches RunSpeed. Static evidence only; not compared with the running game.
+nothing; walking right reaches RunSpeed; walking off a narrow ledge ends in one ring-out below the
+bottom kill line. Static evidence only; not compared with the running game.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 

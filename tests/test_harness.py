@@ -50,6 +50,22 @@ class Harness(unittest.TestCase):
         self.assertIsNotNone(f.ground)
         self.assertAlmostEqual(f.v1d, harness.DEFAULT_STATS["RunSpeed"])   # held at the max
 
+    def test_walk_off_a_ledge_to_a_bottom_ko(self):
+        ledge = ('<LevelDesc><HardCollision X1="-50" X2="50" Y="500" /><HardCollision X1="50" X2="-50" Y="600" />'
+                 '<HardCollision X="-50" Y1="500" Y2="600" /><HardCollision X="50" Y1="600" Y2="500" />'
+                 '<Respawn X="0" Y="0" /></LevelDesc>')
+        cam = (-400.0, -400.0, 400.0, 600.0)
+        kill = {"LeftKill": 100, "RightKill": 100, "TopKill": 100, "BottomKill": 100,
+                "HardLeftKill": False, "HardRightKill": False, "SoftTopKill": False}
+        f = harness.Fighter(0.0, 0.0)
+        tr = harness.run(f, smoke.map_grid(ledge), lambda i: (False, i > 60, False), 600,
+                         bounds=(cam, kill), stop_on_ko=True)
+        kos = [e for _, e in f.events if e[0] == "ko"]
+        self.assertEqual(len(kos), 1)
+        self.assertEqual(f.a3d, kos[0][1])
+        self.assertGreater(f.y, 700.0)                                  # past bottom + BottomKill
+        self.assertGreater(f.x, 50.0)                                   # off the right edge
+
 
 if __name__ == "__main__":
     unittest.main()
