@@ -1,0 +1,51 @@
+# Plan: first two-sided replay check (one self-KO, patch 11.00)
+
+Written 30 Oct 2026 night, after roadmap steps 1–5. Goal: replay the inputs of one simple local replay with
+the merged pieces of `integration-11.00` (draft PR #31), and compare the KO tick of one victim with its
+recorded KO face (`oracle.ko_ticks`, PR #27). The checks done so far (`smoke-fall`, `ko-gap-check`) are
+one-sided; this one can fail.
+
+## Pick the replay (aggregate search, nothing published)
+
+- Patch 11.00 (`version` 271), 1v1, a scoring type with the default drone durations (STOCK = 2).
+- A victim whose **first** KO is a self-KO: no hit received before it. The KO list has (victim, ms) only.
+  [H] The KO event type (1 opponent / 2 self / 9 team) lives in the face writer `_-S45._-04F` #6711
+  (ko-11.00.md §6). Check whether `replay.parse` keeps it; if not, pick a victim whose opponent pressed
+  no attack input before that KO (`input_buffer.state_at`).
+- The simpler the better: a map without moving platforms, the victim walking or jumping off a ledge.
+
+## Pieces already transcribed (module → what it gives)
+
+| Need | Module (PR) | Entry points |
+|---|---|---|
+| Match start, first drone | `entity_states` (#30), `spawn_bot` (#30) | `MATCH_START_MS`, `respawn_index`, `Drone.place` / `tick`, `scoring_rules`, `respawn_ms` |
+| Respawn after a KO | `spawn_bot` (#30) | same; KO commit → `Respawn` in the same tick |
+| Gravity, fall cap | movement-11.00.md (#16 / #26), `smoke.fall` (#31) | 3.75 × 0.384 while `_-P5S` < 70 (85 with Drop) |
+| Step order | entity-step-11.00.md (#26), `step` | `fold_impulse`, `speed_cap`, `clamp` |
+| Ground walk, free move, landing | `air_move` (#30) | `ground_walk`, `air_move`, `respond`, `ground_reset`, `gravity_applies` |
+| Map | `level_collision`, `platforms`, `raycast` (#30) | `static_lines`, `compute_normals`, `Grid`, `parse_platforms`, `carry` |
+| Inputs | `replay` (#14), `input_buffer` (#28), `commands` (#16) | `parse` → `inputs`, `state_at`, `buffered_presses`, bit names |
+| KO test | `ko` (#25) | `ko_mask(x, y, cam, kill, exact, top_allowed)`, commit order (ko-11.00.md §5) |
+| KO oracle | `oracle` (#27) | `ko_ticks`, `compare` |
+| Legend stats | `stats` (#17) | `fighter_stats(levels, stat_types)` (RunSpeed, Friction, …) |
+
+## Pieces missing (in this order)
+
+1. **Horizontal movement as code.** horizontal-11.00.md (#23) gives the max run speed, the friction choice
+   and its application, and the acceleration, but there is no module. Transcribe `Entity._-8i`
+   @519–2052 into `tools/bh/horizontal.py` with anchors. Inputs: legend stats, input bits 4 / 8.
+2. **Jump.** movement-11.00.md (#16) has the impulses (Entity.Jump: dash window, grounded and dash
+   impulses, `vy -= impulse`). The input → `owner.Jump(t)` path is `_-i4Z._-51o` (bit 16). Air jumps and
+   the 192 ms lock are in #28. Wire them into one per-tick function.
+3. **KO bounds data.** CameraBounds from the LevelDesc and the kill values of its LevelType
+   (`LeftKill` … `SoftTopKill`) for `ko_mask`; the commit is in the same tick (phase 5 → 6).
+4. **The harness.** One tick = platforms (`_-d4u`, carry) → per fighter: inputs (`_-1L`) → state
+   dispatch (`_-k5H`: drone phases while state 3 / 4, movement in 0 / 5) → KO test. Start at t = 0 with
+   the match start at 256 ms.
+5. **Compare.** The predicted KO tick of the victim against the face; aggregate over a few replays.
+
+## Open points that may show up
+
+- The slow creep on gentle hard slopes [H] (integration-11.00.md).
+- Floors whose normal is −0.9999999999999999 (items micro-bounce) [H].
+- The drone timing uses the flags `_-nN`; the first trip runs with flag 1 (`_-44x`) clear [H].

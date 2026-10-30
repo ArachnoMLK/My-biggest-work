@@ -24,7 +24,7 @@ PRs #16–#23 from earlier sessions are still open and mergeable.
 
 ## Next steps
 - PRNG draw order: the two R draws of `_-X6R._-b3x` (match start) are now in prng-order-11.00.md §4b (PR #30).
-- Resume here: roadmap items 1–5 are done (items complete in #30, including throws, paths, impacts, spawn; secondary powers `_-33h`). Next: a two-sided replay check. Most promising: use the replay inputs of one simple local replay with no hits (e.g. a self-KO by walking off the stage) and simulate walk + fall + KO bounds with the merged pieces of `integration-11.00`; compare the KO tick with the KO face. Needs the horizontal movement of #23 and the KO bounds of #25 wired into the harness. Open [H]: slow creep on gentle hard slopes; floors whose normal is not exactly −1.
+- Resume here: roadmap items 1–5 are done. Next: the first two-sided replay check, planned step by step in notes/2026-10-30-replay-sim-plan.md (pick a self-KO replay; transcribe the horizontal movement of #23 into a module; wire jump, KO bounds data and a per-tick harness on `integration-11.00`; compare the KO tick with the face). Open [H]: slow creep on gentle hard slopes; floors whose normal is not exactly −1.
 - `_-JQ`: the ImpulseToPoint branch. Hit detection is done in #30, except the other guards in `_-T5A`
   (HoldHitEnts, Uninterruptable), platform rotation on lines, and the item gates (catch windows, `_-Io` / `_-x5G` bits).
 - Power timeline: what `_-82O` (cast end) and `_-E5S` (end tick) gate after the first update.
