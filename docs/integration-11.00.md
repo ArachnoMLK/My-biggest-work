@@ -323,3 +323,10 @@ branch, no `_-I2g` gate, cells read as plain int lists. Rerun (aggregate): the c
 with the fire impulse **224 early, 13 late, 3 within 1 s**, and the harness victims live 13.8 s after the let-go
 (median; 11.9 s before) against 44.2 s in the replays. Next: why the simulated fighters still fall (weapons and
 pick-ups, recovery rules, platforms and ledges, `_-V12` knockback decay), then the `.anm` frames.
+
+What the harness KOs look like (aggregate, all 269 1v1 replays, first 40 s): 874 KOs, **809 through the bottom
+line**, 64 through a side; at the KO 702 fighters had used both air jumps, 531 were in the dodge cooldown, 170
+were in a power, 88 had been hit. So the simulated fighters run out of air options and fall where the players
+recover. Caveat on the method: a replay holds only the inputs, so the check is open loop. Once the simulated
+position drifts from the real one, the replayed inputs no longer fit, and the drift grows. A KO can match only
+when the movement is exact up to it, so this check measures exactness, not "closeness".
