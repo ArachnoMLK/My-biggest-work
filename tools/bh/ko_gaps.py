@@ -4,12 +4,15 @@ The KO commit `Entity._-eR` calls `Respawn` in the same tick, and the drone then
 (spawn_bot.py, PR #30). So between two KO faces of the same victim (oracle.py, PR #27) there are at least
 `respawn_ms` milliseconds, with the durations of the replay's scoring type (ScoringTypes.xml, by
 `ScoringID` = settings `scoring_type_id`). One-sided: a pass shows the replays allow the transcribed drone
-time, not that it is exact. Aggregate counts only.
+time, not that it is exact. It also checks the first KO of each replay against the match start (256 ms) plus
+the first drone trip with the fighters not yet spawned (1500 + 2500 + 700 ms by default) [H: that the first
+trip runs with flag 1 clear]. Aggregate counts only.
 """
 import collections
 import xml.etree.ElementTree as ET
 
 from . import oracle
+from .entity_states import MATCH_START_MS
 from .spawn_bot import F_SPAWNED, respawn_ms, scoring_rules
 
 
@@ -38,6 +41,7 @@ def victim_gaps(rep):
 def check(replays, cells, flags=F_SPAWNED):
     """Aggregate over parsed 11.00 replays: gaps, violations (gap < predicted drone time), smallest margin."""
     c = {"replays": 0, "scoring_types": 0, "gaps": 0, "below_floor": 0, "smallest_margin_ms": None,
+         "first_kos": 0, "first_ko_below_floor": 0, "first_ko_smallest_margin_ms": None,
          "unknown_scoring_type": 0, "non_tick_ko": 0}
     seen = set()
     for rep in replays:
@@ -46,12 +50,22 @@ def check(replays, cells, flags=F_SPAWNED):
         if sid not in cells:
             c["unknown_scoring_type"] += 1
             continue
-        floor = respawn_ms(flags, scoring_rules(cells[sid]))
+        rules = scoring_rules(cells[sid])
+        floor = respawn_ms(flags, rules)
         try:
             gaps = victim_gaps(rep)
+            kos = oracle.ko_ticks(rep)
         except ValueError:
             c["non_tick_ko"] += 1
             continue
+        if kos:                         # match start (256 ms) + the first drone trip, fighters not yet spawned
+            first_floor = MATCH_START_MS + respawn_ms(0, rules)
+            first = oracle.TICK_MS * kos[0][0]
+            c["first_kos"] += 1
+            c["first_ko_below_floor"] += first < first_floor
+            m = first - first_floor
+            c["first_ko_smallest_margin_ms"] = m if c["first_ko_smallest_margin_ms"] is None else min(
+                c["first_ko_smallest_margin_ms"], m)
         if gaps:
             seen.add(sid)
         for g in gaps:

@@ -155,6 +155,8 @@ Local result (756 patch 11.00 replays, aggregate only):
 | Gaps between two KOs of the same victim | 3,241 |
 | Gaps shorter than the predicted drone time | **0** |
 | Smallest margin | 172 ms |
+| Replays with a first KO | 688 |
+| First KOs before match start (256 ms) + the first drone trip (4700 ms by default) | **0** (smallest margin 3,268 ms, a loose bound) |
 
 This is a one-sided check. The replays allow the transcribed drone time, but they do not show it is exact:
 the margin also contains the time needed to be knocked out again. It is the first comparison of a

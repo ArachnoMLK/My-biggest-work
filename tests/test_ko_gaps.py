@@ -37,6 +37,7 @@ class Gaps(unittest.TestCase):
         c = ko_gaps.check(reps, cells)
         self.assertEqual((c["replays"], c["gaps"], c["below_floor"], c["unknown_scoring_type"]), (4, 3, 1, 1))
         self.assertEqual((c["smallest_margin_ms"], c["scoring_types"]), (-4, 2))
+        self.assertEqual((c["first_kos"], c["first_ko_below_floor"]), (3, 3))      # KOs at 0 ms: before 256 + drone
 
 
 if __name__ == "__main__":
