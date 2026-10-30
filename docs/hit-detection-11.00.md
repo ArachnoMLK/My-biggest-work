@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1035 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1069 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -655,6 +655,26 @@ Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not po
 
 So for TargetMethod 2 / 11 (Ranged, ThrownItem), §2's "list = [`_-x4I`]" means the power hits exactly the
 target the item touched. `_-A3S` makes the line of sight ignore item-ignore lines (§7.1).
+
+### 8.0 Throwing an item (`items.throw_vector`, `throw_start`; `_-F5N._-M4Q` #1689) [V]
+
+When a fighter throws its item (`_-M4Q(t, charge)`):
+1. **Spawn.** A `_-p5k` is created at the thrower's (x, y − 30). In the air, `_-M4Q` may move it by
+   Height − 120 when `_-P4n` allows it (not read here).
+2. **Speed** (`_-F5N._-Fi` #1722, from the input bits `_-x10`: 1 up, 2 down, 4 left, 8 right):
+   - a ProximityTrigger item (`_-r58`) cannot be thrown down from a hard ground line (bit 2 is dropped);
+   - with no bit, the item goes the way the thrower faces (`_-r35()`);
+   - up / down set y to −1 / 1, otherwise y = `ThrownHorizontalY` (`_-x5D`, default −0.1);
+   - the vector is normalised to `_-R1O(charge, x == 0)` = (55 straight up / down, else 75) ×
+     (1 + 0.8 × min(charge, 1000)/1000);
+   - then it gains the thrower's `_-v1D` in x and `_-P5S` × 0.25 in y.
+3. **State** (`_-p5k._-q54` #15197):
+   - `_-Lu` / `_-33c` = speed × `ThrownInitialVelocityMult` (`_-I2d`, default 1), and the launch speed
+     (`_-Wj`, `_-A5W`) is the same;
+   - `_-W6M` = **charge ≥ 2000 ms**: a charged throw corkscrews a rocket and gives a boomerang its 1800 ms
+     delay;
+   - `_-BG` = PathType ≠ 0, state `_-5T` = 1, thrower `_-r5B`, team, `_-74O` = 0;
+   - `_-M4Q` then sets `_-O13` = t.
 
 ### 8.1 Motion of a thrown item ([`tools/bh/items.py`](../tools/bh/items.py), `_-p5k._-8i` #15192)
 

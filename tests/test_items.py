@@ -8,7 +8,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.items import (ITEM_DEFAULTS, after_sweep, bounce, expired, ground_walk, impact, item_type, sweep,  # noqa: E402
-                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path, rocket_homing, lerp,
+                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path, rocket_homing, lerp, throw_speed, throw_vector, throw_start,
                       target_gate, velocity)
 from bh.raycast import Line  # noqa: E402
 
@@ -257,6 +257,28 @@ class RocketHoming(unittest.TestCase):
         ang = math.atan2(vy, lu)
         self.assertAlmostEqual(ang, -math.pi / 2 + math.pi / 100, places=2)   # -90 deg turned 1.8 deg toward 0
         self.assertAlmostEqual(math.hypot(lu, vy), 10.0 * 0.25, places=2)      # min(500 / 1000, 1) / 2
+
+class Throw(unittest.TestCase):
+    def test_speed(self):
+        self.assertEqual(throw_speed(0, False), 75.0)
+        self.assertAlmostEqual(throw_speed(500, True), 55.0 * 1.4)
+        self.assertAlmostEqual(throw_speed(5000, False), 75.0 * 1.8)          # charge capped at 1000
+
+    def test_vector(self):
+        x, y = throw_vector(0, 0, False, ITEM_DEFAULTS, None, 0.0, 0.0)       # facing right, y = -0.1
+        n = math.hypot(1.0, -0.1)
+        self.assertAlmostEqual(x, 75.0 / n)
+        self.assertAlmostEqual(y, -0.1 * 75.0 / n)
+        self.assertEqual(throw_vector(0, 1, True, ITEM_DEFAULTS, None, 4.0, 8.0), (4.0, -55.0 + 2.0))   # up
+        prox = dict(ITEM_DEFAULTS, r58=True)
+        x, y = throw_vector(0, 2, False, prox, 1, 0.0, 0.0)                    # down from a hard floor: dropped
+        self.assertLess(y, 0)
+        self.assertEqual(throw_vector(0, 2, False, prox, 2, 0.0, 0.0), (0.0, 55.0))   # soft floor: allowed
+
+    def test_start(self):
+        st = throw_start((10.0, -2.0), dict(ITEM_DEFAULTS, I2d=1.5, z4P=1), 3, 1, 2500, 9000)
+        self.assertEqual((st["Lu"], st["33c"], st["launch"]), (15.0, -3.0, (15.0, -3.0)))
+        self.assertEqual((st["W6M"], st["BG"], st["state"], st["O13"]), (True, True, 1, 9000))
 
 if __name__ == "__main__":
     unittest.main()
