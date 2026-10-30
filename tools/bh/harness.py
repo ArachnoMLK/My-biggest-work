@@ -437,7 +437,8 @@ def apply_hit(f, v, i, t):
     """`_-26u._-76s` #1675 in short (knockback.py) for the hit of `f`'s power entry i on `v`: damage
     (BaseDamage; `hit_damage`), magnitude `knockback_force(VariableImpulse)` (then `_-W22` += damage) +
     FixedImpulse (`final_magnitude`), direction (ImpulseOffsetX mirrored by the attacker's facing, ImpulseOffsetY)
-    scaled to it and written into the victim's `_-84` / `_-A4A`, hitstun `hitstun_ms(FixedStunTime)`.
+    scaled to it and written into the victim's `_-84` / `_-A4A`, one air jump back when all were used
+    (`_-91G` #1677 @1171-1226), hitstun `hitstun_ms(FixedStunTime)`.
     Glue [H]: no charge, no item part, weapon / victim factors and `_-G4s` / `_-13t` = 1, the `_-M3e` Strength /
     Weight entry 1, no directional influence, no MinimumImpulse, no damage setting; the victim's velocity is
     cleared first. Returns (damage, magnitude)."""
@@ -456,6 +457,8 @@ def apply_hit(f, v, i, t):
     v.v1d = v.p5s = 0.0
     if n > 0:
         v.h84, v.a4a = dx / n * m, dy / n * m
+    if m > 0 and v.air_used == v.air_allowed:                   # #1677 @1171-1226: one air jump back
+        v.air_used -= 1
     v.stun_until = t + int(hitstun_ms(_at(st["FixedStunTime"], i)))
     return dmg, m
 

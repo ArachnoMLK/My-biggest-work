@@ -167,6 +167,9 @@ class Harness(unittest.TestCase):
         self.assertAlmostEqual(v.h84, 0.6 * m)
         self.assertAlmostEqual(v.a4a, -0.8 * m)
         self.assertEqual((v.w22, v.stun_until), (10, 1096))
+        v.air_used = v.air_allowed
+        harness.apply_hit(f, v, 0, 1200)
+        self.assertEqual(v.air_used, v.air_allowed - 1)       # a hit gives one air jump back
         ev = harness.tick(v, 1016, smoke.map_grid(FLAT), jump_press=True)
         self.assertFalse(any(e[0] == "press" for e in ev))    # inputs are off in hitstun
 
