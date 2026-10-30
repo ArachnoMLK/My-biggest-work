@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 1411 | 0 |
+| `hit-detection-verify` | 1444 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 316 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 319 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -202,7 +202,7 @@ Local result (756 patch 11.00 replays, aggregate only):
 | Gaps shorter than the predicted drone time | **0** |
 | Smallest margin | 172 ms |
 | Replays with a first KO | 688 |
-| First KOs before match start (256 ms) + the first drone trip (4700 ms by default) | **0** (smallest margin 3,268 ms, a loose bound) |
+| First KOs before match start (272 ms: `_-n4k` = 16, match_start.py) + the first drone trip (4700 ms by default) | **0** (smallest margin 3,252 ms, a loose bound) |
 
 This is a one-sided check. The replays allow the transcribed drone time, but they do not show it is exact:
 the margin also contains the time needed to be knocked out again. It is the first comparison of a

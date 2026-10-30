@@ -12,7 +12,7 @@ import collections
 import xml.etree.ElementTree as ET
 
 from . import oracle
-from .entity_states import MATCH_START_MS
+from .match_start import STEP_MS, match_start_step
 from .spawn_bot import F_SPAWNED, respawn_ms, scoring_rules
 
 
@@ -58,8 +58,8 @@ def check(replays, cells, flags=F_SPAWNED):
         except ValueError:
             c["non_tick_ko"] += 1
             continue
-        if kos:                         # match start (256 ms) + the first drone trip, fighters not yet spawned
-            first_floor = MATCH_START_MS + respawn_ms(0, rules)
+        if kos:                         # match start (272 ms: _-n4k = 16) + the first drone trip, fighters not yet spawned
+            first_floor = match_start_step(STEP_MS) + respawn_ms(0, rules)
             first = oracle.TICK_MS * kos[0][0]
             c["first_kos"] += 1
             c["first_ko_below_floor"] += first < first_floor
