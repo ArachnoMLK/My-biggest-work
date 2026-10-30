@@ -86,7 +86,8 @@ COLUMNS = {"DodgeName": "_-86E", "DodgeID": "_-B3q", "Set": "_-p1r", "Air/Ground
            "direction (Neutral, Side, Up, Down, SideUp, SideDown)": "_-h2L", "IsFast": "_-t3v",
            "Duration": "mDuration", "Recover": "_-53o", "SpeedXMult": "_-a5a", "Cooldown": "_-p2U",
            "CooldownGround": "_-S6E", "CooldownLanded": "_-T2A",
-           "AccelXFormula": "_-K35", "AccelXMult": "_-r4O", "AccelYFormula": "_-F5s", "AccelYMult": "_-k4q"}
+           "AccelXFormula": "_-K35", "AccelXMult": "_-r4O", "AccelYFormula": "_-F5s", "AccelYMult": "_-k4q",
+           "ExitBackX": "_-i16", "ExitBackY": "_-73o", "ExitX": "_-05s", "ExitY": "_-LX", "PostDodge": "_-f6R"}
 KIND_SIDE, KIND_UP, KIND_DOWN = 1, 2, 4           # @660-742: Neutral 0, Side 1, Up 2, Down 4, SideUp 3, SideDown 5
 WHERE_GROUND, WHERE_AIR, WHERE_BOTH = 1, 2, 3     # @357-369 / @312-323; Both = `_-h3i._-I6u` = 1 | 2 (#15351 @27965-27972)
 FALLBACK = "StandardSpot"                         # @1526-1539: the row named StandardSpot is `_-h3i._-Z6`
@@ -196,6 +197,55 @@ def side_latch(l4a, g5e, held):
     if (not l4a or g5e) and held & RIGHT and not held & LEFT:
         return True, False
     return l4a, g5e
+
+
+UP, DROP = 1, 2
+
+
+def exit_speed(a):
+    """`_-t1A` @618-648: a + (60 - a) x 1.5 x (a / 60)^2, a = the max speed of the move step (`_-8i` local 7,
+    `horizontal` max speed, x 1.25 under the `_-H1g._-m47` gate @2018-2052)."""
+    m = a / 60.0
+    m = m * m
+    return a + (60.0 - a) * m * 1.5
+
+
+def exit_velocity(vx, vy, a, moving, held, l4a, g5e, t5l, exit_x, exit_back_x, exit_y, exit_back_y):
+    """`_-t1A` @568-1846, the tick the dodge timer ends (`_-H2b` + `_-Uy` + `_-C1d` <= t) when `_-u5E()` is false.
+
+    vx = `_-v1D`, vy = `_-P5S`, held = `_-R5q._-66U`. In order: a moving vx (!= 0) becomes ±exit_speed(a) (its
+    sign) for a moving type; with a side held or `_-l4A` clear, a moving type's vx going right without Right
+    held (left without Left held) is x ExitBackX when the other side is held, else x ExitX, and only Left
+    (only Right) held faces left (right) through `_-CV`; with `_-l4A` set and no side held, a moving type's vx
+    is x ExitBackX when it goes the latched way (right with `_-g5E`, left without) [H], else x ExitX, then
+    `_-CV(_-g5E)`; a moving type's vx is x `_-T5L`. vy going down without Drop (up without Up) is x ExitBackY
+    with the other key held, else x ExitY, for any type. Then `_-51c(true, false)`, `_-T5L` = `_-WL` = 1 and
+    `_-w47` = false when `_-141()` != `_-n3h`. Returns (vx, vy, cv) with cv the `_-CV` argument or None.
+    [H] `_-CV` sets the facing (true = left)."""
+    if (vx > 0 or vx < 0) and moving:
+        m = exit_speed(a)
+        vx = -m if vx < 0 else m
+    cv = None
+    if held & (LEFT | RIGHT) or not l4a:
+        if vx > 0 and not held & RIGHT and moving:
+            vx *= exit_back_x if held & LEFT else exit_x
+        elif vx < 0 and not held & LEFT and moving:
+            vx *= exit_back_x if held & RIGHT else exit_x
+        if held & LEFT and not held & RIGHT:
+            cv = True
+        elif held & RIGHT and not held & LEFT:
+            cv = False
+    else:
+        if moving:
+            vx *= exit_back_x if (vx > 0 and g5e) or (vx < 0 and not g5e) else exit_x
+        cv = g5e
+    if moving:
+        vx *= t5l
+    if vy > 0 and not held & DROP:
+        vy *= exit_back_y if held & UP else exit_y
+    elif vy < 0 and not held & UP:
+        vy *= exit_back_y if held & DROP else exit_y
+    return vx, vy, cv
 
 
 def formula_mult(formula, vx, k64, dir):
@@ -452,5 +502,41 @@ ANCHORS = {ABC_1100: {
         (2768, 265, "initproperty", "_-k4q"),
         (3173, 1165, "pushint", "4096"),
         (3173, 1167, "initproperty", "_-24F"),
+    ],
+    "Entity._-t1A timer end: PostDodge _-f6R; exit speed a + (60 - a) 1.5 (a/60)^2; ExitX / ExitBackX by held side or latch; x _-T5L; ExitY / ExitBackY; _-T5L = _-WL = 1": [
+        (2992, 436, "callpropvoid", "_-w5G, 1"),
+        (2992, 541, "getproperty", "_-f6R"),
+        (2992, 550, "initproperty", "_-f6R"),
+        (2992, 557, "callproperty", "_-u5E, 0"),
+        (2992, 619, "pushdouble", "60.0"),
+        (2992, 641, "pushdouble", "1.5"),
+        (2992, 675, "pushbyte", "-1"),
+        (2992, 683, "iffalse", "18"),
+        (2992, 718, "pushbyte", "8"),
+        (2992, 743, "not", ""),
+        (2992, 745, "iffalse", "488"),
+        (2992, 854, "getproperty", "_-i16"),
+        (2992, 904, "getproperty", "_-05s"),
+        (2992, 1164, "callpropvoid", "_-CV, 1"),
+        (2992, 1228, "callpropvoid", "_-CV, 1"),
+        (2992, 1241, "getproperty", "_-l4A"),
+        (2992, 1285, "getproperty", "_-g5E"),
+        (2992, 1358, "getproperty", "_-i16"),
+        (2992, 1408, "getproperty", "_-05s"),
+        (2992, 1443, "callpropvoid", "_-CV, 1"),
+        (2992, 1479, "getproperty", "_-T5L"),
+        (2992, 1593, "getproperty", "_-73o"),
+        (2992, 1619, "getproperty", "_-LX"),
+        (2992, 1797, "callpropvoid", "_-51c, 2"),
+        (2992, 1806, "initproperty", "_-T5L"),
+        (2992, 1815, "initproperty", "_-WL"),
+        (2992, 1823, "callproperty", "_-141, 0"),
+        (2992, 1833, "getproperty", "_-n3h"),
+        (2992, 1846, "initproperty", "_-w47"),
+        (2768, 880, "initproperty", "_-i16"),
+        (2768, 908, "initproperty", "_-73o"),
+        (2768, 937, "initproperty", "_-05s"),
+        (2768, 966, "initproperty", "_-LX"),
+        (2768, 1086, "initproperty", "_-f6R"),
     ],
 }}

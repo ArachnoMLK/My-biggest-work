@@ -6,9 +6,9 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (clears_velocity, cooldown_ms, counter, dodge_over, ease, facing, formula_mult, k64,  # noqa: E402
-                      kind, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x, speed_y,
-                      standard_flag, timers)
+from bh.dodge import (clears_velocity, cooldown_ms, counter, dodge_over, ease, exit_speed,  # noqa: E402
+                      exit_velocity, facing, formula_mult, k64, kind, landed_cooldown, moves, neutral_push, pick,
+                      push, side_latch, speed_x, speed_y, standard_flag, timers)
 
 
 class Dodge(unittest.TestCase):
@@ -101,6 +101,21 @@ class Dodge(unittest.TestCase):
         self.assertEqual(side_latch(True, True, 8), (True, False))
         self.assertEqual(side_latch(True, False, 8), (True, False))
         self.assertEqual(side_latch(False, True, 12), (False, True))
+
+    def test_exit_speed(self):
+        self.assertEqual(exit_speed(60.0), 60.0)
+        self.assertEqual(exit_speed(30.0), 41.25)
+
+    def test_exit_velocity(self):
+        k = dict(a=30.0, moving=True, l4a=False, g5e=False, t5l=2.0, exit_x=0.5, exit_back_x=0.25,
+                 exit_y=0.5, exit_back_y=0.25)
+        self.assertEqual(exit_velocity(5.0, 0.0, held=0, **k), (41.25, 0.0, None))
+        self.assertEqual(exit_velocity(5.0, 0.0, held=4, **k), (20.625, 0.0, True))
+        self.assertEqual(exit_velocity(-5.0, 0.0, held=4, **k), (-82.5, 0.0, True))
+        self.assertEqual(exit_velocity(0.0, 8.0, held=1, **k), (0.0, 2.0, None))
+        self.assertEqual(exit_velocity(0.0, -8.0, held=0, **k), (0.0, -4.0, None))
+        self.assertEqual(exit_velocity(5.0, 8.0, held=0, **dict(k, l4a=True, g5e=True)), (20.625, 4.0, True))
+        self.assertEqual(exit_velocity(5.0, 8.0, held=0, **dict(k, moving=False)), (5.0, 4.0, None))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)
