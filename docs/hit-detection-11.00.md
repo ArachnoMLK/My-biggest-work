@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1460 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1471 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -972,6 +972,10 @@ map collision only run in states 0 and 5**.
     is put on the point, phase 0;
   - otherwise the fighter is put just off camera: x = right edge of `_-I1f._-8I` if the point is right of
     its centre, else the left edge; y = top − 200. The state stays 3.
+  - **In a replay** (spawn_bot.py `REPLAY_W35`, `Drone.standalone`) [V; H: dev flag 3 clear in the shipped
+    client]: replay start `_-T12` sets `_-w35` = 1024, and `_-01I` sets 2048 only past `_-331._-G5C` + 2500
+    (the replay's end [H]); neither has an instant bit. "Standalone" is `DevSettings.IsStandaloneClient()`
+    #2563 = dev flag 3 set and 27 clear. So in a replay the drone flies in from the camera edge.
 - **Per tick `SpawnBot._-i1H` #11858**: a lookupswitch on the phase `_-T1X`: 0 `_-q15` (idle), 1 `_-82`, 2 `_-31s`,
   3 `_-m1O`, 4 `_-Ck`. While the phase is 2 the fighter is moved onto the drone afterwards (`_-x1M(_-J2c, _-b3h)`).
   `_-Y6i(p)` sets the phase and clears its start time `_-A6k` [V].

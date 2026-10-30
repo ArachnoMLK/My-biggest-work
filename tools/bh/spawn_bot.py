@@ -10,6 +10,11 @@ the state is 8) -> `_-K5c(t, f)` #6778 (point choice) -> `f._-k5S._-P3o(t, point
   0 idle (`_-q15`), 1 come down (`_-82`), 2 carry the fighter to the point (`_-31s`), 3 drop (`_-m1O`), 4 `_-Ck`.
 `_-Y6i(p)` #11859 sets the phase and clears the phase start `_-A6k` (and the drone's own targets).
 While the phase is 2, `_-i1H` moves the fighter onto the drone after the phase handler (`_-x1M(_-J2c, _-b3h)`).
+
+In a replay [V]: replay start `_-h3U._-T12` #3624 sets `_-w35` = 1024 (@116-123); `_-01I` #3336 turns it into
+2048 only once the target time passes `_-331._-G5C` + 2500 (@4315-4370, the end of the replay [H]). Neither has
+a bit of INSTANT_MASK, so the drone flies in from the camera edge, unless `DevSettings.IsStandaloneClient()`
+#2563: dev flag 3 set and dev flag 27 clear. [H] The shipped client has dev flag 3 clear.
 """
 from .movement import ABC_1100
 from .platforms import ease
@@ -22,6 +27,8 @@ F_MODE = 2         # `_-H1g._-06A._-Z3E(f._-11)` (a game-mode test on the fighte
 F_TIMED = 4        # `_-H1g._-S3h` exists and its `_-w1s` >= t
 
 INSTANT_MASK = 32768 | 16   # `_-N1k._-w35` bits that skip the drone outside a standalone client
+REPLAY_W35 = 1024           # `_-w35` from replay start `_-T12`
+REPLAY_END_W35 = 2048       # `_-w35` after the replay's end (`_-331._-G5C` + 2500)
 DROP_SPEED = 30.0           # `_-P5S` (vertical speed, see movement.py) when the drone lets go
 DROP_SPEED_FAST = 70.0      # in the other team-type case, with `_-F5c` set
 SPAWNBOT_S1I = 1000         # `SpawnBot._-s1I`, set in script641.<init> #11876
@@ -126,6 +133,11 @@ class Drone:
         """`_-Y6i`."""
         self.phase = p
         self.start = 0
+
+    @staticmethod
+    def standalone(dev_flags):
+        """`DevSettings.IsStandaloneClient()` #2563 from the set of dev flags."""
+        return 3 in dev_flags and 27 not in dev_flags
 
     def place(self, t, point, standalone, w35, f3o, camera):
         """`SpawnBot._-P3o` #11873. `point` = (x, y); `camera` = (x, y, width) of `_-I1f._-8I`."""
@@ -310,5 +322,18 @@ ANCHORS = {ABC_1100: {
         (3138, 1134, "getproperty", "_-W1R"),
         (3138, 1142, "callproperty", "_-19, 0"),
         (3138, 1147, "callpropvoid", "Respawn, 3"),
+    ],
+    "Replay drone: _-T12 sets _-w35 = 1024; _-01I sets 2048 past _-331._-G5C + 2500; IsStandaloneClient = dev flag 3 and not 27": [
+        (3624, 119, "pushint", "1024"),
+        (3624, 123, "initproperty", "_-w35"),
+        (3336, 4350, "getproperty", "_-G5C"),
+        (3336, 4354, "pushuint", "2500"),
+        (3336, 4367, "pushint", "2048"),
+        (3336, 4370, "initproperty", "_-w35"),
+        (2563, 3, "pushbyte", "3"),
+        (2563, 6, "callproperty", "ContainsDevFlag, 1"),
+        (2563, 18, "pushbyte", "27"),
+        (2563, 26, "not", ""),
+        (2563, 32, "pushfalse", ""),
     ],
 }}
