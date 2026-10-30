@@ -78,6 +78,19 @@ class Fall(unittest.TestCase):
         self.assertEqual((c["spawn_points"], c["contact"], c["on_line_1e-6"], c["settled"], c["still_60"]),
                          (2, 2, 2, 2, 2))
 
+    def test_walk(self):
+        grid = smoke.map_grid(FLAT)
+        ticks, r = smoke.fall(grid, 0.0, 0.0)
+        self.assertEqual(smoke.walk(grid, r, 6.0), ("walked", 0.0))
+        block = ('<HardCollision X1="200" X2="260" Y="400" /><HardCollision X="260" Y1="400" Y2="500" />'
+                 '<HardCollision X1="260" X2="200" Y="500" /><HardCollision X="200" Y1="500" Y2="400" />')
+        walled = smoke.map_grid(FLAT.replace('<Respawn X="0"', block + '<Respawn X="0"'))
+        ticks, r = smoke.fall(walled, 0.0, 0.0)
+        self.assertEqual(smoke.walk(walled, r, 30.0)[0], "wall")         # a closed block standing on the floor at x = 200
+        ledge = '<LevelDesc><HardCollision X1="-50" X2="50" Y="500" /><HardCollision X1="50" X2="-50" Y="600" />'                 '<HardCollision X="-50" Y1="500" Y2="600" /><HardCollision X="50" Y1="600" Y2="500" />'                 '<Respawn X="0" Y="0" /></LevelDesc>'
+        c = smoke.run_walk([ledge])
+        self.assertEqual((c["walks"], c["left"], c["height_kept_1e-6"]), (2, 2, 2))
+
     def test_run_counts(self):
         c = smoke.run([FLAT, EMPTY, MOVING], max_ticks=200)
         self.assertEqual((c["maps"], c["respawns"], c["contact"], c["within_1e-6"]), (3, 4, 2, 2))

@@ -465,6 +465,9 @@ def cmd_smoke_fall(a):
     counts = smokemod.run(xmls, with_platforms=not a.static_only)
     for k, v in counts.items():
         print(f"  {k:<24} {v}")
+    print("walking both ways at x step 6 after landing (static lines):")
+    for k, v in smokemod.run_walk(xmls).items():
+        print(f"  {k:<24} {v}")
     print("items (default ItemType, static lines):")
     for k, v in smokemod.run_items(xmls, smokemod.items.ITEM_DEFAULTS).items():
         print(f"  {k:<24} {v}")

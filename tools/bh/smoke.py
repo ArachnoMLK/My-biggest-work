@@ -10,7 +10,7 @@ the step-start landing (`_-P5S` = 0) and no gravity on a ground line (air_move.p
 """
 import re
 
-from .air_move import LAVA, _back_off, air_move, gravity_applies, ground_reset
+from .air_move import LAVA, _back_off, air_move, gravity_applies, ground_reset, ground_walk
 from .level_collision import Grid, compute_normals, static_lines
 from . import items
 from .platforms import bind, carry, carry_offset, dynamic_lines, move, parse_platforms
@@ -231,4 +231,47 @@ def run_items(level_xmls, item, max_ticks=1000):
             c["settled"] += 1
             c["settle_ticks_max"] = max(c["settle_ticks_max"], r["settled"])
             c["still_60"] += r["still"]
+    return c
+
+
+def walk(grid, r, x_step, ticks=60, team=0):
+    """After the contact `r`, `ticks` steps with a constant x step (a fighter walking at `_-v1D` = x_step /
+    0.384): step-start landing, ground walk (`ground_walk`), gravity only off the ground, then the free move
+    with the left-over x and the ground push. Returns (outcome, gap): outcome is "walked" (ground kept every
+    tick), "wall" (a wall stopped it) or "left" (it lost the ground); gap is the largest change of the
+    height above the ground line while on a flat line."""
+    x, y, ground, p5s = r.x, r.y, r.ground, 0.0
+    gap0, gap, wall = None, 0.0, False
+    for _ in range(ticks):
+        p5s, _ = ground_reset(ground, False, 0, False, p5s)
+        w = ground_walk(grid, team, x, y, ground, x_step, 3)
+        x, y, ground = w.x, w.y, w.ground
+        wall = wall or w.stop_x
+        if gravity_applies(False, ground, 0, 0, False, GRAVITY) and p5s < FALL_CAP:
+            p5s += GRAVITY * STEP
+        m = air_move(grid, team, x, y, w.left, p5s, ground is not None)
+        x, y, ground = m.x, m.y, m.ground
+        if ground is None:
+            return "left", gap
+        if ground.sy == ground.ey:
+            g = y - ground.sy
+            gap0 = g if gap0 is None else gap0
+            gap = max(gap, abs(g - gap0))
+    return ("wall" if wall else "walked"), gap
+
+
+def run_walk(level_xmls, x_step=6.0, max_ticks=1000):
+    """Aggregate counts of `walk` both ways from every respawn point that lands on a fixed, non-lava line."""
+    c = {"walks": 0, "walked": 0, "wall": 0, "left": 0, "height_kept_1e-6": 0}
+    for xml in level_xmls:
+        grid = map_grid(xml)
+        for x, y in respawns(xml):
+            ticks, r = fall(grid, x, y, max_ticks)
+            if r is None or r.ground.type & LAVA:
+                continue
+            for step in (x_step, -x_step):
+                c["walks"] += 1
+                outcome, gap = walk(grid, r, step)
+                c[outcome] += 1
+                c["height_kept_1e-6"] += gap <= 1e-6
     return c

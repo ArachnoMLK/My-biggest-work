@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 917 | 0 |
+| `hit-detection-verify` | 941 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 262 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 266 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -76,6 +76,20 @@ So the gravity, sweep, grid and ray cast pieces fit together, and the fall stops
 the running game. [H] On a gentle hard slope, the ground push stops after a tiny move, so the 1.01 back-off goes along −normal
 and the fighter creeps. Either the game does the same, or a part not read yet compensates; a real game is
 needed to tell. Next: the KO oracle of #27.
+
+### Walking
+
+After landing on a fixed, non-lava line, the fighter walks both ways at a constant x step of 6 (`_-v1D` =
+15.6) for 60 ticks. Each tick runs the step-start landing, the ground walk (`air_move.ground_walk`, PR #30),
+gravity only off the ground, then the free move with the left-over x and the 2.02 ground push.
+
+| | |
+|---|---|
+| Walks | 1,650 (825 landings × 2 directions) |
+| Ground kept for 60 ticks | 1,187 |
+| Stopped by a wall (`_-v1D` = 0) | 35 |
+| Left the ground | 428: 427 past the end of their line (a ledge), 1 inside its x range (a corner) |
+| Height above a flat line kept within 1e-6 | **1,650 of 1,650** |
 
 ### Items
 
