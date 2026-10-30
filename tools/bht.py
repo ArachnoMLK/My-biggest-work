@@ -20,6 +20,7 @@ from bh import anm as anmmod, collision as collisionmod, commands as commandsmod
 from bh import callgraph as callgraphmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import oracle as oraclemod  # noqa: E402
+from bh import replay_setup as replaysetupmod  # noqa: E402
 from bh import knockback as knockbackmod  # noqa: E402
 from bh import powertypes as powertypesmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
@@ -478,6 +479,35 @@ def cmd_ko_gap_check(a):
     print("one-sided check from the replays' own KO faces; nothing is published (tools/bh/ko_gaps.py)")
 
 
+def cmd_replay_start_check(a):
+    """Match start + each fighter alone with its own inputs on local 1v1 replays (aggregate counts only)."""
+    from collections import Counter
+    swz = replaysetupmod.Swz(a.swz or os.path.join(WORK, "swz"))
+    c = Counter()
+    for p in glob.glob(os.path.join(a.dir, "*.replay")):
+        try:
+            with open(p, "rb") as f:
+                rep = replaymod.parse(f.read())
+        except Exception:
+            continue
+        if rep.get("version") != 271:
+            continue
+        try:
+            out = replaysetupmod.run(rep, swz, ticks=a.ticks)
+        except ValueError as e:
+            c[f"skipped ({e})"] += 1
+            continue
+        c["replays run"] += 1
+        for _, t_go, ko in out:
+            c["fighters let go" if t_go is not None else "fighters never let go"] += 1
+            if t_go is not None:
+                c["let go at 6000 ms" if t_go == 6000 else "let go at another time"] += 1
+                c["first ring-out predicted" if ko is not None else "no ring-out in the window"] += 1
+    for k, v in sorted(c.items()):
+        print(f"  {k:<28} {v}")
+    print("one-sided run, not compared with the replays' KOs yet; nothing is published (tools/bh/replay_setup.py)")
+
+
 def cmd_smoke_fall(a):
     """One fighter, no input, falls from every respawn point of the local LevelDescs (aggregate counts only)."""
     import glob
@@ -784,6 +814,8 @@ def main():
     add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
     add("input-buffer-verify", cmd_input_buffer_verify, abc)
     add("knockback-verify", cmd_knockback_verify, abc)
+    add("replay-start-check", cmd_replay_start_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
+        (["--swz"], {"help": "swz-dump folder (default work/swz)"}), (["--ticks"], {"type": int, "default": 1500}))
     add("ko-gap-check", cmd_ko_gap_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
         (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
     add("smoke-fall", cmd_smoke_fall, (["--swz"], {"help": "swz-dump folder (default work/swz)"}),

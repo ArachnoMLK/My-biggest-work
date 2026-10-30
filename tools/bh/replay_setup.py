@@ -1,0 +1,124 @@
+"""Replay setup for the harness on patch 11.00 (plan step 4): map, KO bounds, legend stats and the match start
+of a plain 1v1 replay, read from the local swz dump at run time (nothing from the game is stored).
+
+Pieces [V] in their own modules: stats.py (the replay's stance -> fields), level_bounds.py (CameraBounds,
+LevelType kills), respawn_points.py, smoke.map_grid, and harness.match_start (match_start.py, spawn_bot.py).
+Once the drone lets go, the fighter moves in the same `Entity._-k5H` call (the drone ticks first, @45-66, then
+the state dispatch), so its first harness tick is the let-go step.
+
+The glue is [H]: the HeroType is found by HeroID; the fighter uses its first hero; the drone's camera
+rectangle `_-I1f._-8I` is the CameraBounds at the match start; only the static lines (no moving platforms);
+the fighters do not interact (no hits, no grabs); the harness reads only the Speed family fields; a ring-out
+stops the run (the KO commit and the respawn are not chained yet).
+"""
+import os
+import re
+import xml.etree.ElementTree as ET
+
+from . import harness, stats
+from .level_bounds import camera_bounds, level_kills
+from .respawn_points import parse_respawns
+from .smoke import map_grid
+
+HARNESS_STATS = ("RunSpeed", "AirRunSpeed", "Friction", "AirFriction", "Acceleration", "AirAcceleration")
+
+
+def _read(path):
+    with open(path, "rb") as f:
+        raw = f.read()
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("cp1252")
+
+
+def hero_names(herotypes_xml):
+    """{HeroID: HeroName} from HeroTypes.xml (the HeroName attribute, as RuneTypes.xml names the legends)."""
+    out = {}
+    for name, body in re.findall(r'<HeroType HeroName="([^"]+)"[^>]*>(.*?)</HeroType>', herotypes_xml, re.S):
+        m = re.search(r"<HeroID>(\d+)</HeroID>", body)
+        if m:
+            out[int(m.group(1))] = name
+    return out
+
+
+def level_name(level_types_xml, level_id):
+    """LevelName of the LevelType whose LevelID is `level_id`, or None."""
+    for t in ET.fromstring(level_types_xml):
+        if (t.findtext("LevelID") or "").strip() == str(level_id):
+            return t.get("LevelName") or t.findtext("LevelName")
+    return None
+
+
+def harness_stats(entity, names, stances, stat_types):
+    """The harness's stat dict for the entity's first hero and stance, or None when the stance is unknown."""
+    h = entity["heroes"][0]
+    levels = stances.get((names.get(h["hero_id"]), h["stance"]))
+    if levels is None:
+        return None
+    full = stats.fighter_stats(levels, stat_types)
+    return {k: full[k] for k in HARNESS_STATS}
+
+
+class Swz:
+    """The XML files the setup needs, from a swz-dump folder."""
+
+    def __init__(self, root):
+        self.root = root
+        game = os.path.join(root, "Game.swz")
+        self.names = hero_names(_read(os.path.join(game, "HeroTypes.xml")))
+        self.stances = stats.parse_stances(_read(os.path.join(game, "RuneTypes.xml")))
+        self.stat_types = stats.parse_stat_types(_read(os.path.join(game, "StatTypes.xml")))
+        self.scoring = {}
+        for t in ET.fromstring(_read(os.path.join(game, "ScoringTypes.xml"))):
+            cells = {c.tag: (c.text or "") for c in t}
+            if cells.get("ScoringID"):
+                self.scoring[int(cells["ScoringID"])] = cells
+        self.level_types = _read(os.path.join(root, "Init.swz", "LevelTypes.xml"))
+        self.kills = level_kills(self.level_types)
+
+    def level(self, level_id):
+        """(name, LevelDesc text) or (name, None) when the file is missing."""
+        name = level_name(self.level_types, level_id)
+        path = os.path.join(self.root, "Dynamic.swz", f"LevelDesc_{name}.xml")
+        return name, (_read(path) if name and os.path.exists(path) else None)
+
+
+def setup(rep, swz):
+    """Everything `run` needs for one parsed replay, or raises ValueError with a reason."""
+    if len(rep["entities"]) != 2:
+        raise ValueError("not 1v1")
+    name, desc = swz.level(rep["level_id"])
+    if desc is None:
+        raise ValueError("no LevelDesc")
+    cam = camera_bounds(desc)
+    if cam is None or name not in swz.kills:
+        raise ValueError("no bounds")
+    fighter_stats = {}
+    for e in rep["entities"]:
+        st = harness_stats(e, swz.names, swz.stances, swz.stat_types)
+        if st is None:
+            raise ValueError("unknown stance")
+        fighter_stats[e["id"]] = st
+    return {"grid": map_grid(desc), "points": parse_respawns(desc), "cam": cam, "kill": swz.kills[name],
+            "drone_camera": (cam[0], cam[1], cam[2] - cam[0]), "stats": fighter_stats,
+            "cells": swz.scoring.get(rep["settings"]["scoring_type_id"], {})}
+
+
+def run(rep, swz, ticks=3000):
+    """Match start, then each fighter alone with its own inputs until its first ring-out or `ticks` ticks.
+    Returns [(entity id, let-go t, ring-out t or None)] in `_-5r` order."""
+    s = setup(rep, swz)
+    started = harness.match_start(rep["entities"], rep["random_seed"], s["points"], s["drone_camera"], s["cells"])
+    out = []
+    for e, f, t_go, _ in started:
+        if f is None:
+            out.append((e["id"], None, None))
+            continue
+        f.stats = dict(s["stats"][e["id"]])
+        inputs = harness.from_records(rep["inputs"].get(e["id"], []), t_go - harness.TICK_MS)
+        trace = harness.run(f, s["grid"], inputs, ticks, t0=t_go - harness.TICK_MS,
+                            bounds=(s["cam"], s["kill"]), stop_on_ko=True)
+        ko = trace[-1][0] if trace and f.a3d else None
+        out.append((e["id"], t_go, ko))
+    return out

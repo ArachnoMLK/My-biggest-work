@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 326 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 330 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -201,6 +201,29 @@ tests, with the default scoring durations:
 players wait from replay start (spawn_bot.py `SPAWNED_AT_MATCH_START`; `_-J1Y` only comes from the BRAWLBALL /
 TAG rules). `_-k5H` also ticks the drone first, so the drone's first tick is in the match-start step [V]. The
 KO gap check now uses the 5700 ms first trip. [H] the `_-vs` gate of the normal update holds.
+
+## Real replays through the harness (`replay-start-check`, [`tools/bh/replay_setup.py`](../tools/bh/replay_setup.py))
+
+For each local 1v1 replay of patch 11.00: the map (static lines of the LevelDesc), the KO bounds (CameraBounds
+and the LevelType kills), the legend stats of each fighter's first hero and stance (stats.py), the scoring
+durations, then `harness.match_start` and, from the let-go step, each fighter alone with its own inputs until
+its first ring-out (`harness.run`, `from_records`). The drone ticks first in `Entity._-k5H` and the state
+dispatch follows in the same call, so the first harness tick is the let-go step [V].
+
+Glue [H]: the HeroType by HeroID, the first hero only, the drone's camera rectangle = CameraBounds, no moving
+platforms, no interaction between the fighters, only the Speed family fields used, the run stops at the first
+ring-out (no KO commit or respawn yet).
+
+Local run (aggregate only):
+
+| | |
+|---|---|
+| 1v1 replays run | 266 (490 others skipped: not 1v1) |
+| Fighters let go | 532 (472 at 6000 ms, 60 at another time: other scoring durations) |
+| First ring-out predicted within 24 s | 434 (98 with none) |
+
+This only shows that the chain runs on real data. The predicted ring-outs are **not** compared with the
+replays' KO faces yet: that is plan step 5.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 
