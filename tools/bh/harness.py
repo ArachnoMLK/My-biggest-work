@@ -36,7 +36,7 @@ from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, coold
                     speed_y, standard_flag, timers)
 from .hitdetect import (area_center, capsules_touch, frame_window, hit_capsule, hurtbox_capsule, row_values,
                         target_method)
-from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_force
+from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_decay, knockback_force
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, state_at
@@ -102,6 +102,8 @@ class Fighter:
     moves: dict = None        # {"hero": hero_powers row, "weapon": item_slots row, "powers": power_rows}
     power: dict = None        # the running power: {"name", "steps": power_steps, "tl": Timeline}
     w22: float = 0.0          # `_-W22`, damage taken
+    j1m: float = 0.0          # `_-J1m`, x overshoot of the impulse fold
+    d4x: float = 0.0          # `_-d4x`, y overshoot
     stun_until: int = 0       # end of the hitstun (`_-5q()` until then) [H]
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
@@ -318,7 +320,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
     vmax = _vmax(f)
-    if not f.e6p:                                               # friction only when !`_-E6P()` [H: local 8]
+    if t < f.stun_until and f.v1d * f.v1d + f.p5s * f.p5s >= 2500.0:   # @713-760: `_-V12` instead of friction
+        f.v1d, f.p5s, f.j1m, f.d4x = knockback_decay(f.v1d, f.p5s, f.j1m, f.d4x, f.stats.get("Recovery", 4.0))
+    elif not f.e6p:                                             # friction only when !`_-E6P()` [H: local 8]
         fr = friction_value(t, airborne, f.stats["Friction"], f.stats["AirFriction"], f.dash_timer, vx=f.v1d)
         f.v1d = apply_friction(f.v1d, fr)
     if left != right:
@@ -332,7 +336,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         events.append(("release", jump(f, t, left, right, third_arg=True)))
         f.xb = 0
     cap = speed_cap()
-    f.v1d, _ = fold_impulse(f.v1d, f.h84)
+    f.v1d, over = fold_impulse(f.v1d, f.h84)
+    if over is not None:
+        f.j1m = over                                            # @2901 [H: the stored value is the full sum]
     f.v1d = clamp(f.v1d, cap)
     x_step = f.v1d * STEP
     was_airborne = f.ground is None
@@ -341,7 +347,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         f.x, f.y, f.ground, x_step = w.x, w.y, w.ground, w.left
         if w.stop_x:
             f.v1d = 0.0
-    f.p5s, _ = fold_impulse(f.p5s, f.a4a)
+    f.p5s, over = fold_impulse(f.p5s, f.a4a)
+    if over is not None:
+        f.d4x = over
     f.p5s = clamp(f.p5s, cap)
     g_term = 0.0
     fall_cap = FALL_CAP_DROP if keys & 2 else FALL_CAP           # @5097-5170: 85 with Drop held [H: `_-61h`, lock]

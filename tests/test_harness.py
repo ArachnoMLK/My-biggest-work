@@ -189,6 +189,12 @@ class Harness(unittest.TestCase):
         harness.fire_impulse(f, {"FireImpulseX": "5,7"}, 3)
         self.assertEqual((f.v1d, f.p5s), (-5.0, -20.0))
 
+    def test_knockback_decay_in_hitstun(self):
+        f = harness.Fighter(0.0, -400.0, v1d=60.0, p5s=0.0, stun_until=2000)
+        f.stats["Recovery"] = 10.0
+        harness.tick(f, 1000, smoke.map_grid(FLAT))
+        self.assertAlmostEqual(f.v1d, 60.0 - 10.0 * 0.384)      # no friction, the decay instead
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)
