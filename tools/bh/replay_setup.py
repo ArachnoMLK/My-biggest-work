@@ -21,7 +21,8 @@ from .respawn_points import parse_respawns
 from .smoke import map_grid
 
 UNARMED = "Unarmed"        # `ItemType._-m4V` (ItemType._-R2Z #4965 @313-330); fighters start unarmed [H]
-HARNESS_STATS = ("RunSpeed", "AirRunSpeed", "Friction", "AirFriction", "Acceleration", "AirAcceleration")
+HARNESS_STATS = ("RunSpeed", "AirRunSpeed", "Friction", "AirFriction", "Acceleration", "AirAcceleration",
+                 "ImpulseMult", "HPOffset", "ImpulseNegation")
 
 
 def _read(path):
@@ -58,7 +59,7 @@ def harness_stats(entity, names, stances, stat_types):
     if levels is None:
         return None
     full = stats.fighter_stats(levels, stat_types)
-    return {k: full[k] for k in HARNESS_STATS}
+    return {k: full[k] for k in HARNESS_STATS if k in full}
 
 
 def default_hurtbox(path):

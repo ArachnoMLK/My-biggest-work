@@ -148,11 +148,27 @@ class Harness(unittest.TestCase):
         f = harness.Fighter(0.0, 0.0)
         f.power = {"name": "J", "steps": power_steps(row), "g4i": 1, "hit": set()}
         box = {"Width": [40], "Height": [80], "OffsetX": [0], "OffsetY": [0]}
-        self.assertTrue(harness.step_hits(f, 0, harness.Fighter(60.0, 20.0), box))
-        self.assertFalse(harness.step_hits(f, 0, harness.Fighter(300.0, 20.0), box))
+        self.assertEqual(harness.step_hits(f, 0, harness.Fighter(60.0, 20.0), box), 0)
+        self.assertIsNone(harness.step_hits(f, 0, harness.Fighter(300.0, 20.0), box))
         f.facing_left = True                                  # the offset is mirrored
-        self.assertFalse(harness.step_hits(f, 0, harness.Fighter(60.0, 20.0), box))
-        self.assertTrue(harness.step_hits(f, 0, harness.Fighter(-60.0, 20.0), box))
+        self.assertIsNone(harness.step_hits(f, 0, harness.Fighter(60.0, 20.0), box))
+        self.assertEqual(harness.step_hits(f, 0, harness.Fighter(-60.0, 20.0), box), 0)
+
+    def test_apply_hit(self):
+        from bh.power_data import power_steps
+        row = {"PowerName": "J", "CastTime": "1", "BaseDamage": "10", "VariableImpulse": "20", "FixedImpulse": "5",
+               "ImpulseOffsetX": "3", "ImpulseOffsetY": "-4", "FixedStunTime": "6"}
+        f, v = harness.Fighter(0.0, 0.0), harness.Fighter(50.0, 0.0)
+        f.power = {"name": "J", "steps": power_steps(row), "g4i": 1, "hit": set()}
+        dmg, m = harness.apply_hit(f, v, 0, 1000)
+        d = 10 / 100
+        self.assertEqual(dmg, 10)
+        self.assertAlmostEqual(m, 20 * (d + d * (d / 2)) + 5)
+        self.assertAlmostEqual(v.h84, 0.6 * m)
+        self.assertAlmostEqual(v.a4a, -0.8 * m)
+        self.assertEqual((v.w22, v.stun_until), (10, 1096))
+        ev = harness.tick(v, 1016, smoke.map_grid(FLAT), jump_press=True)
+        self.assertFalse(any(e[0] == "press" for e in ev))    # inputs are off in hitstun
 
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words

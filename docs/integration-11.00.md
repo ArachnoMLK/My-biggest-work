@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 378 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 379 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -302,4 +302,16 @@ hit per power and victim. Glue [H]: the DEFAULT row of hurtboxTypes.csv for ever
 no team mask, no line of sight, no item / point areas, fighters stay Unarmed, the hit changes nothing yet (b5).
 Local run (aggregate only, first 60 s of 269 1v1 replays of format 271): **175 hits, in 114 replays**, far
 fewer than in real games, as expected without weapons, animation hurtboxes and knockback.
-Next: b5 (knockback and hitstun from `knockback.py`), and the `.anm` frames for the hurtbox rows.
+**(b5, first cut)** `harness.apply_hit`: damage (`hit_damage`, BaseDamage), magnitude (`knockback_force` with
+VariableImpulse and the victim's `_-W22` before the hit plus this damage, then + FixedImpulse via
+`final_magnitude`), direction ImpulseOffsetX (mirrored by the attacker's facing) / ImpulseOffsetY, written into the
+victim's `_-84` / `_-A4A` after clearing its velocity; hitstun `hitstun_ms(FixedStunTime)` turns the inputs off and
+feeds the `_-5q()` argument of the ring-out test. Glue [H]: no charge / item part / DI / MinimumImpulse / damage
+setting, `_-M3e` and the power-controller factors 1, the knockback decay `_-V12` not chained.
+
+**(b6) first-KO check without the attack filter** (aggregate only, 1v1 format 271, first KO of the match): 233
+predicted early, 4 late, median gap about 30 s, 2 within 1 s; the victim was hit in the harness in 60 of them. The
+**same run without hits** gives 232 early, 5 late: the early KOs come from the movement, not the knockback. Leading
+[H]: powers do not move their owner yet (recoveries, aerials, the power's own velocity writes), there are no
+weapons, no ledge / platform behaviour beyond the static map, so the simulated fighters fall where the players
+recover. Next: the owner movement of a running power (power step velocity columns), then the `.anm` frames.

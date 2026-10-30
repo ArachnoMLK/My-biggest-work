@@ -36,6 +36,7 @@ from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, coold
                     speed_y, standard_flag, timers)
 from .hitdetect import (area_center, capsules_touch, frame_window, hit_capsule, hurtbox_capsule, row_values,
                         target_method)
+from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_force
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, state_at
@@ -99,6 +100,8 @@ class Fighter:
     e3: int = 0               # `_-3E`
     moves: dict = None        # {"hero": hero_powers row, "weapon": item_slots row, "powers": power_rows}
     power: dict = None        # the running power: {"name", "steps": power_steps, "tl": Timeline}
+    w22: float = 0.0          # `_-W22`, damage taken
+    stun_until: int = 0       # end of the hitstun (`_-5q()` until then) [H]
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -229,6 +232,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     `dodge_press` with `dodge_rows` (dodge.parse_types) tries `Entity.Dodge(t, keys & 15)` first (#6313 tries the
     dodge before the jump). Returns the list of events of this tick."""
     events = []
+    if t < f.stun_until:                                        # `_-5q()`: no input acts in hitstun [H]
+        left = right = jump_press = dodge_press = light_press = heavy_press = False
+        keys = 0
     if f.power is not None:                                     # `_-Kc._-25` before `_-8i` (state 0)
         step = f.power["tl"].update(tick_index(t))
         if step is not None:
@@ -311,7 +317,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         f.air_used = 0                                          # [H] where `_-k1j(0)` runs is not read
         events.append(("land", f.y))
     if bounds is not None:
-        mask = ko_mask(f.x, f.y, bounds[0], bounds[1], False, f.ground is not None or f.r51 != 0)
+        mask = ko_mask(f.x, f.y, bounds[0], bounds[1], t < f.stun_until, f.ground is not None or f.r51 != 0)
         if mask:
             f.a3d = mask
             events.append(("ko", mask))
@@ -348,7 +354,7 @@ def from_records(records, t0=0):
 
 
 def step_hits(f, step, victim, hurtbox):
-    """True when the hit areas of `f`'s power at `step` touch `victim`'s hurtbox capsule.
+    """The frame index of the first hit area of `f`'s power at `step` touching `victim`'s hurtbox, or None.
 
     The frames scanned are `hitdetect.frame_window(q24, step)`; each makes an area with `area_center` (the power's
     TargetMethod `_-g4i`, CenterOffsetX / Y), the capsule `hit_capsule(AoERadiusX, AoERadiusY)`, tested with
@@ -367,8 +373,39 @@ def step_hits(f, step, victim, hurtbox):
         if c is None:
             continue
         if capsules_touch(hit_capsule(c[0], c[1], st["AoERadiusX"][i], st["AoERadiusY"][i]), hb):
-            return True
-    return False
+            return i
+    return None
+
+
+def _at(values, i, default=0):
+    return values[i] if i < len(values) else (values[0] if values else default)
+
+
+def apply_hit(f, v, i, t):
+    """`_-26u._-76s` #1675 in short (knockback.py) for the hit of `f`'s power entry i on `v`: damage
+    (BaseDamage; `hit_damage`), magnitude `knockback_force(VariableImpulse)` (then `_-W22` += damage) +
+    FixedImpulse (`final_magnitude`), direction (ImpulseOffsetX mirrored by the attacker's facing, ImpulseOffsetY)
+    scaled to it and written into the victim's `_-84` / `_-A4A`, hitstun `hitstun_ms(FixedStunTime)`.
+    Glue [H]: no charge, no item part, weapon / victim factors and `_-G4s` / `_-13t` = 1, the `_-M3e` Strength /
+    Weight entry 1, no directional influence, no MinimumImpulse, no damage setting; the victim's velocity is
+    cleared first. Returns (damage, magnitude)."""
+    st = f.power["steps"]
+    dmg = hit_damage(_at(st["BaseDamage"], i), 0, 0, 1.0, 1.0, 1.0, victim_w22=v.w22)
+    vi = _at(st["VariableImpulse"], i)
+    u = knockback_force(vi, dmg, v.w22, v.stats.get("HPOffset", 0.0), 1.0, 1.0, v.stats.get("ImpulseNegation", 0.0),
+                        attacker_z4f=f.stats.get("ImpulseMult", 1.0))   # `_-W22` before this hit + its damage
+    v.w22 += dmg                                                # [H] where `_-W22` is written is not chained
+    m = final_magnitude(u, _at(st["FixedImpulse"], i), 0.0, vi)
+    dx = _at(st["ImpulseOffsetX"], i)
+    dy = _at(st["ImpulseOffsetY"], i)
+    if f.facing_left:
+        dx = -dx
+    n = (dx * dx + dy * dy) ** 0.5
+    v.v1d = v.p5s = 0.0
+    if n > 0:
+        v.h84, v.a4a = dx / n * m, dy / n * m
+    v.stun_until = t + int(hitstun_ms(_at(st["FixedStunTime"], i)))
+    return dmg, m
 
 
 def match_start(entities, seed, points, camera, cells=None, team_type=0, spawned=SPAWNED_AT_MATCH_START,
@@ -460,8 +497,10 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                     v = q["f"]
                     if q is p or v is None or q["e"]["id"] in f.power["hit"]:
                         continue
-                    if step_hits(f, step, v, hurtbox):
+                    i = step_hits(f, step, v, hurtbox)
+                    if i is not None:
                         f.power["hit"].add(q["e"]["id"])
+                        apply_hit(f, v, i, t)
                         p.setdefault("hits", []).append((t, q["e"]["id"], f.power["name"]))
         for p in players:                                   # phase 6
             f, body = p["f"], p["body"]
