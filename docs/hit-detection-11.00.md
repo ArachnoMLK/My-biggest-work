@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1388 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1411 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -925,6 +925,9 @@ map collision only run in states 0 and 5**.
   rightmost Initial points when there are two or more), each through the drone `_-P3o`. One fighter →
   `_-X5t`; more → `_-z16` / `_-U24` (not read). So a plain 1v1 draws R **four** times at the match start:
   two for the shuffle, then the two `_-G5X` draws.
+- **R at that tick** (match_start.py, prng-order-11.00.md §4c) [V; H: completeness]: in a STOCK / TIMED
+  replay, R is seeded at replay start and drawn once per player when its `Entity` is built (`_-F5N.<init>`:
+  `_-56C` = R % 2); nothing else draws R before the match-start tick.
 - **Respawn point** (`_-X6R._-K5c` #6778, `respawn_index`). `_-G5X` holds the respawn point counters, so
   the two draws above pick where the rotation starts [V]. Each respawn takes the candidate list from `_-x22`
   and adds 1 to a counter:

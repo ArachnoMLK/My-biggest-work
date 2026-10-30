@@ -119,6 +119,25 @@ shuffle draws, then the two `_-G5X` draws.
 So the replay generator R is drawn (at least) twice on the first tick with t ≥ `_-n4k` + 256 ms, in phase 4, before
 the entity passes. Pinned by `hit-detection-verify` (group "Match start in _-X6R._-b3x").
 
+## 4c. R before the match start in a STOCK / TIMED replay (typed call graph)
+
+`python -I tools/bht.py abc-reach --roots 3624 --name _-f4c --receiver _-s3D._-22 --stop-classes <the 20 special
+rules classes>` lists the R draws reachable from replay start `_-h3U._-T12` #3624 through
+[`tools/bh/callgraph.py`](../tools/bh/callgraph.py), which resolves each call by the static type of its receiver
+(slot, getter and return types, `coerce` / `astype`, virtual overrides, interface implementers). Result [V shapes;
+H: completeness, see below]:
+
+| Order | Draw | Evidence |
+|---|---|---|
+| seed | `_-Y3u` #3348 seeds R (`_-24O`) with the replay seed, then builds the rules `_-76j` | #3624 @259, #3348 @116–137 |
+| 1 per player | `Entity.<init>` → `_-r4L` → `new _-F5N`; `_-F5N.<init>` sets `_-56C` = R % 2, unconditionally | #3624 @380, #2887 @4790, #1683 @567–591 |
+| per tick, before 256 ms | none: STOCK / TIMED use the base rules `_-QA` (no case in `_-76j` #7133), whose methods draw nothing; `_-Z36` (`_-K4x` == 2) and `_-q2i` (`_-K4x` == 3) are off; `_-F5N._-81Z` → `_-b2h._-k5r` runs only in states 7 / 8; MessageTrigger and the scoreboard taunt are off the replay path (§1–3) | #7133 @787, #7132 @23, #2991 @1618 |
+| match-start tick | 2 shuffle draws + 2 `_-G5X` draws in 1v1 (§4b) | match_start.py |
+
+So in a plain 1v1 replay the match-start tick finds R after 2 draws (`match_start.r_at_match_start`).
+The graph has no edge through receivers of unknown type (`*`, `Object`, `Function`, `[rt]` names), so a draw
+reached only that way would be missed; the two `_-724` loops of `_-T12` were read by hand.
+
 ## 5. Limits and unknowns (precise boundaries)
 
 - **L1 — other `_-w35` writers.** `abc-find _-w35 --member` lists every method touching the name.
@@ -131,7 +150,7 @@ the entity passes. Pinned by `hit-detection-verify` (group "Match start in _-X6R
 - **L2 — scoreboard timing.** Unknown which code pushes `_-y4L` onto `_-4p._-Bn` (candidates:
   `_-4p.static._-7G`, `_-E6e._-g5j`, `_-o4W._-O27`, `_-9D._-q4z` reference `_-y4L`) and whether that can
   happen during replay playback before the last tick that draws R.
-- **L3 — rule entry points.** `_-99._-u1O` #7128 (phase 3) and `_-99._-m4d` #7130 (phase 9) are the
+- **L3 — rule entry points.** (For STOCK / TIMED, settled in §4c.) `_-99._-u1O` #7128 (phase 3) and `_-99._-m4d` #7130 (phase 9) are the
   rules entry points, but their call graphs to the R draw sites of prng-11.00 §3 (rule subclasses
   built by `_-76j`, `_-P4P` Horde alias, `_-X6R`, `MessageTrigger`…) were not traced. Draw counts per
   tick and the order between rule objects remain unknown.

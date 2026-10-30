@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.match_start import one_v_one  # noqa: E402
+from bh.match_start import one_v_one, r_at_match_start  # noqa: E402
 from bh.prng import Well512, shuffle  # noqa: E402
 from bh.respawn_points import parse_respawns  # noqa: E402
 
@@ -37,6 +37,12 @@ class MatchStart(unittest.TestCase):
         placed, g5x = one_v_one(Well512(1), ["a", "b"], parse_respawns('<Respawn X="0" Y="0" />'))
         self.assertEqual([p for _, p in placed], [None, None])            # `_-N4x()`
         self.assertTrue(all(0 <= v < 1 for v in g5x))
+
+    def test_r_at_match_start(self):
+        rng, c56 = r_at_match_start(-5, 2)                                  # header seed read as i32
+        ref = Well512(4294967291)
+        self.assertEqual(c56, [ref.next_u32() % 2, ref.next_u32() % 2])
+        self.assertEqual(rng.getstate(), ref.getstate())
 
 
 if __name__ == "__main__":

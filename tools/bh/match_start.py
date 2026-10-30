@@ -21,12 +21,29 @@ tick with t >= `_-n4k` + 256, flag `_-C3h`) the fighters are not all passed to `
 
 So in a plain 1v1 the match start draws R four times: two for the shuffle, then two for `_-G5X`. [H] `_-a4w()`
 (sort instead of shuffle), `_-X5t`, `_-z16` and `_-U24` are not read.
+
+**R before the match start** (a replay with a STOCK / TIMED scoring type, `_-d3Y._-K4x` not 2 or 3). Replay start
+`_-h3U._-T12` #3624 seeds R through `_-Y3u` (@259, `Random._-24O(seed)`), then creates one Entity per player of
+the replay (@283-668, `Entity._-724` @380). Each `Entity.<init>` builds its power controller (`_-r4L` @4790 ->
+`new _-F5N`), whose constructor draws R once: `_-56C` = R % 2 (#1683 @567-591), with no branch around it. The
+rules object of those scoring types is the base `_-QA` (`_-99._-76j` #7133 @774-792: no case for them), whose
+per-tick methods draw nothing; the other per-tick R users found by the typed call graph (`abc-reach`) need a
+special rules class, `_-K4x` == 2 (`_-Z36`, also in `Entity.<init>` @2830) or 3 (`_-q2i`, `_-99._-M6H` @23), or the
+eliminated states 7 / 8 (`_-F5N._-81Z` in `Entity._-k5H` @1618), or run on UI screens. So at the match-start
+tick R has drawn once per player. [H] The call graph under-approximates calls through untyped values.
 """
 from .movement import ABC_1100
-from .prng import js_mod, shuffle, to_u32
+from .prng import Well512, js_mod, seed_from_header, shuffle, to_u32
 from .respawn_points import candidates
 
 G5X_DEFAULT_N = 37
+
+
+def r_at_match_start(seed, n_players):
+    """R as the match-start tick finds it in a STOCK / TIMED replay: seeded with the header seed
+    (`prng.seed_from_header`), then one draw per player (`_-F5N.<init>`). Returns (generator, `_-56C` values)."""
+    rng = Well512(seed_from_header(seed))
+    return rng, [to_u32(js_mod(rng.next_u32(), 2)) for _ in range(n_players)]
 
 
 def one_v_one(rng, fighters, points, sort_mode=False):
@@ -103,5 +120,32 @@ ANCHORS = {ABC_1100: {
         (6782, 171, "subtract_i", ""),
         (6782, 187, "getproperty", "_-k5S"),
         (6782, 193, "callpropvoid", "_-P3o, 2"),
+    ],
+    "R before the match start: _-T12 seeds through _-Y3u then creates an Entity per player; Entity.<init> -> _-r4L -> new _-F5N; _-F5N.<init>: _-56C = R._-f4c() % 2": [
+        (3624, 259, "callpropvoid", "_-Y3u, 2"),
+        (3624, 380, "callproperty", "_-724, 5"),
+        (3348, 116, "getproperty", "_-22"),
+        (3348, 127, "callpropvoid", "_-24O, 1"),
+        (3348, 137, "callpropvoid", "_-76j, 0"),
+        (3170, 17, "constructprop", "Entity, 8"),
+        (2887, 4790, "callproperty", "_-r4L, 1"),
+        (3134, 8, "constructprop", "_-F5N, 2"),
+        (1683, 580, "getproperty", "_-22"),
+        (1683, 583, "callproperty", "_-f4c, 0"),
+        (1683, 588, "pushbyte", "2"),
+        (1683, 590, "modulo", ""),
+        (1683, 591, "initproperty", "_-56C"),
+    ],
+    "Other R users gated: _-76j default _-QA; Entity.<init> _-e3L (_-Z36); _-M6H _-K4x == 3 (_-q2i); _-81Z only in states 7 / 8 of _-k5H": [
+        (7133, 787, "constructprop", "_-QA, 1"),
+        (7133, 922, "pushbyte", "2"),
+        (7133, 945, "constructprop", "_-Z36, 1"),
+        (2887, 2830, "getproperty", "_-e3L"),
+        (2887, 2906, "callproperty", "_-u1W, 2"),
+        (7132, 19, "getproperty", "_-K4x"),
+        (7132, 23, "pushbyte", "3"),
+        (7132, 47, "constructprop", "_-q2i, 1"),
+        (2991, 89, "lookupswitch", "35, 151, 35, 105, 118, 118, 151, 1204, 1352, 1352, 1576"),
+        (2991, 1618, "callpropvoid", "_-81Z, 1"),
     ],
 }}
