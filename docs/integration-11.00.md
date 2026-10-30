@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 290 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 293 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -139,6 +139,19 @@ tick then runs the velocity (thrown gravity), item ground walk, sweep and landin
 holds. If the game computes the normal the same way, items on those floors bounce imperceptibly forever.
 [H] That depends on the player's `Point.normalize` doing `x *= thickness / length`, which a real game
 should confirm.
+
+### KO bounds ([`tools/bh/level_bounds.py`](../tools/bh/level_bounds.py))
+
+The data for `ko.ko_mask` (PR #25) comes from two places: the LevelDesc's CameraBounds (left, top,
+right, bottom = x, y, x + w, y + h), and the kill values of the LevelType of the same name (LevelTypes.xml).
+All 122 local LevelDescs have such a LevelType.
+
+| | |
+|---|---|
+| Respawn points inside the kill box | 989 of 995. The 6 others are all on one map, outside on the left (4) or the top (2) [H: a map whose camera or bounds change during the match] |
+| Falls with no line below (static lines) | 166 |
+| … ending in a bottom KO | 160, within 189 ticks |
+| … ending in another KO | 6: the 6 points above, KO'd at tick 1 |
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 

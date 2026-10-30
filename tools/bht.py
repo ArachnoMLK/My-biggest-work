@@ -26,6 +26,7 @@ from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
 from bh import smoke as smokemod  # noqa: E402
 from bh import ko_gaps as kogapsmod  # noqa: E402
+from bh import level_bounds as levelboundsmod  # noqa: E402
 from bh import step as stepmod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
 from bh import stats as statsmod  # noqa: E402
@@ -471,6 +472,12 @@ def cmd_smoke_fall(a):
     print("items (default ItemType, static lines):")
     for k, v in smokemod.run_items(xmls, smokemod.items.ITEM_DEFAULTS).items():
         print(f"  {k:<24} {v}")
+    lt = os.path.join(a.swz or os.path.join(WORK, "swz"), "Init.swz", "LevelTypes.xml")
+    if os.path.exists(lt):
+        names = [os.path.basename(f)[len("LevelDesc_"):-len(".xml")] for f in files]
+        print("KO bounds (CameraBounds + LevelType kill values), falls into the void:")
+        for k, v in levelboundsmod.run(list(zip(names, xmls)), levelboundsmod.level_kills(rendermod.read_text(lt))).items():
+            print(f"  {k:<24} {v}")
     print("item thrown from every landing, 6 directions x (no charge, 2.5 s) (static lines):")
     for k, v in smokemod.run_throws(xmls, smokemod.items.ITEM_DEFAULTS).items():
         print(f"  {k:<24} {v}")
