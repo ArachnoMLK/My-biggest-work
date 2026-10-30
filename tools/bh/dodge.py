@@ -153,7 +153,7 @@ def landed_cooldown(y1f, airborne, r51, hitstun, a1h, q42, t, i46, cooldown_land
 def dodge_over(t, u5e, h2b, y1f, e3):
     """`_-t1A` @233-349: with `_-u5E()`, `_-H2b` + `_-y1F` <= t and not within 112 ms of `_-3E` (local 5,
     `_-3E` + 112 > t), the dodge is over: `_-Kc._-MX(PowerType._-Z32)` when `_-H2b` > 0, `_-H2b` = 0, then
-    `_-51c(false, true)`. Returns (over, calls_mx). [H] `_-u5E()`, `_-3E` (written by Dash), `_-MX`, `_-51c`."""
+    `_-51c(false, true)`. Returns (over, calls_mx). [H] `_-u5E()`, `_-3E` (also read by Dash), `_-MX`, `_-51c`."""
     over = bool(u5e) and h2b + y1f <= t and not (e3 + DASH_HOLD_MS > t)
     return over, over and h2b > 0
 
@@ -246,6 +246,93 @@ def exit_velocity(vx, vy, a, moving, held, l4a, g5e, t5l, exit_x, exit_back_x, e
     elif vy < 0 and not held & UP:
         vy *= exit_back_y if held & DROP else exit_y
     return vx, vy, cv
+
+
+DASH_TAP_MS = 192          # Entity.Dash #3132 @510-542: three side taps within 192 ms of each other
+DASH_WINDOW_MS = 80        # @399, local 17; 160 with side + Drop (@393) or within 160 ms of `_-K1k` (@411-421)
+DASH_WINDOW_LONG_MS = 160
+DASH_REPEAT_MS = 96        # @799: a dash that keeps its side needs t >= `_-K1k` + 96
+DASH_TURN_LOCK_MS = 640    # @764-772: `_-26T` + 320 + 320
+DASH_SPEED_TURN, DASH_SPEED_TURN_FAST = 15.0, 7.0   # @651-657, local 19
+
+
+def dash(t, dir, y1u, w4c, grounded, held, held_left, facing_left, ve, v22, r3l, t5z, m3v, k1k, d532, e3, m3h,
+         vx, vy, l3a, t26, w47):
+    """`Entity.Dash(t, dir)` #3132, called by Dodge (@416) with `dir` = `keys & 15`. Returns None for false
+    (nothing written), else the writes as a dict (`dir_left` is the `_-CV` / `_-q2o` argument, local 16).
+
+    y1u = `_-y1U(t, false)` (local 3); w4c = `_-w4c(t, false, false, dir)`, only called with a side in dir and
+    y1u false (local 6). Not grounded (`_-96f` null): false. held = `_-R5q._-66U`, held_left = `_-141()`,
+    facing_left = `_-r35()`; ve / v22 / r3l = `_-VE` / `_-V22` / `_-r3L`, the last side-tap times (newest first,
+    shifted with t in locals only when the press turns the held side, without `_-t5z`). The dash goes left
+    (local 13) with Left held, or facing left without Right. local 16 starts as the facing, then: within the
+    window (80, 160 with side + Drop or after `_-K1k` + 160) of `_-532` or `_-3E` it is `_-M3h`; else three taps
+    192 ms apart without `_-M3V` turn it to the dash side (the other side with Drop); else without `_-t5z` and
+    `_-M3V`, within the window of the last tap it is the other side. local 18 = (w4c and vy < 0) or y1u (speed
+    gate 7, else 15); without w4c it is cleared when local 16 differs from the dash side, and when set local 16
+    is the dash side. A turn (local 16 != dash side) in kind 3 / 7 with `_-M3V` or before `_-26T` + 640: false; a
+    non-turn before `_-K1k` + 96: false. Kind `_-L3a`: turn with |vx| >= gate 7; local 18 6; turn with `_-M3V`
+    7; turn 3; `_-M3V` after 3 / 7 5; `_-M3V` 4 (`_-K1k` = t when `_-w47`, `_-w47` = false); y1u 2; else 1.
+    Then `_-CV` / `_-q2o`(local 16), `_-v3x` = t, `_-P50` = true, `_-M3V` = false, `_-t5z` = true, `_-Q3q()`,
+    `_-G6S` = 0, `_-K53._-p3c` + 1. Kind 2 is never reached: y1u sets local 18, which gives 6 or is cleared
+    on a turn. The 'dash.Forward' / 'dash.Back' cue and the `_-O2r` record are not
+    transcribed. [H] meanings of the kinds, `_-y1U`, `_-w4c`, `_-532`, `_-M3h`, `_-K1k`, `_-26T`."""
+    side = dir & (LEFT | RIGHT) != 0
+    drop = dir & DROP != 0
+    if y1u:
+        w4c = False
+    elif not side:
+        w4c = False
+    if not grounded:
+        return None
+    left = held & LEFT != 0 or (facing_left and not held & RIGHT)
+    if not t5z and side and left != held_left:
+        ve, v22, r3l = t, ve, v22
+    out = facing_left
+    window = DASH_WINDOW_LONG_MS if side and drop else DASH_WINDOW_MS
+    if k1k + DASH_WINDOW_LONG_MS > t:
+        window = DASH_WINDOW_LONG_MS
+    if d532 + window > t or e3 + window > t:
+        out = m3h
+    elif (not m3v and side and r3l > 0 and v22 + DASH_TAP_MS >= ve and r3l + DASH_TAP_MS >= v22
+          and ve + DASH_TAP_MS >= t):
+        out = (not left) if drop else left
+    elif not t5z and not m3v and ve + window > t:
+        out = not left
+    fast = (w4c and vy < 0) or bool(y1u)
+    gate = DASH_SPEED_TURN_FAST if fast else DASH_SPEED_TURN
+    if not w4c and out != left:
+        fast = False
+    if fast:
+        out = left
+    turn = out != left
+    if turn and l3a in (3, 7) and (m3v or t26 + DASH_TURN_LOCK_MS > t):
+        return None
+    if not turn and k1k + DASH_REPEAT_MS > t:
+        return None
+    w = {}
+    if turn and abs(vx) >= gate:
+        kind = 7
+    elif fast:
+        kind = 6
+    elif turn and m3v:
+        kind = 7
+    elif turn:
+        kind = 3
+    elif m3v and l3a in (3, 7):
+        kind = 5
+    elif m3v:
+        if w47:
+            w["_-K1k"] = t
+        w["_-w47"] = False
+        kind = 4
+    elif y1u:
+        kind = 2
+    else:
+        kind = 1
+    w.update({"_-L3a": kind, "dir_left": out, "_-v3x": t, "_-P50": True, "_-M3V": False, "_-t5z": True,
+              "_-G6S": 0})
+    return w
 
 
 def formula_mult(formula, vx, k64, dir):
@@ -538,5 +625,51 @@ ANCHORS = {ABC_1100: {
         (2768, 937, "initproperty", "_-05s"),
         (2768, 966, "initproperty", "_-LX"),
         (2768, 1086, "initproperty", "_-f6R"),
+    ],
+    "Entity.Dash #3132: ground only; side taps _-VE / _-V22 / _-r3L within 192 ms; windows 80 / 160 (_-532, _-3E, _-K1k); gate 7 / 15; turn locks; kinds _-L3a 1-7; writes": [
+        (3132, 135, "callproperty", "_-y1U, 2"),
+        (3132, 166, "callproperty", "_-w4c, 4"),
+        (3132, 183, "getproperty", "_-96f"),
+        (3132, 199, "callproperty", "_-141, 0"),
+        (3132, 211, "callproperty", "_-r35, 0"),
+        (3132, 223, "getproperty", "_-VE"),
+        (3132, 234, "getproperty", "_-V22"),
+        (3132, 244, "getproperty", "_-r3L"),
+        (3132, 314, "getproperty", "_-t5z"),
+        (3132, 366, "getproperty", "_-M3V"),
+        (3132, 393, "pushuint", "160"),
+        (3132, 399, "pushbyte", "80"),
+        (3132, 408, "getproperty", "_-K1k"),
+        (3132, 431, "getproperty", "_-532"),
+        (3132, 449, "getproperty", "_-3E"),
+        (3132, 466, "getproperty", "_-M3h"),
+        (3132, 510, "pushuint", "192"),
+        (3132, 651, "pushdouble", "7.0"),
+        (3132, 657, "pushdouble", "15.0"),
+        (3132, 760, "getproperty", "_-26T"),
+        (3132, 764, "pushuint", "320"),
+        (3132, 769, "pushuint", "320"),
+        (3132, 799, "pushbyte", "96"),
+        (3132, 842, "callproperty", "abs, 1"),
+        (3132, 858, "pushbyte", "7"),
+        (3132, 877, "pushbyte", "6"),
+        (3132, 924, "pushbyte", "3"),
+        (3132, 977, "pushbyte", "5"),
+        (3132, 1009, "initproperty", "_-K1k"),
+        (3132, 1017, "initproperty", "_-w47"),
+        (3132, 1024, "pushbyte", "4"),
+        (3132, 1042, "pushbyte", "2"),
+        (3132, 1055, "pushbyte", "1"),
+        (3132, 1067, "callpropvoid", "_-CV, 1"),
+        (3132, 1077, "callpropvoid", "_-q2o, 1"),
+        (3132, 1086, "initproperty", "_-v3x"),
+        (3132, 1094, "initproperty", "_-P50"),
+        (3132, 1102, "initproperty", "_-M3V"),
+        (3132, 1111, "initproperty", "_-t5z"),
+        (3132, 1118, "callpropvoid", "_-Q3q, 0"),
+        (3132, 1127, "initproperty", "_-G6S"),
+        (3132, 1142, "initproperty", "_-p3c"),
+        (3132, 1433, "returnvalue", ""),
+        (3132, 1435, "returnvalue", ""),
     ],
 }}

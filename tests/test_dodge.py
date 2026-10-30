@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (clears_velocity, cooldown_ms, counter, dodge_over, ease, exit_speed,  # noqa: E402
+from bh.dodge import (clears_velocity, cooldown_ms, counter, dash, dodge_over, ease, exit_speed,  # noqa: E402
                       exit_velocity, facing, formula_mult, k64, kind, landed_cooldown, moves, neutral_push, pick,
                       push, side_latch, speed_x, speed_y, standard_flag, timers)
 
@@ -116,6 +116,27 @@ class Dodge(unittest.TestCase):
         self.assertEqual(exit_velocity(0.0, -8.0, held=0, **k), (0.0, -4.0, None))
         self.assertEqual(exit_velocity(5.0, 8.0, held=0, **dict(k, l4a=True, g5e=True)), (20.625, 4.0, True))
         self.assertEqual(exit_velocity(5.0, 8.0, held=0, **dict(k, moving=False)), (5.0, 4.0, None))
+
+    def test_dash(self):
+        base = dict(t=1000, dir=0, y1u=False, w4c=False, grounded=True, held=0, held_left=False,
+                    facing_left=False, ve=0, v22=0, r3l=0, t5z=False, m3v=False, k1k=0, d532=0, e3=0, m3h=False,
+                    vx=0.0, vy=0.0, l3a=0, t26=0, w47=False)
+        self.assertIsNone(dash(**dict(base, grounded=False)))
+        w = dash(**base)
+        self.assertEqual((w["_-L3a"], w["dir_left"], w["_-t5z"], w["_-v3x"]), (1, False, True, 1000))
+        self.assertEqual(dash(**dict(base, y1u=True))["_-L3a"], 6)  # kind 2 is not reached
+        self.assertIsNone(dash(**dict(base, k1k=950)))
+        # a fresh Left press without _-t5z, right after a tap: the dash turns (kind 3)
+        w = dash(**dict(base, dir=4, held=4, ve=950))
+        self.assertEqual((w["_-L3a"], w["dir_left"]), (3, False))
+        self.assertEqual(dash(**dict(base, dir=4, held=4, ve=950, vx=20.0))["_-L3a"], 7)
+        self.assertIsNone(dash(**dict(base, dir=4, held=4, ve=950, l3a=3, t26=400)))
+        self.assertEqual(dash(**dict(base, dir=4, held=4, ve=950, l3a=3, t26=300))["_-L3a"], 3)
+        w = dash(**dict(base, m3v=True, w47=True))
+        self.assertEqual((w["_-L3a"], w["_-K1k"], w["_-w47"]), (4, 1000, False))
+        self.assertEqual(dash(**dict(base, m3v=True, l3a=7))["_-L3a"], 5)
+        w = dash(**dict(base, dir=4, held=4, w4c=True, vy=-1.0, ve=950))
+        self.assertEqual((w["_-L3a"], w["dir_left"]), (6, True))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)
