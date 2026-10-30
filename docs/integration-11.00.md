@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 299 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 303 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -152,6 +152,25 @@ All 122 local LevelDescs have such a LevelType.
 | Falls with no line below (static lines) | 166 |
 | … ending in a bottom KO | 160, within 189 ticks |
 | … ending in another KO | 6: the 6 points above, KO'd at tick 1 |
+
+## Per-tick harness, first version ([`tools/bh/harness.py`](../tools/bh/harness.py))
+
+Plan step 4. One fighter, inputs left / right / jump, a static map. One tick at time t:
+
+1. the input consumer: a fresh jump press calls `Jump(t)` (jump.py: the squat, or the jump at once in the
+   dash window);
+2. `_-8i` in byte order: step-start landing → friction, then acceleration toward the held side → squat
+   release (`_-A2X` once t ≥ `_-I5A` + 32) → x impulse fold and clamp → ground walk → y impulse fold and
+   clamp → gravity → free move → landing delay of a pending jump (+64 ms) → `_-84` = `_-A4A` = 0.
+
+Every piece is [V] in its own module; the glue is [H]. Not modelled yet: powers, hitstun, the wall contact
+(`_-r51`), the `_-532` lock and the air-jump counter writers (the harness resets the count on landing [H]),
+the facing flip of the wall jump, the ring-out test inside the tick (ko.py is ready; the KO bounds come from
+level_bounds.py), and real legend stats (synthetic defaults; stats.py gives the real ones).
+
+On the synthetic flat map of `tests/test_harness.py`: the fighter lands at 500 − 1.01; a jump press leaves
+the ground 32 ms later with a first rise of (57 − 1.44) × 0.384; two air jumps follow, a third press does
+nothing; walking right reaches RunSpeed. Static evidence only; not compared with the running game.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 
