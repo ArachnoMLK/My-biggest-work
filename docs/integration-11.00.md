@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 760 | 0 |
+| `hit-detection-verify` | 776 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 239 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 243 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -76,3 +76,24 @@ So the gravity, sweep, grid and ray cast pieces fit together, and the fall stops
 the running game. [H] On a gentle hard slope, the ground push stops after a tiny move, so the 1.01 back-off goes along −normal
 and the fighter creeps. Either the game does the same, or a part not read yet compensates; a real game is
 needed to tell. Next: the KO oracle of #27.
+
+## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
+
+The KO commit calls `Respawn` in the same tick, and the drone then comes down, carries and drops the fighter
+(spawn_bot.py, PR #30). So two KO faces of the same victim (oracle.py, PR #27) are at least `respawn_ms`
+apart. That time comes from the durations of the replay's scoring type (ScoringTypes.xml, by `ScoringID`).
+With the defaults and a spawned fighter, it is 2000 + 3000 + 700 = 5700 ms.
+
+Local result (756 patch 11.00 replays, aggregate only):
+
+| | |
+|---|---|
+| Scoring types with at least one gap | 4 |
+| Gaps between two KOs of the same victim | 3,241 |
+| Gaps shorter than the predicted drone time | **0** |
+| Smallest margin | 172 ms |
+
+This is a one-sided check. The replays allow the transcribed drone time, but they do not show it is exact:
+the margin also contains the time needed to be knocked out again. It is the first comparison of a
+transcribed piece with the replays' own records.
+

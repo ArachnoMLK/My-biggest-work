@@ -25,6 +25,7 @@ from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
 from bh import smoke as smokemod  # noqa: E402
+from bh import ko_gaps as kogapsmod  # noqa: E402
 from bh import step as stepmod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
 from bh import stats as statsmod  # noqa: E402
@@ -433,6 +434,26 @@ def cmd_knockback_verify(a):
     print("static bytecode evidence only: no execution, no runtime oracle (docs/knockback-11.00.md)")
 
 
+def cmd_ko_gap_check(a):
+    """No KO of the same victim before the respawn drone has dropped it (oracle + spawn bot); aggregate only."""
+    base = os.path.join(a.swz or os.path.join(WORK, "swz"), "Game.swz", "ScoringTypes.xml")
+    if not os.path.exists(base):
+        sys.exit("no ScoringTypes.xml; run swz-dump first (or pass --swz)")
+    cells = kogapsmod.scoring_cells(rendermod.read_text(base))
+    reps = []
+    for p in glob.glob(os.path.join(a.dir, "*.replay")):
+        try:
+            with open(p, "rb") as f:
+                rep = replaymod.parse(f.read())
+        except Exception:
+            continue
+        if rep.get("version") == 271:
+            reps.append(rep)
+    for k, v in kogapsmod.check(reps, cells).items():
+        print(f"  {k:<22} {v}")
+    print("one-sided check from the replays' own KO faces; nothing is published (tools/bh/ko_gaps.py)")
+
+
 def cmd_smoke_fall(a):
     """One fighter, no input, falls from every respawn point of the local LevelDescs (aggregate counts only)."""
     import glob
@@ -716,6 +737,8 @@ def main():
     add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
     add("input-buffer-verify", cmd_input_buffer_verify, abc)
     add("knockback-verify", cmd_knockback_verify, abc)
+    add("ko-gap-check", cmd_ko_gap_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
+        (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
     add("smoke-fall", cmd_smoke_fall, (["--swz"], {"help": "swz-dump folder (default work/swz)"}),
         (["--static-only"], {"action": "store_true", "help": "leave the moving platforms' lines out"}))
     add("power-columns", cmd_power_columns, abc, (["--markdown"], {"action": "store_true"}))
