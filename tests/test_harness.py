@@ -141,6 +141,19 @@ class Harness(unittest.TestCase):
         self.assertEqual(fired, [(2, 0), (5, 1)])             # step 0 after 2 ticks, step 1 three ticks later
         self.assertIsNone(f.power)
 
+    def test_step_hits(self):
+        from bh.power_data import power_steps
+        row = {"PowerName": "J", "CastTime": "1", "TargetMethod": "PBAoE", "AoERadiusX": "20", "AoERadiusY": "20",
+               "CenterOffsetX": "50", "CenterOffsetY": "0"}
+        f = harness.Fighter(0.0, 0.0)
+        f.power = {"name": "J", "steps": power_steps(row), "g4i": 1, "hit": set()}
+        box = {"Width": [40], "Height": [80], "OffsetX": [0], "OffsetY": [0]}
+        self.assertTrue(harness.step_hits(f, 0, harness.Fighter(60.0, 20.0), box))
+        self.assertFalse(harness.step_hits(f, 0, harness.Fighter(300.0, 20.0), box))
+        f.facing_left = True                                  # the offset is mirrored
+        self.assertFalse(harness.step_hits(f, 0, harness.Fighter(60.0, 20.0), box))
+        self.assertTrue(harness.step_hits(f, 0, harness.Fighter(-60.0, 20.0), box))
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)

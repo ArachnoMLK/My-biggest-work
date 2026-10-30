@@ -61,6 +61,23 @@ def harness_stats(entity, names, stances, stat_types):
     return {k: full[k] for k in HARNESS_STATS}
 
 
+def default_hurtbox(path):
+    """The DEFAULT row of hurtboxTypes.csv as {"Width", "Height", "OffsetX", "OffsetY": int lists}, or None.
+    [H] the harness uses it for every frame (the animation-dependent rows need the .anm frames)."""
+    if not os.path.exists(path):
+        return None
+    import csv
+    import io
+    rows = list(csv.reader(io.StringIO(_read(path))))
+    head = rows[1]
+    for r in rows[2:]:
+        cells = dict(zip(head, r))
+        if cells.get("HurtboxName") == "DEFAULT":
+            return {k: [int(float(x)) for x in (cells.get(k) or "0").split(",")]
+                    for k in ("Width", "Height", "OffsetX", "OffsetY")}
+    return None
+
+
 class Swz:
     """The XML files the setup needs, from a swz-dump folder."""
 
@@ -75,6 +92,7 @@ class Swz:
         self.heroes = power_pick.hero_powers(_read(os.path.join(game, "HeroTypes.xml")))
         path = os.path.join(game, "itemTypes.csv")
         self.items = power_pick.item_slots(_read(path)) if os.path.exists(path) else {}
+        self.hurtbox = default_hurtbox(os.path.join(game, "hurtboxTypes.csv"))
         path = os.path.join(game, "powerTypes.csv")
         self.powers = power_pick.power_rows(_read(path)) if os.path.exists(path) else {}
         self.scoring = {}
@@ -123,4 +141,5 @@ def run(rep, swz, ticks=6000):
     lives = rep["settings"].get("starting_lives", 0)
     return harness.play(rep["entities"], rep["random_seed"], s["points"], s["drone_camera"], s["grid"],
                         (s["cam"], s["kill"]), s["stats"], rep["inputs"], s["cells"], lives=lives,
-                        lives_mode=lives > 0, ticks=ticks, dodge_rows=swz.dodge_rows, moves_by_id=s["moves"])
+                        lives_mode=lives > 0, ticks=ticks, dodge_rows=swz.dodge_rows, moves_by_id=s["moves"],
+                        hurtbox=swz.hurtbox)

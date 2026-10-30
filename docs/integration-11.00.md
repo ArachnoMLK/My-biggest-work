@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 377 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 378 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -295,4 +295,11 @@ yet: the power is not started (b2-b5). [H] glue: no running move, `_-f2b()` fals
 not exhausted, `_-b3A` 0 [H]). Then the power starts when none runs: `power_data.power_steps` and a `power_timeline.Timeline` from the press
 tick; each tick, before `_-8i` (`_-Kc._-25` in state 0), the step that fires is recorded ("step", name, step) and
 the power is dropped once its last step fired [H: the end rules `ends_now`, chains and cancels are not chained].
-Next in b3: the frames (`anim_frames`, `.anm`), then b4 (capsules).
+**(b4, first cut)** `harness.step_hits`: when a power step fires, its frames (`hitdetect.frame_window(q24, step)`)
+make hit areas (`area_center` with the TargetMethod `_-g4i` and CenterOffsetX / Y, `hit_capsule` with AoERadiusX
+/ Y), tested with `capsules_touch` against the opponent's hurtbox capsule; `play` records (t, victim, power), one
+hit per power and victim. Glue [H]: the DEFAULT row of hurtboxTypes.csv for every frame (no `.anm` frame yet),
+no team mask, no line of sight, no item / point areas, fighters stay Unarmed, the hit changes nothing yet (b5).
+Local run (aggregate only, first 60 s of 269 1v1 replays of format 271): **175 hits, in 114 replays**, far
+fewer than in real games, as expected without weapons, animation hurtboxes and knockback.
+Next: b5 (knockback and hitstun from `knockback.py`), and the `.anm` frames for the hurtbox rows.

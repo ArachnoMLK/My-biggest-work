@@ -34,6 +34,8 @@ from .air_move import WallState, air_move, gravity_applies, ground_reset, ground
 from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
                     gates, is_dodge_locked, k64, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x,
                     speed_y, standard_flag, timers)
+from .hitdetect import (area_center, capsules_touch, frame_window, hit_capsule, hurtbox_capsule, row_values,
+                        target_method)
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, state_at
@@ -231,6 +233,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         step = f.power["tl"].update(tick_index(t))
         if step is not None:
             events.append(("step", f.power["name"], step))
+            f.power["fired"] = step
         if f.power["tl"].done:
             f.power = None                                      # [H] the end rules (`ends_now`) are not chained
     if dodge_press and dodge_rows:
@@ -250,7 +253,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                 if power is not None and f.power is None:       # [H] no chain / cancel into a running power
                     steps = power_steps(power)
                     if steps["CastTime"]:
-                        f.power = {"name": name, "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t))}
+                        f.power = {"name": name, "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t)),
+                                   "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set()}
             events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
@@ -343,6 +347,30 @@ def from_records(records, t0=0):
     return inputs
 
 
+def step_hits(f, step, victim, hurtbox):
+    """True when the hit areas of `f`'s power at `step` touch `victim`'s hurtbox capsule.
+
+    The frames scanned are `hitdetect.frame_window(q24, step)`; each makes an area with `area_center` (the power's
+    TargetMethod `_-g4i`, CenterOffsetX / Y), the capsule `hit_capsule(AoERadiusX, AoERadiusY)`, tested with
+    `capsules_touch` against `hurtbox_capsule` of the victim's `hurtbox` row 0. [H] glue: the DEFAULT hurtbox
+    (no animation frame), no team mask, no line of sight, no item or point areas."""
+    st = f.power["steps"]
+    first, count = frame_window(st["q24"], step)
+    w = row_values(hurtbox["Width"], 0)
+    h = row_values(hurtbox["Height"], 0)
+    hb = hurtbox_capsule(victim.x, victim.y, w, h, row_values(hurtbox["OffsetX"], 0), row_values(hurtbox["OffsetY"], 0),
+                         victim.facing_left)
+    for i in range(first, first + count):
+        if not all(i < len(st[c]) for c in ("CenterOffsetX", "CenterOffsetY", "AoERadiusX", "AoERadiusY")):
+            continue
+        c = area_center(f.power["g4i"], f.x, f.y, i, st["CenterOffsetX"], st["CenterOffsetY"], f.facing_left)
+        if c is None:
+            continue
+        if capsules_touch(hit_capsule(c[0], c[1], st["AoERadiusX"][i], st["AoERadiusY"][i]), hb):
+            return True
+    return False
+
+
 def match_start(entities, seed, points, camera, cells=None, team_type=0, spawned=SPAWNED_AT_MATCH_START,
                 start_xy=(0.0, 0.0),
                 standalone=False, max_ticks=1000):
@@ -382,7 +410,8 @@ def ko_reset(f):
 
 
 def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id, cells=None, lives=3,
-         lives_mode=True, team_type=0, standalone=False, ticks=6000, dodge_rows=None, moves_by_id=None):
+         lives_mode=True, team_type=0, standalone=False, ticks=6000, dodge_rows=None, moves_by_id=None,
+         hurtbox=None):
     """Both fighters of a plain 1v1 replay in lockstep from the match-start step. Per tick, in `_-5r` order:
     phase 5 (`_-k5H`: the drone first, then movement in states 0 / 5, which clears `_-44x`), then phase 6
     (`_-eR`: a ring-out mask -> KO commit at t, lives - 1, then `Respawn`: state 7 when eliminated, else the
@@ -421,6 +450,19 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                      bool(keys & JUMP and not before & JUMP), 0, bounds,
                      bool(keys & DODGE_DASH and not before & DODGE_DASH), keys, dodge_rows,
                      bool(keys & LIGHT and not before & LIGHT), bool(keys & HEAVY and not before & HEAVY))
+        if hurtbox is not None:                             # b4: queued hits of the fired steps [H]
+            for p in players:
+                f = p["f"]
+                if f is None or f.power is None or f.power.get("fired") is None:
+                    continue
+                step, f.power["fired"] = f.power["fired"], None
+                for q in players:
+                    v = q["f"]
+                    if q is p or v is None or q["e"]["id"] in f.power["hit"]:
+                        continue
+                    if step_hits(f, step, v, hurtbox):
+                        f.power["hit"].add(q["e"]["id"])
+                        p.setdefault("hits", []).append((t, q["e"]["id"], f.power["name"]))
         for p in players:                                   # phase 6
             f, body = p["f"], p["body"]
             if f is None or body["state"] not in (0, 5) or not f.a3d:
@@ -439,4 +481,4 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                              camera)
         if all(p["body"]["state"] == 7 for p in players):
             break
-    return {p["e"]["id"]: {"kos": p["kos"], "let_go": p["let_go"]} for p in players}
+    return {p["e"]["id"]: {"kos": p["kos"], "let_go": p["let_go"], "hits": p.get("hits", [])} for p in players}
