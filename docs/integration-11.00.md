@@ -349,3 +349,8 @@ Then `_-532` = t at each power start (`Entity._-c1r`, input-buffer-11.00.md §6)
 Then the last widening, `_-322` = the landing time (`_-8i` @13446): window 9 for 64 ms after a landing; no change.
 Then the power and hitstun friction rules of `friction_value` (KeepGroundFriction `_-y25`; [H] `_-o3I._-7E` false;
 4.0 in hitstun below the decay speed): no change.
+
+More diagnosis (aggregate, local): harness life is the same on maps with and without moving platforms (median
+13.9 s over 60 victims vs 13.1 s over 177), so the left-out platforms are not the main gap. Of 879 harness KOs,
+**118 never landed** after the let-go (a placement / drop question to check against the drone and the spawn
+points), 525 landed 1-3 times, 236 four times or more.
