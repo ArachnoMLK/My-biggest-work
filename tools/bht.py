@@ -16,7 +16,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
-from bh import anm as anmmod, collision as collisionmod, commands as commandsmod, ko as komod  # noqa: E402
+from bh import anm as anmmod, collision as collisionmod, commands as commandsmod, input_buffer as inputbufmod, ko as komod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import oracle as oraclemod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
@@ -324,6 +324,10 @@ def cmd_step_verify(a):
 
 def cmd_ko_verify(a):
     """Check the pinned static evidence of the KO bounds test; exit 1 on mismatch, 2 on unknown ABC."""
+
+
+def cmd_input_buffer_verify(a):
+    """Check the pinned shape of the input buffer (#6313, #6323); exit 1 on mismatch, 2 on unknown ABC."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
     if not os.path.exists(p):
         sys.exit("run `abc-extract` first (or pass --abc)")
@@ -356,6 +360,18 @@ def cmd_ko_verify(a):
     for group in komod.ANCHORS[sha]:
         print(f"  ok  {group}")
     print("static bytecode evidence only: no execution, no runtime oracle (docs/ko-11.00.md)")
+    if sha not in inputbufmod.ANCHORS:
+        print(f"no input-buffer anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in inputbufmod.ANCHORS)})")
+        sys.exit(2)
+    bad = inputbufmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    print(f"ABC {sha[:8]}...  anchors {inputbufmod.count(sha)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in inputbufmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/input-buffer-11.00.md)")
 
 
 def cmd_swz_key(a):
@@ -600,6 +616,7 @@ def main():
     add("step-verify", cmd_step_verify, abc)
     add("ko-verify", cmd_ko_verify, abc)
     add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
+    add("input-buffer-verify", cmd_input_buffer_verify, abc)
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
