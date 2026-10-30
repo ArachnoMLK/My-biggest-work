@@ -42,8 +42,10 @@ bytecode arithmetic and a `*-verify` command pins it.
 5. **An integration branch.** Done: `integration-11.00` (draft PR #31, do not merge) merges #16–#30;
    11 verify commands at 0 mismatches, 231 tests. First smoke test `smoke-fall`: one fighter falls from every
    respawn point of the 122 local maps; 829 of 829 ground contacts end on the line within 1e-6; the 166 falls
-   without contact are all on maps with moving platforms (dynamic lines left out). Next: dynamic lines
-   (`platforms.py`) in the harness, then landing (`Entity._-8i` @8869-), then the KO oracle of #27.
+   without contact are all on maps with moving platforms (dynamic lines left out). With the moving platforms'
+   lines: 965 of 965 contacts on the line; then 60 standing ticks (step-start landing `_-P5S` = 0, no gravity on
+   a ground line, both in #30): all 794 flat fixed-ground cases stay still. Next: slope slide and platform
+   carry while standing, then the KO oracle of #27.
 
 ## Rules that stay in force
 
