@@ -122,7 +122,7 @@ def _back_off(line, mv):
     tiny = line.type & 1 and -SMALL <= mv[0] <= SMALL and -SMALL <= mv[1] <= SMALL
     v = (-line.normal[0], -line.normal[1]) if tiny else mv
     n = _length(v)
-    return (0.0, 0.0) if n == 0 else (v[0] * GROUND_PUSH / n, v[1] * GROUND_PUSH / n)
+    return (0.0, 0.0) if n == 0 else (v[0] * (GROUND_PUSH / n), v[1] * (GROUND_PUSH / n))
 
 
 def sweep(lines, team, x, y, move, mask, height, no_geometry=False):
@@ -231,6 +231,75 @@ def after_sweep(lu, vy, ground, item, state, can_stick=False):
         elif state == 2 and lu == 0 and vy == 0:
             state = 0
     return lu, vy, state, kind
+
+
+def ground_walk(lines, team, x, y, ground, x_step, mask, lu, vy, item, max_passes=10000):
+    """`_-p5k._-8i` #15192 @1225-1736: an item's walk along its ground line (normal y < 0 only).
+
+    Like the fighter's walk, `_-N3a` points along `_-96f` normalised to the x step `local10`, and the sweep
+    ignores the current line (here also the item-ignore lines). Unlike it, **`local10` is never reduced by the
+    length walked**: each new non-vertical line is walked with the full step again, and after the loop the
+    same `local10` is the x part of the free move (@4509), so on the ground an item covers its x step twice.
+    A wall calls the impact (`_-u1I`, bounce or stick) and sets `local10` to 0 when the item stuck (`_-f4i`),
+    else to -`local10`. No hit ends the loop. Returns (x, y, ground, local10, lu, vy, impact kinds).
+    `max_passes` only guards this transcription against an endless loop; the game has no such limit.
+    """
+    if hasattr(lines, "candidates"):
+        def cands(cx, cy, d):
+            return lines.candidates(cx, cy, cx + d[0], cy + d[1])
+    else:
+        def cands(cx, cy, d):
+            return lines
+    kinds = []
+    if ground is None or ground.normal[1] >= 0:
+        return x, y, ground, x_step, lu, vy, kinds
+    for _ in range(max_passes):
+        if x_step == 0:
+            break
+        dx, dy = ground.ex - ground.sx, ground.ey - ground.sy
+        n = _length((dx, dy))
+        d = (dx * (x_step / n), dy * (x_step / n)) if n else (0.0, 0.0)   # Point.normalize: x *= k / len
+        hit = ray_cast(cands(x, y, d), team, x, y, d[0], d[1], mask, 0, ITEM_IGNORE, ground)
+        if hit is not None:
+            d = hit.remaining
+        x, y = x + d[0], y + d[1]
+        if hit is None:
+            break
+        ground = hit.line
+        nd = _length(d)
+        if nd:
+            x, y = x - d[0] * (GROUND_PUSH / nd), y - d[1] * (GROUND_PUSH / nd)
+        if ground.sx == ground.ex:
+            lu, vy, kind = impact(lu, vy, ground, item)
+            kinds.append(kind)
+            x_step = 0.0 if kind == "stick" else -x_step
+            break
+    return x, y, ground, x_step, lu, vy, kinds
+
+
+def wall_slide(lines, team, x, y, wanted_y, moved_y, mask, height):
+    """`_-p5k._-8i` @6362-6886: in state 6, after a sweep that stopped on a vertical line, `_-Lu` = 0 and the
+    y the sweep did not use (`_-U5T`.y - `_-611`.y) is slid along the wall: a feet cast (mask, item-ignore
+    excluded, nothing ignored) and a top cast from `height` above (hard only); the top one wins when shorter.
+    The item moves by that y, and by 1.01 back (against the wanted direction) when a line stopped it.
+    Returns (x, y, lu) with lu = 0."""
+    if hasattr(lines, "candidates"):
+        def cands(cx, cy, d):
+            return lines.candidates(cx, cy, cx + d[0], cy + d[1])
+    else:
+        def cands(cx, cy, d):
+            return lines
+    d = (0.0, wanted_y - moved_y)
+    feet = ray_cast(cands(x, y, d), team, x, y, d[0], d[1], mask, 0, ITEM_IGNORE)
+    fv = d if feet is None else feet.remaining
+    hit = feet
+    top = ray_cast(cands(x, y - height, d), team, x, y - height, d[0], d[1], 1, 0, ITEM_IGNORE)
+    if top is not None and _length(top.remaining) < _length(fv):
+        fv, hit = (fv[0], top.remaining[1]), top
+    y = y + fv[1]
+    if hit is not None:
+        y = y + (-GROUND_PUSH if wanted_y > 0 else GROUND_PUSH)
+    return x, y, 0.0
 
 
 def expired(t, thrown_at, path_length):
@@ -419,5 +488,32 @@ ANCHORS = {ABC_1100: {
         (4974, 276, "initproperty", "_-XJ"),
         (4974, 2997, "pushstring", "'StickToWalls'"),
         (4974, 3014, "initproperty", "_-o1G"),
+    ],
+    "_-p5k._-8i item walk: _-N3a along _-96f normalised to local10 (never reduced), item-ignore excluded; wall -> _-u1I, local10 = 0 or -local10": [
+        (15192, 1273, "getproperty", "_-N3a"),
+        (15192, 1336, "getlocal", "10"),
+        (15192, 1338, "callpropvoid", "normalize, 1"),
+        (15192, 1393, "getproperty", "_-96f"),
+        (15192, 1415, "getproperty", "_-M4J"),
+        (15192, 1423, "callproperty", "_-X2e, 13"),
+        (15192, 1521, "initproperty", "_-96f"),
+        (15192, 1582, "getproperty", "_-x3M"),
+        (15192, 1690, "callpropvoid", "_-u1I, 2"),
+        (15192, 1698, "getproperty", "_-f4i"),
+        (15192, 1716, "negate", ""),
+        (15192, 1736, "ifne", "-472"),
+        (15192, 4509, "getlocal", "10"),
+    ],
+    "_-p5k._-8i wall slide in state 6: _-Lu = 0, remaining y (U5T - 611) along the wall, feet + Height casts, 1.01 back": [
+        (15192, 6370, "pushbyte", "6"),
+        (15192, 6416, "equals", ""),
+        (15192, 6428, "initproperty", "_-Lu"),
+        (15192, 6476, "subtract", ""),
+        (15192, 6596, "callproperty", "_-X2e, 13"),
+        (15192, 6650, "getproperty", "_-S2O"),
+        (15192, 6701, "callproperty", "_-X2e, 13"),
+        (15192, 6750, "lessthan", ""),
+        (15192, 6869, "getproperty", "_-x3M"),
+        (15192, 6872, "negate", ""),
     ],
 }}

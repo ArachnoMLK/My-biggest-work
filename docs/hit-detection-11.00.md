@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(941 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(964 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -664,8 +664,14 @@ order]:
    the air (defaults 2.5 / 0.15). It stops at 0 instead of changing sign.
 2. **Horizontal impulse and cap.** `_-Lu` += `_-B66`, then it is capped at ±`_-Z5d`. `ItemType.<init>` sets
    `_-Z5d` to 0 and no column writes it, so the cap is **350**. The x step is `_-Lu` × 0.384.
-3. **Ground walk.** On a ground line with normal y < 0, the x step walks along the line (@1268–1732, the
-   same loop shape as the fighter's). Not transcribed yet.
+3. **Ground walk** (`items.ground_walk`, @1225–1736) [V]. On a ground line with normal y < 0, the x step
+   `local10` walks along the line, with the same loop shape as the fighter's (item-ignore lines are
+   excluded). Unlike the fighter's walk, **`local10` is never reduced** by the length walked:
+   - each new non-vertical line is walked with the full step again;
+   - after the loop, the same `local10` is the x part of the free move (@4509), so on the ground an item
+     covers its x step twice;
+   - a wall calls the impact (`_-u1I`) and sets `local10` to 0 if the item stuck (`_-f4i`), else to
+     −`local10`.
 4. **Vertical impulse and cap.** `_-33c` += `_-46m`, then the same ±cap.
 5. **Lifetime.** The item is removed (`_-5k()`) once t − `_-O13` > `PathLength` (when PathLength ≠ 0).
 6. **Path behaviours.** With `_-BG` set, `PathType` chooses one: BoomerangHoming 1, Linear 2, Rocket 3,
@@ -687,7 +693,9 @@ order]:
    `_-p5k._-u4H` = `Entity._-u4H`), otherwise along the move. The ceiling cast @5474–5544 is a
    `callpropvoid`, so its result is dropped and `local37` stays null: **items have no ceiling re-cast**.
 10. **After the sweeps** (`items.after_sweep`, @6891–7391) [V]:
-    - In state 6 against a wall, the item slides down it instead (@6362–6886, not transcribed).
+    - In state 6, when the sweep stopped on a vertical line (`items.wall_slide`, @6362–6886), `_-Lu` = 0 and
+      the y the sweep did not use (`_-U5T`.y − `_-611`.y) is slid along the wall. Feet and Height casts run,
+      the top one wins when shorter, and the item goes 1.01 back against the wanted direction when stopped.
     - A moving item (`_-Lu` or `_-33c` ≠ 0) in state 0 or 1, or with `AlwaysArmed`, hits its ground line
       through `_-u1I`; a lava line always does. Otherwise a floor (normal y < 0) only zeroes `_-33c`.
     - The impulses `_-B66` / `_-46m` are cleared.
