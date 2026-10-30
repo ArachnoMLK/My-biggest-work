@@ -577,7 +577,43 @@ in movement-11.00.md, PR #16) [V]. The grounded branch is taken when `_-96f` is 
 - in the dash window (`_-26T` + 160 > t, with a ground line or `_-Xb` == 1), it is 170 instead;
 - then `_-P5S` = 0, `_-96f` = null and `_-A4A` −= impulse, which the next fold adds to `_-P5S`.
 
-The air jumps (@1545–) are not transcribed.
+- **After a ground jump** (@1066–1537), when a side is held (`_-81n()`) or local 6 (the dash window with the
+  `_-R5q._-66U` bits 4 / 8 matching the side), with M = `_-K64()`. Held left (`_-141()`): with `_-M3V` and
+  vx > 4, vx −= 4; else a positive vx becomes 0; else at vx ≤ −M, `_-84` −= `_-13G` × 0.5 (`_-13G` = 30, so
+  15). Held right is the mirror. [H] `_-84` is the horizontal impulse, folded like `_-A4A`.
+
+**Wall jump** (@1545–2014) [V], when the grounded branch is not taken and `_-r51` ≠ 0 or `_-Xb` == 2:
+- `_-31A()`, `_-96f` = null, `_-A4A` −= `Entity._-S4O` × k (53 × k), `_-v1D` = 0;
+- `_-P5S` takes the value returned by the `_-v1D` write [H: 0; `_-N5C` is an interface, #3199 has no body];
+- with no side held, `_-CV(_-r35())` [H: turn away from the wall];
+- `_-84` += 48 on a wall `_-r51` == 1 (× 0.9 when held left), else −= 48 (× 0.9 when held right): the push
+  is weaker when the held side points back at the wall [H on the side meaning];
+- event `'jump.Wall'`.
+
+**Air jump** (@2018–2423) [V], when `_-P5Y()` < `_-56T()` [H: air jumps used < allowed]:
+- `_-31A()`, impulse 57 × k, or 65 × k with the second argument; `_-P5S` = 0; `_-A4A` −= impulse;
+  `_-k1j(_-P5Y() + 1)`; a stat counter `_-K53._-G5O`++ under `_-i2H._-A1S`;
+- with a side held and M = `_-K64(false)`: held left, vx > M becomes M; held right, vx < −M becomes −M;
+- event `'jump.Air'`.
+- With no air jump left (@2427): local 12 = `_-e3e` & `Entity._-8` ≠ 0, `_-I5A` = 0.
+
+**Jump squat** (`Entity.Jump` @223–506, `Entity._-8i` #2984, `Entity._-A2X` #3131) [V]. The input
+(`_-i4Z._-51o` #6313) calls `Jump(t)` with one argument; a power calls `Jump(t, true)` (`_-F5N._-C5S` #1700,
+hence k = 0.86).
+- **Gate** (@223–320): no second nor third argument, no running power (`_-Kc._-o3I`), the jump lock over
+  (`_-532` == 0 or t > `_-532` + `Entity._-z3C`, 192), and no dash window or `_-L3a` == 2.
+- **Start** (@324–506): if `_-w3i` + `Entity._-k5G` (192) ≥ t, `_-w4c(t, false, false, _-R5q._-66U)` and, in the
+  air, `_-y1U(t, false)`; then `_-n5b(t, airborne, on a wall, false)`, the pending kind `_-Xb` = 1 (ground),
+  2 (`_-r51` ≠ 0) or 3 (air), `_-I5A` = t, and Jump returns without any impulse.
+- **Release** (`_-8i` @2674–2718): once `_-Xb` ≠ 0 and t ≥ `_-I5A` + 32, `_-A2X(t)`: `_-g38()` when no power
+  runs, `_-P5S` = 0, `_-I5A` = 0, then `Jump(t, false, true)`, which takes the ground / wall / air branch above.
+  So a jump leaves the ground 32 ms (2 ticks of 16 ms) after the press [H on the tick count].
+- **Landing** (`_-8i` @13427–13510): when the fighter was airborne before the move (local 37 = `_-wn()`), is
+  not after it, and `_-96p()` [H]: `_-t4D` = t, and a pending jump waits 64 ms more (`_-I5A` += 64).
+- In the dash window with `_-L3a` ≠ 2, there is no squat: the jump (170) happens at the press.
+- `_-Xb` goes back to 0 right after that call (`_-A2X` @82), in `Entity._-Re` #2981 @440 (with `_-I5A` = 0 while
+  `_-5q()`, hitstun [H]) and in `_-p1Y` #3034 @298 (with `_-r51` = 0).
+- Not read: the `_-H5F(t, third)` guard @36–59 (Jump returns when it is true and there is no second argument).
 
 **Horizontal speed** ([`tools/bh/horizontal.py`](../tools/bh/horizontal.py), `_-8i` @519–2659; first read in
 horizontal-11.00.md, PR #23) [V]. Before the walk, `_-v1D` goes through friction, then acceleration:
