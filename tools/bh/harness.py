@@ -39,7 +39,7 @@ from .hitdetect import (area_center, capsules_touch, frame_window, hit_capsule, 
 from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_decay, knockback_force
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
-from .input_buffer import attack_slot, state_at
+from .input_buffer import attack_slot, buffered_presses, state_at
 from .power_data import power_steps
 from .power_pick import power_name, redirect
 from .power_timeline import Timeline, tick_index
@@ -547,11 +547,23 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
             if body["state"] in (0, 5) and p["f"] is not None:
                 body["spawned"] = SPAWNED_IN_PLAY
                 records = inputs_by_id.get(p["e"]["id"], [])
-                keys, before = state_at(records, t), state_at(records, t - STEP_MS)
-                tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT),
-                     bool(keys & JUMP and not before & JUMP), 0, bounds,
-                     bool(keys & DODGE_DASH and not before & DODGE_DASH), keys, dodge_rows,
-                     bool(keys & LIGHT and not before & LIGHT), bool(keys & HEAVY and not before & HEAVY))
+                keys = state_at(records, t)
+                bp = buffered_presses(records, t) or {}         # #6313: presses kept 4 ticks (window 5)
+                done = p.setdefault("handled", {})
+                fresh = {a: bp[a] for a in ("Jump", "DodgeDash", "LightAttack", "HeavyAttack")
+                         if a in bp and bp[a] > done.get(a, -1)}
+                ev = tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT), "Jump" in fresh, 0,
+                          bounds, "DodgeDash" in fresh, keys, dodge_rows, "LightAttack" in fresh,
+                          "HeavyAttack" in fresh)
+                attacks = [a for a in ("LightAttack", "HeavyAttack") if a in fresh]   # tick's order
+                for e in ev:                                    # a press is handled once its action ran [H]
+                    if e[0] == "press" and e[1] is not None:
+                        done["Jump"] = fresh["Jump"]
+                    elif e[0] == "dodge":
+                        done["DodgeDash"] = fresh["DodgeDash"]  # `_-C51` = t (#6313 @2389-2504)
+                    elif e[0] == "attack" and attacks:
+                        a = attacks.pop(0)
+                        done[a] = fresh[a]
         if hurtbox is not None:                             # b4: queued hits of the fired steps [H]
             for p in players:
                 f = p["f"]

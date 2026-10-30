@@ -335,3 +335,9 @@ Two more [V] rules added after that: a hit with a knockback gives the victim one
 @1171-1226), and the fall cap is 85 with Drop held (movement-11.00.md, @5097-5170). Neither moves the
 aggregate (224 early, 13 late, harness life 13.8 s): the drift is broad, and the first-KO time is too coarse to
 judge one piece at a time. A finer check needs a per-tick reference (positions), which a replay does not hold.
+
+Then the knockback decay `_-V12` (in hitstun while v² >= 2500, instead of friction; fold overshoots kept in
+`_-J1m` / `_-d4x`): no change. Then **the input buffer in `play`**: `input_buffer.buffered_presses` (window 5, a
+press kept 4 ticks) feeds Jump, DodgeDash, LightAttack and HeavyAttack, and a press counts as handled once its
+action ran (`_-C51` for the dodge; [H] for the others), so a refused press is retried on the next ticks. Rerun:
+10 late, **1 off by one tick** (the first near-exact first KO), 4 within 1 s, harness life 14.0 s (median).
