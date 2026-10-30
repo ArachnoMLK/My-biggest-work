@@ -611,8 +611,9 @@ hence k = 0.86).
 - **Landing** (`_-8i` @13427–13510): when the fighter was airborne before the move (local 37 = `_-wn()`), is
   not after it, and `_-96p()` [H]: `_-t4D` = t, and a pending jump waits 64 ms more (`_-I5A` += 64).
 - In the dash window with `_-L3a` ≠ 2, there is no squat: the jump (170) happens at the press.
-- Not read: where `_-Xb` goes back to 0, and the `_-H5F(t, third)` guard @36–59 (return when it is true and
-  there is no second argument).
+- `_-Xb` goes back to 0 right after that call (`_-A2X` @82), in `Entity._-Re` #2981 @440 (with `_-I5A` = 0 while
+  `_-5q()`, hitstun [H]) and in `_-p1Y` #3034 @298 (with `_-r51` = 0).
+- Not read: the `_-H5F(t, third)` guard @36–59 (Jump returns when it is true and there is no second argument).
 
 **Horizontal speed** ([`tools/bh/horizontal.py`](../tools/bh/horizontal.py), `_-8i` @519–2659; first read in
 horizontal-11.00.md, PR #23) [V]. Before the walk, `_-v1D` goes through friction, then acceleration:

@@ -68,7 +68,8 @@ def squat_start(t, ground, r51):
 def squat_due(t, xb, i5a):
     """`Entity._-8i` #2984 @2674-2718: with a jump pending (`_-Xb` != 0) and t >= `_-I5A` + 32, `_-A2X(t)` runs:
     `_-g38()` when no power runs, `_-P5S` = 0, `_-I5A` = 0, then `Jump(t, false, true)` (the third argument skips
-    the squat; the kind of jump is then picked from `_-96f`, `_-r51` and the stored `_-Xb`)."""
+    the squat; the kind of jump is then picked from `_-96f`, `_-r51` and the stored `_-Xb`), then `_-Xb` = 0.
+    `Entity._-Re` #2981 also clears a pending jump: `_-I5A` = 0 while `_-5q()` (hitstun) and `_-Xb` = 0 at @440."""
     return xb != 0 and t >= i5a + SQUAT_MS
 
 
@@ -241,7 +242,7 @@ ANCHORS = {ABC_1100: {
         (2984, 2707, "greaterequals", ""),
         (2984, 2718, "callpropvoid", "_-A2X, 1"),
     ],
-    "Entity._-A2X: _-g38 without power; _-P5S = 0; _-I5A = 0; Jump(t, false, true)": [
+    "Entity._-A2X: _-g38 without power; _-P5S = 0; _-I5A = 0; Jump(t, false, true); _-Xb = 0 (also cleared in _-Re #2981 and _-p1Y #3034)": [
         (3131, 8, "getproperty", "_-o3I"),
         (3131, 31, "callpropvoid", "_-g38, 0"),
         (3131, 44, "getproperty", "_-P5S"),
@@ -249,6 +250,12 @@ ANCHORS = {ABC_1100: {
         (3131, 68, "pushfalse", ""),
         (3131, 69, "pushtrue", ""),
         (3131, 70, "callpropvoid", "Jump, 3"),
+        (3131, 79, "pushbyte", "0"),
+        (3131, 82, "initproperty", "_-Xb"),
+        (2981, 34, "callproperty", "_-5q, 0"),
+        (2981, 49, "initproperty", "_-I5A"),
+        (2981, 440, "initproperty", "_-Xb"),
+        (3034, 298, "initproperty", "_-Xb"),
     ],
     "Entity._-8i landing: not _-wn() and local 37 and _-96p(): _-t4D = t; _-Xb != 0 -> _-I5A += 64": [
         (2984, 13139, "setlocal", "37"),
