@@ -6,8 +6,9 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (clears_velocity, cooldown_ms, counter, dodge_over, facing, formula_mult, k64,  # noqa: E402
-                      kind, landed_cooldown, neutral_push, pick, speed_x, speed_y, standard_flag, timers)
+from bh.dodge import (clears_velocity, cooldown_ms, counter, dodge_over, ease, facing, formula_mult, k64,  # noqa: E402
+                      kind, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x, speed_y,
+                      standard_flag, timers)
 
 
 class Dodge(unittest.TestCase):
@@ -73,6 +74,33 @@ class Dodge(unittest.TestCase):
         self.assertEqual(dodge_over(1000, True, 700, 300, 888), (True, True))
         self.assertEqual(dodge_over(1000, True, 0, 300, 0), (True, False))
         self.assertEqual(dodge_over(1000, False, 700, 300, 0), (False, False))
+
+    def test_moves(self):
+        self.assertFalse(moves(0, 1))
+        self.assertTrue(moves(0, 2))
+        self.assertTrue(moves(1, 1))
+
+    def test_ease(self):
+        self.assertEqual(ease("None", 1100, 1000, 300, 100), 1.0)
+        self.assertAlmostEqual(ease("EaseHorizontal", 1080, 1000, 300, 100), 1.5)
+        self.assertAlmostEqual(ease("EaseHorizontal", 1100, 1000, 300, 100), 1 - 0.25 / 3)
+
+    def test_push(self):
+        args = dict(t=1000, h2b=1000, e3e=0, moving=True, t5l=0.5, wl=0.25, ax_mult=2.0, ay_mult=1.0,
+                    ax_formula="", ay_formula="", uy=100, c1d=100)
+        self.assertEqual(push(o5c=4, **args), (-60.0, 15.0))
+        self.assertEqual(push(o5c=8, **args), (60.0, 15.0))
+        self.assertEqual(push(o5c=1, **args), (0.0, 15.0))
+        self.assertIsNone(push(o5c=8, **dict(args, t=999)))
+        self.assertIsNone(push(o5c=8, **dict(args, e3e=4096)))
+        self.assertIsNone(push(o5c=8, **dict(args, moving=False)))
+
+    def test_side_latch(self):
+        self.assertEqual(side_latch(False, False, 4), (True, True))
+        self.assertEqual(side_latch(True, True, 4), (True, True))
+        self.assertEqual(side_latch(True, True, 8), (True, False))
+        self.assertEqual(side_latch(True, False, 8), (True, False))
+        self.assertEqual(side_latch(False, True, 12), (False, True))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)

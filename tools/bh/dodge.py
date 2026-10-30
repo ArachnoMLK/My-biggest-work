@@ -85,7 +85,8 @@ def counter(k6, chained, has_dir_bits, airborne, f2b, e6p=False):
 COLUMNS = {"DodgeName": "_-86E", "DodgeID": "_-B3q", "Set": "_-p1r", "Air/Ground/Both": "_-6H",
            "direction (Neutral, Side, Up, Down, SideUp, SideDown)": "_-h2L", "IsFast": "_-t3v",
            "Duration": "mDuration", "Recover": "_-53o", "SpeedXMult": "_-a5a", "Cooldown": "_-p2U",
-           "CooldownGround": "_-S6E", "CooldownLanded": "_-T2A"}
+           "CooldownGround": "_-S6E", "CooldownLanded": "_-T2A",
+           "AccelXFormula": "_-K35", "AccelXMult": "_-r4O", "AccelYFormula": "_-F5s", "AccelYMult": "_-k4q"}
 KIND_SIDE, KIND_UP, KIND_DOWN = 1, 2, 4           # @660-742: Neutral 0, Side 1, Up 2, Down 4, SideUp 3, SideDown 5
 WHERE_GROUND, WHERE_AIR, WHERE_BOTH = 1, 2, 3     # @357-369 / @312-323; Both = `_-h3i._-I6u` = 1 | 2 (#15351 @27965-27972)
 FALLBACK = "StandardSpot"                         # @1526-1539: the row named StandardSpot is `_-h3i._-Z6`
@@ -154,6 +155,47 @@ def dodge_over(t, u5e, h2b, y1f, e3):
     `_-51c(false, true)`. Returns (over, calls_mx). [H] `_-u5E()`, `_-3E` (written by Dash), `_-MX`, `_-51c`."""
     over = bool(u5e) and h2b + y1f <= t and not (e3 + DASH_HOLD_MS > t)
     return over, over and h2b > 0
+
+
+FLAG_24F = 4096            # `Entity._-24F` (script157.<init> #3173 @1165): an `_-e3e` bit that stops the push
+
+
+def moves(h2l, where):
+    """`_-t1A` @367-400 (local 6): false only for a Neutral (`_-h2L` == 0) ground-only (`_-6H` == 1) type."""
+    return not (h2l == 0 and where == WHERE_GROUND)
+
+
+def ease(formula, t, h2b, uy, c1d):
+    """`_-h3i._-I5a(t, formula, fighter)` #2772: "EaseHorizontal": e = (t - `_-H2b`) / (`_-Uy` + `_-C1d`),
+    1 + 2.5 e while e < 0.25, else 1 - e / 3; anything else: 1. [H] the uint wrap of t < `_-H2b` is not
+    reached: the caller runs only from `_-H2b` on."""
+    if formula != "EaseHorizontal":
+        return 1.0
+    e = ((t - h2b) & 0xFFFFFFFF) / float((uy + c1d) & 0xFFFFFFFF)
+    return 1 + e * 2.5 if e < 0.25 else 1 - e / 3
+
+
+def push(t, h2b, e3e, moving, t5l, wl, ax_mult, ay_mult, ax_formula, ay_formula, uy, c1d, o5c):
+    """`_-t1A` @1854-2097, the tick of a dodge still under way (`_-H2b` + `_-Uy` + `_-C1d` > t): from t >= `_-H2b`
+    with the `_-e3e` bit 4096 clear and a moving type, `_-v1D` = `_-P5S` = 0, then the impulses
+    `_-84` = ±60 `_-T5L` AccelXMult ease(AccelXFormula) (negative with Left in `_-O5C`, 0 without a side) and
+    `_-A4A` = 60 `_-WL` AccelYMult ease(AccelYFormula). Returns None when nothing is written, else (`_-84`, `_-A4A`)."""
+    if t < h2b or e3e & FLAG_24F or not moving:
+        return None
+    vx = 60.0 * t5l * ax_mult * ease(ax_formula, t, h2b, uy, c1d)
+    vy = 60.0 * wl * ay_mult * ease(ay_formula, t, h2b, uy, c1d)
+    return (-vx if o5c & LEFT else vx if o5c & RIGHT else 0.0), vy
+
+
+def side_latch(l4a, g5e, held):
+    """`_-t1A` @2101-2300 (same gate as `push`, any type): only Left held (`_-R5q._-66U`) with `_-l4A` or
+    `_-g5E` clear sets both true; else only Right held with `_-l4A` clear or `_-g5E` set sets `_-l4A` = true,
+    `_-g5E` = false. Returns (`_-l4A`, `_-g5E`). [H] the side pressed during the dodge, for its end."""
+    if (not l4a or not g5e) and held & LEFT and not held & RIGHT:
+        return True, True
+    if (not l4a or g5e) and held & RIGHT and not held & LEFT:
+        return True, False
+    return l4a, g5e
 
 
 def formula_mult(formula, vx, k64, dir):
@@ -373,5 +415,42 @@ ANCHORS = {ABC_1100: {
         (3173, 803, "initproperty", "_-y4m"),
         (3173, 882, "pushuint", "240"),
         (3173, 885, "initproperty", "_-l2o"),
+    ],
+    "Entity._-t1A dodge tick: moving unless Neutral ground-only; _-84 / _-A4A = 60 x _-T5L / _-WL x AccelMult x _-I5a ease; side latch _-l4A / _-g5E": [
+        (2992, 373, "getproperty", "_-h2L"),
+        (2992, 386, "getproperty", "_-6H"),
+        (2992, 428, "iffalse", "1422"),
+        (2992, 1863, "greaterequals", ""),
+        (2992, 1878, "getproperty", "_-24F"),
+        (2992, 1892, "iffalse", "205"),
+        (2992, 1910, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2992, 1928, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2992, 1932, "pushdouble", "60.0"),
+        (2992, 1942, "getproperty", "_-r4O"),
+        (2992, 1950, "pushdouble", "60.0"),
+        (2992, 1962, "getproperty", "_-k4q"),
+        (2992, 1977, "getproperty", "_-K35"),
+        (2992, 1981, "callproperty", "_-I5a, 3"),
+        (2992, 1998, "getproperty", "_-F5s"),
+        (2992, 2002, "callproperty", "_-I5a, 3"),
+        (2992, 2021, "getproperty", "_-84"),
+        (2992, 2045, "negate", ""),
+        (2992, 2091, "getproperty", "_-A4A"),
+        (2992, 2188, "initproperty", "_-l4A"),
+        (2992, 2197, "initproperty", "_-g5E"),
+        (2992, 2291, "initproperty", "_-l4A"),
+        (2992, 2300, "initproperty", "_-g5E"),
+        (2772, 20, "pushstring", "'EaseHorizontal'"),
+        (2772, 29, "getproperty", "_-H2b"),
+        (2772, 61, "pushdouble", "0.25"),
+        (2772, 72, "pushdouble", "2.5"),
+        (2772, 88, "pushbyte", "3"),
+        (2768, 149, "pushstring", "'AccelXFormula'"),
+        (2768, 182, "pushstring", "'AccelXMult'"),
+        (2768, 202, "initproperty", "_-r4O"),
+        (2768, 245, "pushstring", "'AccelYMult'"),
+        (2768, 265, "initproperty", "_-k4q"),
+        (3173, 1165, "pushint", "4096"),
+        (3173, 1167, "initproperty", "_-24F"),
     ],
 }}
