@@ -11,7 +11,7 @@ bytecode arithmetic and a `*-verify` command pins it.
 |---|---|---|---|
 | 3 | Moving platforms and their lines (`_-22K._-d4u`) | #30 `platforms.py` | done (rotation on lines open) |
 | 5 | Inputs: replay timeline → keys, buffer, press edges | #28 `input_buffer.py`, #16 bit names | done |
-| 5 | Fighter state dispatch (`_-65w`), power choice (slot → power) | #30 `entity_states.py` (dispatch map), #28 (slots) | dispatch, power start, match start, respawn points mapped; respawn 3 → 0 to confirm |
+| 5 | Fighter state dispatch (`_-65w`), power choice (slot → power) | #30 `entity_states.py` (dispatch map), #28 (slots) | dispatch, power start, match start, respawn points, respawn drone 3 → 4 → 0 / 5 (`spawn_bot.py`) mapped |
 | 5 | Movement: impulses, friction, gravity, ground walk | #4 / #23 / #26 `step.py` | done (shape) |
 | 5 | Free move against the map: sweeps, back-off, response (ceiling, slope, walls, bounce) | #30 `air_move.py` | done (`_-wn()`, `_-t46()` and other flags passed in) |
 | 5 | Map: LevelDesc lines, curves, default normals, grid, ray cast | #20 (flags), #30 `level_collision.py`, `raycast.py` | done |
@@ -26,10 +26,10 @@ bytecode arithmetic and a `*-verify` command pins it.
 
 ## Missing pieces, by priority
 
-1. **Fighter state transitions.** Mostly done (#30): the dispatch on `_-65w`, the power start chain, match
-   start (state 3 then Respawn, two R draws), the respawn point rotation, and state 7 = "Eliminated" (no
-   7 → 0 in a normal match). Left: confirm that a normal respawn goes 3 → 0 through `_-k5S._-P3o`
-   (SpawnBot `_-P3o` / `_-m1O`).
+1. **Fighter state transitions.** Done (#30): the dispatch on `_-65w`, the power start chain, match start
+   (state 3, then `Respawn` with `eliminated` = false, two R draws), the respawn point rotation, state 7 =
+   "Eliminated", and the respawn drone `SpawnBot` (`spawn_bot.py`): instant 0 in some modes, otherwise come
+   down / carry / drop phases, state 4 while held, then 0 (or 5). Left as data: the scoring-type durations.
 2. **Animation frame table `_-cA`** (`_-l4X._-54L` #86). It maps ticks since cast to animation frames, from
    CastAnim (`_-HT` / `_-6b`) and the animation's frame data (`_-y1v`: `_-T6`, `_-W1n`, `_-012`). It
    selects the target's hurtbox row (§4 of hit-detection-11.00.md). Needs the `.anm` parser of PR #19.
