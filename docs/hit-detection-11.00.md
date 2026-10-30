@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1289 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1342 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -923,6 +923,20 @@ map collision only run in states 0 and 5**.
   - in team mode (`_-O3P()`), team 1 uses counter 0 and the first half of the list (counter mod (n >> 1));
     team 2 uses counter 1 and the second half (the same plus ceil(n/2));
   - the fighter is then placed with `_-k5S._-P3o`.
+
+- **Candidate lists** ([`tools/bh/respawn_points.py`](../tools/bh/respawn_points.py)) [V]. `_-139._-L1q` #5288
+  reads each `<Respawn>` into a point at (X + dx, Y + dy) (dx / dy: the parent's offset [H]); `Initial` and
+  `ExpandedInit` count only when their text is "TRUE" in any case. `_-a2j._-y1c` puts every point in `_-X6Q`,
+  the ones without ExpandedInit in `_-o5y`, the Initial ones in `_-d2Y`; a point in a moving platform also
+  sets `_-V5D`. Once per tick `_-W1y` sorts the three lists with `_-J5b`: by x, then y, static points before
+  platform ones, then the platform id `_-94r` [H: `Array.sort` is not stable on equal keys].
+- **Which list** (`_-X6R._-x22(t, n, flags)` #6790) [V]. n (from `_-K5c`) counts the fighters without the
+  `Entity._-o2q` bit and not in state 7 / 8. With flag 1 (`_-44x`) and at least n Initial points, the Initial
+  list; else `_-o5y`; and with flag 1, no `_-F3O` and fewer than n points, `_-X6Q`. With moving respawns
+  (`_-V5D`) the list is filtered by `_-n1u` at t + `_-Y5H(t, flags)` (not transcribed). `_-K5c` first asks the
+  game mode (`_-H1g._-sZ._-N3`) for a point, and falls back to `_-I1f._-N4x()` on an empty list.
+- So `_-o5y`, the list the match-start draws use (n = its length, or 37), is the sorted list of points
+  without ExpandedInit.
 
 ### 10.1 Respawn drone: from state 3 back to 0 ([`tools/bh/spawn_bot.py`](../tools/bh/spawn_bot.py))
 
