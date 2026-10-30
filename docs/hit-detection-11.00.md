@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(776 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(851 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -613,13 +613,26 @@ Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not po
 4. **Swept test.** When the fine test misses, a swept capsule from the previous position (`_-X2D`,
    `_-14l` − h/2) to the current one is tried, with radius min(w, h)/2 of the item type (@1234–1282). A
    fast item cannot pass through a target between two ticks.
-5. **Per-target gates.** Gates per target run on the bit `1 << _-03K()` of `_-Io` / `_-x5G`. They
-   involve:
-   - catch windows `_-O13 + 400`;
-   - 32 or 64 ms depending on whether the item moves mostly along x (`_-Lu`) or y (`_-33c`);
-   - `_-K3V`, `_-J5Z`, `_-66f`, `_-I1E`.
+5. **Per-target gates** (`items.target_gate`) [V; names of `_-J5Z` / `_-66f` / `_-I1E` are H]. Each candidate
+   has a bit `1 << _-03K()`. `_-Io` holds the targets already hit (−1 = all), `_-x5G` the targets still in
+   contact. In order:
+   - **Only stunned.** With `OnlyStunnedTrigger` (`_-N59`), a fighter that is not in hitstun is skipped.
+   - **Already hit.** A target in `_-Io` is skipped, unless `AllowRepeatedCollision` (`_-A4s`) is set and
+     `_-Io` ≠ −1.
+   - **400 ms after the throw** (`_-O13 + 400`), a fighter is skipped in two cases: the thrower is in
+     hitstun from that fighter's last power, and that power is not a ThrownItem (TargetMethod 11); or
+     `_-I1E(candidate)` is true.
+   - **No overlap** (steps 3–4): the bit is cleared from `_-x5G`, no hit.
+   - **Catch.** If the fighter can catch (`_-J5Z(t, false, true)`), there is no hit. The bit is cleared when
+     `_-66f(_-Lu, _-33c)` is true, set otherwise.
+   - **Grace after the throw.** A fighter not in hitstun is not hit during the first 32 ms after the throw,
+     or 64 ms when the item moves more along y than x. The bit is set.
+   - **Boomerang** (PathType 1). The bit is cleared again once t − max(`_-u4B`, `_-O13`) ≥ 500 ms
+     (`_-p5k._-K3V`).
+   - **Still in contact.** A target whose bit is set is not hit again, unless `_-f4i` and an
+     `OnExplodePower` exist.
 
-   These are read but **not transcribed** [V shape; meanings H].
+   Otherwise the candidate is kept. The last candidate kept is the one that is hit.
 6. **Hit.** The last target that passes is handed to `_-Q3h(t, holder, target)` (@1792). That calls
    `_-R58` (#15230 @242), which spawns a power of the thrower with `_-F5N._-q5` (#15209 @1829). `_-q5`
    builds a new `_-l4X` with **`_-x4I = the hit target`** and `_-A3S = true`, adds it to `_-pX` and runs
@@ -627,6 +640,32 @@ Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not po
 
 So for TargetMethod 2 / 11 (Ranged, ThrownItem), §2's "list = [`_-x4I`]" means the power hits exactly the
 target the item touched. `_-A3S` makes the line of sight ignore item-ignore lines (§7.1).
+
+### 8.1 Motion of a thrown item ([`tools/bh/items.py`](../tools/bh/items.py), `_-p5k._-8i` #15192)
+
+Each tick, before its map sweeps, a thrown item updates its speeds `_-Lu` (x) and `_-33c` (y) [V, bytecode
+order]:
+1. **Friction.** `_-Lu` moves toward 0 by `Friction` × 0.384 on a ground line, or `AirFriction` × 0.384 in
+   the air (defaults 2.5 / 0.15). It stops at 0 instead of changing sign.
+2. **Horizontal impulse and cap.** `_-Lu` += `_-B66`, then it is capped at ±`_-Z5d`. `ItemType.<init>` sets
+   `_-Z5d` to 0 and no column writes it, so the cap is **350**. The x step is `_-Lu` × 0.384.
+3. **Ground walk.** On a ground line with normal y < 0, the x step walks along the line (@1268–1732, the
+   same loop shape as the fighter's). Not transcribed yet.
+4. **Vertical impulse and cap.** `_-33c` += `_-46m`, then the same ±cap.
+5. **Lifetime.** The item is removed (`_-5k()`) once t − `_-O13` > `PathLength` (when PathLength ≠ 0).
+6. **Path behaviours.** With `_-BG` set, `PathType` chooses one: BoomerangHoming 1, Linear 2, Rocket 3,
+   RocketHoming 4, Crawl 5, otherwise 0 (lookupswitch @1901). Not transcribed yet.
+7. **Gravity.** Without `_-BG`, gravity is added unless the item rests on a flat line (`_-Lu` = `_-33c` = 0,
+   normal y = −1). It is `ThrownGravity` while thrown (`_-r5B` ≠ 0, `_-o2O` false), else `Gravity` (both
+   3.75 by default), times 0.384. The cap is applied before gravity, not after.
+8. **Move vector.** It is (x step, `_-33c` × 0.384), plus 2 × `_-p5k._-x3M` = 2.02 on a ground line.
+
+**Mask.** The sweeps use hard | soft, or hard only in three cases:
+- for 64 ms after a throw by a fighter standing on a soft line (state 1);
+- for a BoomerangHoming item while `_-BG` is set;
+- in state 1 with ThrownGravity 0 and `ForceNoHitstop` (`_-T30`).
+
+Local check (aggregate): the 75 local item types parse with 0 errors; 2 use a path behaviour.
 
 ## 9. Where this runs in a tick
 
