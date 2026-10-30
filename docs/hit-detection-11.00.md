@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1342 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1388 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -916,6 +916,15 @@ map collision only run in states 0 and 5**.
   state 0 at once. In the same call, the replay generator R (`_-s3D._-22`) is **drawn twice**:
   `_-G5X[i] = R._-f4c() % n` for i = 0, 1, where n is the number of `_-I1f._-o5y` entries, or 37 when there
   are none (@904–1002) [V].
+- **Correction: the match-start placement** ([`tools/bh/match_start.py`](../tools/bh/match_start.py)) [V]. Not
+  every fighter goes to `Respawn`. On the match-start tick only fighters in state 2 are taken; those with no
+  `Entity._-o2q` bit, no game-mode test (`_-06A._-Z3E`) and no mode point (`_-sZ._-N3`) form a **start list**,
+  the others go to `Respawn`. The start list is shuffled with R (`_-A6B._-eV`, one draw per fighter) unless
+  `_-d3Y._-a4w()` (then sorted by `_-34Y`); with two fighters outside team mode, `_-Q2Q` gives the first one
+  the first candidate of `_-x22(t, 2, 1)` and the second one the last candidate (so the leftmost and the
+  rightmost Initial points when there are two or more), each through the drone `_-P3o`. One fighter →
+  `_-X5t`; more → `_-z16` / `_-U24` (not read). So a plain 1v1 draws R **four** times at the match start:
+  two for the shuffle, then the two `_-G5X` draws.
 - **Respawn point** (`_-X6R._-K5c` #6778, `respawn_index`). `_-G5X` holds the respawn point counters, so
   the two draws above pick where the rotation starts [V]. Each respawn takes the candidate list from `_-x22`
   and adds 1 to a counter:

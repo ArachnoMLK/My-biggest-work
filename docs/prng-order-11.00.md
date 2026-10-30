@@ -111,7 +111,12 @@ that can happen is limit L2.
 | | @904–1002, only when local 2: n = `_-N1k._-I1f._-o5y.length`, or 37 when 0 (@919–943); **two draws** `_-G5X[i] = R._-f4c() % n` for i = 0, 1 with `R = _-N1k._-s3D._-22` (@972–992) | [V] draws; [H] `_-G5X` meaning |
 | | the same call gives the eligible fighters state 3 (@408–411) and passes them to `Respawn` (@879–886) | [V] |
 
-So the replay generator R is drawn twice on the first tick with t ≥ `_-n4k` + 256 ms, in phase 4, before
+**Correction** (match_start.py, PR #30): before those two draws, the same call shuffles the start list with
+R (`_-A6B._-eV(list, R)` @712–730, one draw per fighter) unless `_-d3Y._-a4w()` [V]. So in a plain 1v1 R is
+drawn **four** times on the first tick with t ≥ `_-n4k` + 256 ms, in phase 4, before the entity passes: two
+shuffle draws, then the two `_-G5X` draws.
+
+So the replay generator R is drawn (at least) twice on the first tick with t ≥ `_-n4k` + 256 ms, in phase 4, before
 the entity passes. Pinned by `hit-detection-verify` (group "Match start in _-X6R._-b3x").
 
 ## 5. Limits and unknowns (precise boundaries)
