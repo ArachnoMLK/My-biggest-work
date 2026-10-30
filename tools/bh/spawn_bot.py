@@ -75,6 +75,32 @@ def drop_ms(flags, rules):
     return rules["C18"]
 
 
+# `ScoringType.static._-6P` #7475 column -> field, and the `ScoringType.<init>` #7470 defaults. `_-K2V` and
+# `_-Ac` are Boolean slots that `<init>` leaves at false.
+SCORING_COLUMNS = {"FetchDuration": "o2N", "RespawnDuration": "j57", "DropDuration": "C18",
+                   "RespawnTimesForRounds": "K2V", "RespawnTimesOnlyForSpecialEntities": "Ac"}
+SCORING_DEFAULTS = {"o2N": 1500, "j57": 2500, "C18": 700, "K2V": False, "Ac": False}
+
+
+def scoring_rules(cells, f3o=False, timed_until=None, n4k=0):
+    """`rules` for the duration getters from one ScoringType's cells ({column: text}); missing cells keep
+    the defaults. Integers through `_-N2e._-vD`, booleans through `_-Qr` ("true" [H: the exact spelling
+    rules of `_-Qr` are not read here])."""
+    r = dict(SCORING_DEFAULTS)
+    for col, field in SCORING_COLUMNS.items():
+        v = cells.get(col)
+        if v is None or v == "":
+            continue
+        r[field] = v.strip().lower() == "true" if field in ("K2V", "Ac") else int(v)
+    r.update({"F3O": f3o, "timed_until": timed_until, "n4k": n4k})
+    return r
+
+
+def respawn_ms(flags, rules):
+    """Phases 1 + 2 + 3 of the drone: the time from `Respawn` to the drop."""
+    return come_down_ms(flags, rules) + carry_ms(flags, rules) + drop_ms(flags, rules)
+
+
 def drop_anim_scale(duration):
     """`SpawnBot._-m1O` @55-106: the drop animation speed `_-H1j`."""
     return DEFAULT_DROP_MS / duration if duration != DEFAULT_DROP_MS else 1.0
@@ -264,5 +290,25 @@ ANCHORS = {ABC_1100: {
         (6792, 197, "getproperty", "_-j57"),
         (6794, 37, "pushuint", "700"),
         (6794, 53, "getproperty", "_-C18"),
+    ],
+    "ScoringType columns: FetchDuration _-o2N 1500, RespawnDuration _-j57 2500, DropDuration _-C18 700; K2V / Ac": [
+        (7475, 290, "pushstring", "'DropDuration'"),
+        (7475, 312, "initproperty", "_-C18"),
+        (7475, 321, "pushstring", "'FetchDuration'"),
+        (7475, 342, "initproperty", "_-o2N"),
+        (7475, 352, "pushstring", "'RespawnDuration'"),
+        (7475, 373, "initproperty", "_-j57"),
+        (7475, 1106, "pushstring", "'RespawnTimesForRounds'"),
+        (7475, 1126, "initproperty", "_-K2V"),
+        (7475, 1136, "pushstring", "'RespawnTimesOnlyForSpecialEntities'"),
+        (7475, 1156, "initproperty", "_-Ac"),
+        (7470, 24, "pushuint", "700"),
+        (7470, 32, "pushuint", "2500"),
+        (7470, 42, "pushuint", "1500"),
+    ],
+    "KO commit Entity._-eR calls _-W1R.Respawn(t, this, _-19()) in the same tick": [
+        (3138, 1134, "getproperty", "_-W1R"),
+        (3138, 1142, "callproperty", "_-19, 0"),
+        (3138, 1147, "callpropvoid", "Respawn, 3"),
     ],
 }}

@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(760 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(776 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -733,8 +733,21 @@ map collision only run in states 0 and 5**.
 
   The long case is: `_-S3h` exists, flag 4 is set and `_-w1s` = `_-n4k` + 6000; or else flag 1 (phase 1) or
   flag 1 or 4 (phase 2) is set and `_-K2V` is false.
-- [H] The scoring-type fields (`_-o2N`, `_-j57`, `_-C18`, `_-K2V`, `_-Ac`) come from game data and are not
-  read here; with them, a normal respawn takes phase 1 + phase 2 + phase 3 ms before the fighter moves.
+- **Scoring-type fields** (`ScoringType.static._-6P` #7475, defaults from `<init>` #7470) [V]:
+  - `FetchDuration` → `_-o2N` (default 1500);
+  - `RespawnDuration` → `_-j57` (default 2500);
+  - `DropDuration` → `_-C18` (default 700);
+  - `RespawnTimesForRounds` → `_-K2V` and `RespawnTimesOnlyForSpecialEntities` → `_-Ac`, both false by
+    default (`spawn_bot.scoring_rules`).
+
+  For a spawned fighter (flag 1) without `_-K2V`, the drone therefore takes 2000 + 3000 + 700 = **5700 ms**
+  with the defaults.
+- **From the KO.** The KO commit `Entity._-eR` #3138 calls `_-W1R.Respawn(t, this, _-19())` in the same
+  tick (@1134–1147), so the drone starts right after a ring-out [V].
+- **Replay check** (`ko-gap-check` on `integration-11.00`, aggregate only). On the 756 local 11.00 replays,
+  no gap between two KOs of the same victim is shorter than the drone time predicted for its scoring type:
+  3,241 gaps over 4 scoring types, smallest margin 172 ms. It is a one-sided check. The replays allow the
+  predicted time, but they do not show it is exact.
 
 `Entity._-b6D` #3015 is true for 4000 ms after the elimination, from `_-164` in state 7 or `_-a2O` in state 8 (it first requires the `_-8` bit of `_-e3e`) [V]. [H] It drives the post-elimination display.
 
