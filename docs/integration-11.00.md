@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 376 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 377 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -292,4 +292,7 @@ yet: the power is not started (b2-b5). [H] glue: no running move, `_-f2b()` fals
 (signatures) and itemTypes.csv (`_-Z6M`), and each fighter starts with the Unarmed item (`ItemType._-m4V`)
 [H: no pick-up yet]. **(b3, start)** the name then goes through the powerTypes.csv lookup (`power_pick.power_rows`, `_-p4G`) and
 `redirect` (GCVersion under the gravity cancel, MomentumVersion at \|vx\| >= 60 toward the facing; no test set,
-not exhausted, `_-b3A` 0 [H]). Next in b3: the power's steps (`power_data.power_steps`) and its timeline.
+not exhausted, `_-b3A` 0 [H]). Then the power starts when none runs: `power_data.power_steps` and a `power_timeline.Timeline` from the press
+tick; each tick, before `_-8i` (`_-Kc._-25` in state 0), the step that fires is recorded ("step", name, step) and
+the power is dropped once its last step fired [H: the end rules `ends_now`, chains and cancels are not chained].
+Next in b3: the frames (`anim_frames`, `.anm`), then b4 (capsules).

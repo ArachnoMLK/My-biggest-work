@@ -37,7 +37,9 @@ from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, coold
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, state_at
+from .power_data import power_steps
 from .power_pick import power_name, redirect
+from .power_timeline import Timeline, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
@@ -94,6 +96,7 @@ class Fighter:
     i46: int = 0              # `_-46I`, last hit (no hits here)
     e3: int = 0               # `_-3E`
     moves: dict = None        # {"hero": hero_powers row, "weapon": item_slots row, "powers": power_rows}
+    power: dict = None        # the running power: {"name", "steps": power_steps, "tl": Timeline}
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -224,6 +227,12 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     `dodge_press` with `dodge_rows` (dodge.parse_types) tries `Entity.Dodge(t, keys & 15)` first (#6313 tries the
     dodge before the jump). Returns the list of events of this tick."""
     events = []
+    if f.power is not None:                                     # `_-Kc._-25` before `_-8i` (state 0)
+        step = f.power["tl"].update(tick_index(t))
+        if step is not None:
+            events.append(("step", f.power["name"], step))
+        if f.power["tl"].done:
+            f.power = None                                      # [H] the end rules (`ends_now`) are not chained
     if dodge_press and dodge_rows:
         name = dodge(f, t, keys & DIR_MASK, dodge_rows)
         if name is not None:
@@ -238,6 +247,10 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             if name is not None and rows:
                 power = redirect(rows.get(name), rows.get, gc=gc, vx=f.v1d, facing_left=f.facing_left)
                 name = power["PowerName"] if power else None
+                if power is not None and f.power is None:       # [H] no chain / cancel into a running power
+                    steps = power_steps(power)
+                    if steps["CastTime"]:
+                        f.power = {"name": name, "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t))}
             events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None

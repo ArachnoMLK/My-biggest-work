@@ -129,6 +129,18 @@ class Harness(unittest.TestCase):
         ev = harness.tick(f, 1016, smoke.map_grid(FLAT), light_press=True, keys=0)
         self.assertEqual(ev[0][3], "JM")                      # |vx| >= 60 toward the facing (right)
 
+    def test_power_steps_fire_on_their_ticks(self):
+        powers = {"J": {"PowerName": "J", "CastTime": "2,3"}}
+        f = harness.Fighter(0.0, -400.0, moves={"hero": {}, "weapon": {"id": "Unarmed", "slots": ["J"] * 21},
+                                                 "powers": powers})
+        grid, fired = smoke.map_grid(FLAT), []
+        for i in range(8):
+            t = 1600 + 16 * i
+            ev = harness.tick(f, t, grid, light_press=(i == 0))
+            fired += [(i, e[2]) for e in ev if e[0] == "step"]
+        self.assertEqual(fired, [(2, 0), (5, 1)])             # step 0 after 2 ticks, step 1 three ticks later
+        self.assertIsNone(f.power)
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)
