@@ -32,6 +32,9 @@ REST_SPEED2 = 2500      # `_-p5k._-Y3M` (script822.<init> #15249): a thrown item
 STOP_SPEED = 5          # `_-u1I` @1366: on a flat floor, slower impacts stop instead of bouncing
 STRICT_COS = -0.7237379   # `_-u1I` @1187: STRICT_ANGLE sticks when cos(velocity, normal) is below this
 BOUNCY = 64             # `_-z2k._-B6P`
+BOOMERANG_DELAY_MS = 180        # `_-p5k._-L1Y` (script822.<init> #15249)
+BOOMERANG_DELAY_WOBBLE_MS = 1800   # `_-p5k._-i4S`, when `_-W6M`
+BOOMERANG_PULL = 0.05333333333333334   # `_-p5k._-o1V`
 BOOMERANG_REARM_MS = 500    # `_-p5k._-K3V` (script822.<init> #15249)
 THROW_GUARD_MS = 400        # `_-h20` @866-880
 PATH_TYPES = {"BoomerangHoming": 1, "Linear": 2, "Rocket": 3, "RocketHoming": 4, "Crawl": 5}   # else 0
@@ -324,6 +327,49 @@ def atan2_netsafe(y, x):
     return as3_round(math.atan2(a, b) * 1000.0) / 1000.0
 
 
+def dot(ax, ay, bx, by):
+    """`_-A6B.static._-467` #1023."""
+    return ax * bx + ay * by
+
+
+def boomerang_path(t, thrown_at, turned_at, launch, lu, vy, x_committed, y, target, wobble, io, x5g,
+                   thrower_gone=False):
+    """PathType 1 (BoomerangHoming), `_-p5k._-8i` @1932-2673. Returns (lu, vy, turned_at, io, x5g, removed).
+
+    1. Not turned yet (`_-74O` = 0) and the speed points against the launch speed (dot < 0): `_-74O` = t, the
+       targets already hit move into the contact mask (`_-x5G` |= `_-Io`) and `_-Io` = 0.
+    2. The item is removed when its thrower is gone (`thrower_gone`: `_-r5B` > 0 with no entity, or the
+       thrower is in a state other than 0 and 6).
+    3. `target` is the thrower's (`_-M43`, `_-E3d`), or the stored origin (`_-22W`, `_-S6B`) without one.
+       The distance uses `_-p5a()` = `_-S1I`, the x committed by the last `_-x1M` (`x_committed`), and the
+       current y.
+    4. More than 10 away and past the delay (180 ms, 1800 with `_-W6M`): the speed gains (target - pos) x
+       |launch| x 0.0533 / distance, then is capped at |launch|.
+    5. Once turned, the item is removed when it is back behind the target (dot(launch, pos - target) < 0).
+    """
+    wj, a5w = launch
+    if turned_at == 0 and dot(wj, a5w, lu, vy) < 0:
+        turned_at = t
+        x5g |= io
+        io = 0
+    if thrower_gone:
+        return lu, vy, turned_at, io, x5g, True
+    tx, ty = target
+    dx, dy = x_committed - tx, y - ty
+    dist = math.sqrt(dx * dx + dy * dy)
+    delay = BOOMERANG_DELAY_WOBBLE_MS if wobble else BOOMERANG_DELAY_MS
+    if dist > 10 and t - thrown_at > delay:
+        sp = math.sqrt(wj * wj + a5w * a5w)
+        f = sp * BOOMERANG_PULL / dist
+        lu += (tx - x_committed) * f
+        vy += (ty - y) * f
+        v = math.sqrt(lu * lu + vy * vy)
+        if v > sp:
+            lu, vy = lu * (sp / v), vy * (sp / v)
+    removed = turned_at != 0 and dot(wj, a5w, x_committed - tx, y - ty) < 0
+    return lu, vy, turned_at, io, x5g, removed
+
+
 def linear_path(lu, vy, launch):
     """PathType 2 (Linear), `_-p5k._-8i` @2677-2812: the speed keeps its direction and takes the length of
     the launch speed (`_-Wj`, `_-A5W`) again (Point.normalize: x *= k / len)."""
@@ -585,5 +631,30 @@ ANCHORS = {ABC_1100: {
         (1098, 42, "pushdouble", "1000.0"),
         (1098, 104, "callproperty", "atan2, 2"),
         (1098, 122, "callproperty", "round, 1"),
+    ],
+    "PathType BoomerangHoming: turn (_-74O, _-Io -> _-x5G), thrower gone, pull _-o1V past 180 / 1800 ms beyond 10, cap |launch|, back behind": [
+        (15192, 1936, "getproperty", "_-74O"),
+        (15192, 1983, "callproperty", "_-467, 4"),
+        (15192, 2001, "initproperty", "_-74O"),
+        (15192, 2021, "bitor", ""),
+        (15192, 2031, "initproperty", "_-Io"),
+        (15192, 2131, "pushbyte", "6"),
+        (15192, 2145, "callpropvoid", "_-5k, 0"),
+        (15192, 2171, "getproperty", "_-M43"),
+        (15192, 2187, "getproperty", "_-22W"),
+        (15192, 2248, "callproperty", "_-p5a, 0"),
+        (15192, 2307, "getproperty", "_-i4S"),
+        (15192, 2319, "getproperty", "_-L1Y"),
+        (15192, 2328, "pushbyte", "10"),
+        (15192, 2413, "getproperty", "_-o1V"),
+        (15192, 2550, "ifngt", "44"),
+        (15192, 2652, "callproperty", "_-467, 4"),
+        (15192, 2669, "callpropvoid", "_-5k, 0"),
+        (1023, 2, "multiply", ""),
+        (15186, 6, "getproperty", "_-S1I"),
+        (15182, 7, "initproperty", "_-S1I"),
+        (15249, 503, "pushuint", "180"),
+        (15249, 512, "pushuint", "1800"),
+        (15249, 523, "pushdouble", "0.05333333333333334"),
     ],
 }}

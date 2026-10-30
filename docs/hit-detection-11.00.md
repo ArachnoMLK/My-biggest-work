@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(984 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1007 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -688,7 +688,17 @@ order]:
 
      `_-A6B._-22H` #1132 (`items.ease_22h`) is −0.5 (cos πt − 1) in-out, 1 − cos(t π/2) in, else
      sin(t π/2). `atan2_netsafe` #1098 rounds both unit-vector parts and the angle to 1/1000.
-   - BoomerangHoming and RocketHoming are not transcribed yet.
+   - **BoomerangHoming** (`items.boomerang_path`, @1932–2673) [V]:
+     1. **Turn.** The first time the speed points against the launch speed (dot < 0, `_-A6B._-467`),
+        `_-74O` = t, and the targets already hit move into the contact mask (`_-x5G` |= `_-Io`, `_-Io` = 0).
+     2. **No thrower.** The item is removed when its thrower is gone or in a state other than 0 and 6.
+     3. **Pull.** The target is the thrower's point (`_-M43`, `_-E3d`), else the stored origin (`_-22W`,
+        `_-S6B`). The distance uses `_-p5a()` = `_-S1I`, the x committed by the last `_-x1M`, with the
+        current y. Beyond 10 and past 180 ms (1800 with `_-W6M`), the speed gains (target − pos) ×
+        |launch| × 0.0533 / distance, then is capped at |launch|.
+     4. **Catch.** Once turned, the item is removed when it is back behind the target
+        (dot(launch, pos − target) < 0).
+   - RocketHoming (4) is not transcribed yet.
 7. **Gravity.** Without `_-BG`, gravity is added unless the item rests on a flat line (`_-Lu` = `_-33c` = 0,
    normal y = −1). It is `ThrownGravity` while thrown (`_-r5B` ≠ 0, `_-o2O` false), else `Gravity` (both
    3.75 by default), times 0.384. The cap is applied before gravity, not after.
