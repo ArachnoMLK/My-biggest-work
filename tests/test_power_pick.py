@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.power_pick import hero_powers, item_slots, power_name, redirect  # noqa: E402
+from bh.power_pick import hero_powers, item_slots, power_name, power_rows, redirect  # noqa: E402
 
 HERO = {"mBaseWeapon1": 4, "mBaseWeapon2": 5, "mSpecialPower1": "N1", "mSpecialPower2": "N2",
         "mSpecialPower1_Forward": "S1", "mSpecialPower2_Down": "D2"}
@@ -36,6 +36,11 @@ class PowerPick(unittest.TestCase):
         self.assertEqual((heroes[3]["mBaseWeapon1"], heroes[3]["mSpecialPower1"], heroes[3]["mBaseWeapon2"]),
                          ("Sword", "X", None))
         self.assertEqual(power_name(11, heroes[3], items["Sword"]), "X")
+
+    def test_power_rows(self):
+        rows = power_rows("powerTypes\nPowerName,PowerID,GCVersion\nA,1,AG\nAG,2,\n")
+        self.assertEqual(redirect(rows["A"], rows.get, gc=True)["PowerName"], "AG")
+        self.assertNotIn("GCVersion", rows["AG"])
 
     def test_redirect(self):
         table = {"P": {"PowerName": "P", "GCVersion": "PG", "MomentumVersion": "PM"},
