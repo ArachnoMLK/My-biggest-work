@@ -43,8 +43,8 @@ one-sided; this one can fail.
 4. **The harness.** One tick = platforms (`_-d4u`, carry) → per fighter: inputs (`_-1L`) → state
    dispatch (`_-k5H`: drone phases while state 3 / 4, movement in 0 / 5) → KO test. Start at t = 0 with
    the match start at 256 ms.
-   Started on `integration-11.00`: `tools/bh/harness.py` (one fighter, left / right / jump; no KO test, stats,
-   walls, powers or replay inputs yet).
+   Under way on `integration-11.00`: `tools/bh/harness.py` (one fighter, left / right / jump, wall contact and
+   wall jumps, ring-out test; no replay inputs, real stats, drone / respawn, KO commit or powers yet).
 5. **Compare.** The predicted KO tick of the victim against the face; aggregate over a few replays.
 
 ## Open points that may show up
