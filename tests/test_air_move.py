@@ -141,5 +141,29 @@ class Flags(unittest.TestCase):
                 self.assertFalse(packed_flag(pack_flag(False, bit, noise)))
 
 
+
+
+class GroundStart(unittest.TestCase):
+    def test_reset_on_ground(self):
+        from bh.air_move import ground_reset
+        g = object()
+        self.assertEqual(ground_reset(g, False, 0, False, 12.5), (0.0, True))
+        self.assertEqual(ground_reset(g, False, 0, True, -3.0), (-3.0, True))     # _-564 keeps a rise
+        self.assertEqual(ground_reset(g, False, 0, True, 3.0), (0.0, True))
+        self.assertEqual(ground_reset(None, False, 0, False, 5.0), (5.0, None))
+        self.assertEqual(ground_reset(g, True, 0, False, 5.0), (5.0, None))      # hitstun
+        self.assertEqual(ground_reset(g, False, 8, False, 5.0), (5.0, None))     # _-B6B
+
+    def test_gravity_gate(self):
+        from bh.air_move import gravity_applies
+        self.assertTrue(gravity_applies(False, None, 0, 100, False, 3.75))
+        self.assertFalse(gravity_applies(False, object(), 0, 100, False, 3.75))
+        self.assertFalse(gravity_applies(False, None, 200, 100, False, 3.75))
+        self.assertTrue(gravity_applies(False, None, 100, 100, False, 3.75))
+        self.assertFalse(gravity_applies(False, None, 0, 100, True, 3.75))
+        self.assertFalse(gravity_applies(True, None, 0, 100, False, 3.75))
+        self.assertFalse(gravity_applies(False, None, 0, 100, False, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

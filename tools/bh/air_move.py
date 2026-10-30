@@ -331,6 +331,28 @@ def respond(lines, team, r, p5s, v1d, power_4a=False, wall_state=None):
     return Response(x, y, p5s, v1d, "other")
 
 
+def ground_reset(ground, hitstun, b6b_bit, power_564, p5s):
+    """`Entity._-8i` #2984 @290-408, at the start of the step: the landing on the ground line `_-96f` kept
+    from the previous step. Returns (p5s, on_ground `_-G1T`).
+
+    Only when `_-96f` is set, `_-5q()` (hitstun [H]) is false and the `_-e3e` bit `_-B6B` is clear: `_-P5S`
+    becomes 0 unless the power holds `_-564` and `_-P5S` <= 0, and `_-G1T` is set. Then (@411-467) the
+    power's `_-C3x()` runs unless `_-r51` is set and `_-x2C` >= 9 (not modelled here).
+    """
+    if ground is None or hitstun or b6b_bit:
+        return p5s, None
+    if not power_564 or p5s > 0:
+        p5s = 0.0
+    return p5s, True
+
+
+def gravity_applies(e6p, ground, y1l, t, cancel_gravity, gravity):
+    """`Entity._-8i` @5172-5273: gravity is added only with no ground line, `_-E6P()` false, no `_-y1L` hold
+    (`_-y1L` = 0 or <= t), the power without CancelGravity (`_-q1G`) and a non-zero `_-84Q`."""
+    return (not e6p and ground is None and not (y1l != 0 and y1l > t) and not cancel_gravity
+            and gravity != 0)
+
+
 def steep(line):
     """`_-S1A` as `_-R15._-q3q` #1570 sets it: normal y < 0 and |nx / ny| >= 5/3."""
     nx, ny = line.normal
@@ -442,6 +464,25 @@ ANCHORS = {ABC_1100: {
         (1670, 74, "callpropvoid", "_-q2W, 1"),
         (2981, 114, "callpropvoid", "_-q2W, 1"),
         (3085, 15, "getproperty", "_-s2O"),
+    ],
+    "_-8i step start: on _-96f, no _-5q, no _-B6B -> _-P5S = 0 (unless _-564 and _-P5S <= 0), _-G1T = true": [
+        (2984, 295, "getproperty", "_-96f"),
+        (2984, 311, "callproperty", "_-5q, 0"),
+        (2984, 333, "getproperty", "_-B6B"),
+        (2984, 352, "getproperty", "_-564"),
+        (2984, 378, "pushbyte", "0"),
+        (2984, 400, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 408, "initproperty", "_-G1T"),
+        (2984, 467, "callpropvoid", "_-C3x, 0"),
+    ],
+    "_-8i gravity gate: !_-E6P, _-96f null, no _-y1L hold, !_-q1G, _-84Q != 0; then _-P5S += _-84Q x _-Vj below the cap": [
+        (2984, 5180, "callproperty", "_-E6P, 0"),
+        (2984, 5195, "getproperty", "_-96f"),
+        (2984, 5215, "getproperty", "_-y1L"),
+        (2984, 5252, "getproperty", "_-q1G"),
+        (2984, 5265, "getproperty", "_-84Q"),
+        (2984, 5296, "ifnlt", "160"),
+        (2984, 5340, "getproperty", "_-84Q"),
     ],
 }}
 
