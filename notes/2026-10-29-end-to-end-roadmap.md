@@ -38,7 +38,9 @@ bytecode arithmetic and a `*-verify` command pins it.
    hitstun" [H], `_-e36()` "on lava"; `_-t46()` / `_-81n()` come from the power and the input handler. A
    simulator keeps them as plain booleans (the camouflage draws from the global generator, not the replay
    one).
-4. **Items**: motion of `_-p5k`, pick-up and catch gates (`_-Io` / `_-x5G`), other spawners (`_-33h`).
+4. **Items.** Mostly done (#30, `items.py`): thrown item speeds and mask, ItemType columns, the per-target
+   gates (`_-Io` / `_-x5G`, catch, grace, boomerang). Left: ground walk, path behaviours (PathType), the map
+   sweeps of `_-p5k._-8i`, other spawners (`_-33h`, `_-u1I`).
 5. **An integration branch.** Done: `integration-11.00` (draft PR #31, do not merge) merges #16–#30;
    11 verify commands at 0 mismatches, 231 tests. First smoke test `smoke-fall`: one fighter falls from every
    respawn point of the 122 local maps; 829 of 829 ground contacts end on the line within 1e-6; the 166 falls
