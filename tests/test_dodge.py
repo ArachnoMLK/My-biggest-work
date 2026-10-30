@@ -6,7 +6,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import clears_velocity, counter, facing, kind, neutral_push, pick, timers  # noqa: E402
+from bh.dodge import (clears_velocity, cooldown_ms, counter, facing, formula_mult, kind,  # noqa: E402
+                      neutral_push, pick, speed_x, speed_y, standard_flag, timers)
 
 
 class Dodge(unittest.TestCase):
@@ -54,6 +55,39 @@ class Dodge(unittest.TestCase):
         self.assertEqual(pick(rows, 8, airborne=True, is_fast=False, test_set=True)["DodgeName"], "c")
         self.assertEqual(pick(rows, 1, airborne=False, is_fast=False)["DodgeName"], "StandardSpot")
         self.assertEqual(pick(rows, 4, airborne=False, is_fast=True)["DodgeName"], "StandardSpot")
+
+
+    def test_standard_flag(self):
+        self.assertTrue(standard_flag(1064, True, 1000, 0))
+        self.assertFalse(standard_flag(1065, True, 1000, 0))
+        self.assertFalse(standard_flag(1000, False, 1000, 0))
+        self.assertFalse(standard_flag(1000, True, 0, 0))
+        self.assertFalse(standard_flag(1000, True, 1000, 1))
+
+    def test_formula_mult(self):
+        self.assertEqual(formula_mult("Other", 5.0, 10.0, 0), 1.0)
+        self.assertEqual(formula_mult("MomentumHorizontal", -30.0, 10.0, 0), 0.75)
+        self.assertAlmostEqual(formula_mult("StandardHorizontal", 10.0, 10.0, 8), 1.0)       # at k: x = 1
+        self.assertAlmostEqual(formula_mult("StandardHorizontal", 20.0, 10.0, 8), 1.0)       # past k
+        self.assertAlmostEqual(formula_mult("StandardHorizontal", 0.0, 10.0, 8), 0.6 + 0.25 * 0.4)   # x = 0.5
+        self.assertAlmostEqual(formula_mult("StandardHorizontal", 10.0, 10.0, 4), 0.7 - 0.125 * 0.8)  # k = -10, x = 0
+        self.assertAlmostEqual(formula_mult("StandardHorizontal", -20.0, 10.0, 4), 1.0)      # past -k on the left
+
+    def test_speed_x(self):
+        self.assertEqual(speed_x(2.0, 1.5, 0, 4, 9.0, 10.0), 3.0)
+        self.assertEqual(speed_x(2.0, 1.5, 3.0, 0, 9.0, 10.0), 3.0)
+        self.assertAlmostEqual(speed_x(2.0, 1.0, 3.0, 8, 1.0, 10.0), 2.0)            # r clamped to 0.33
+        self.assertAlmostEqual(speed_x(2.0, 1.0, 3.0, 4, -9.0, 10.0), 6.0)           # r clamped to 0.57
+
+    def test_speed_y(self):
+        self.assertEqual(speed_y(2.0, 1.5, 0, 1, -30.0), 3.0)
+        self.assertAlmostEqual(speed_y(2.0, 1.0, 3.0, 1, 10.0), 2.0)                 # up while falling: 0 -> 0.5
+        self.assertAlmostEqual(speed_y(2.0, 1.0, 3.0, 1, -40.0), 6.0)                # r = 1 -> 0.75
+        self.assertAlmostEqual(speed_y(2.0, 1.0, 3.0, 2, 42.0), 2.0 * (1.0 + 0.4 * 2.0))   # r = 0.6
+
+    def test_cooldown(self):
+        self.assertEqual(cooldown_ms(10, 4, True), 160)
+        self.assertEqual(cooldown_ms(10, 4, False), 64)
 
 
 if __name__ == "__main__":
