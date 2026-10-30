@@ -7,6 +7,8 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh import harness, smoke  # noqa: E402
+from bh.respawn_points import parse_respawns  # noqa: E402
+from bh.spawn_bot import DROP_SPEED, DROP_SPEED_FAST, F_SPAWNED, respawn_ms, scoring_rules  # noqa: E402
 
 FLAT = ('<LevelDesc><HardCollision X1="-1000" X2="1000" Y="500" /><HardCollision X1="1000" X2="-1000" Y="900" />'
         '<HardCollision X="-1000" Y1="500" Y2="900" /><HardCollision X="1000" Y1="900" Y2="500" />'
@@ -92,6 +94,34 @@ class Harness(unittest.TestCase):
         self.assertEqual([e for _, e in f.events][1:3], [("press", "squat"), ("release", "ground")])
         self.assertEqual(f.events[1][0], 1296)
 
+
+class MatchStart(unittest.TestCase):
+    XML = ('<LevelDesc><Respawn Initial="true" X="-200" Y="100" /><Respawn Initial="true" X="200" Y="100" />'
+           '<Respawn X="0" Y="0" /></LevelDesc>')
+
+    def run_start(self, j1y):
+        return harness.match_start([{"id": 9}, {"id": 4}], 12345, parse_respawns(self.XML), (-500, -300, 1000),
+                                   j1y=j1y)
+
+    def test_spawned_drone_lets_go_in_state_0(self):
+        out = self.run_start(True)
+        self.assertEqual([e["id"] for e, _, _, _ in out], [4, 9])
+        self.assertEqual(sorted(f.x for _, f, _, _ in out), [-200.0, 200.0])
+        trip = respawn_ms(F_SPAWNED, scoring_rules({}, n4k=16))
+        for _, f, t, state in out:
+            self.assertEqual((f.y, f.p5s, state), (100.0, DROP_SPEED, 0))
+            self.assertTrue(272 + trip <= t <= 272 + trip + 3 * 16, t)
+
+    def test_not_spawned_lets_go_in_state_5(self):
+        trip = respawn_ms(0, scoring_rules({}, n4k=16))
+        for _, f, t, state in self.run_start(False):
+            self.assertEqual((f.y, f.p5s, state), (100.0, DROP_SPEED_FAST, 5))
+            self.assertTrue(272 + trip <= t <= 272 + trip + 3 * 16, t)
+
+    def test_no_point_gives_none(self):
+        out = harness.match_start([{"id": 1}, {"id": 2}], 1,
+                                  parse_respawns('<LevelDesc><Respawn X="0" Y="0" /></LevelDesc>'), (0, 0, 100))
+        self.assertEqual([f for _, f, _, _ in out], [None, None])
 
 if __name__ == "__main__":
     unittest.main()

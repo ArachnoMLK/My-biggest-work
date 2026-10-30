@@ -18,6 +18,12 @@ Plan step 4 (notes/2026-10-30-replay-sim-plan.md). It chains the transcribed pie
 Every piece is [V] in its own module; the glue is [H]: no power, no hitstun, no bounce, the `_-532` jump lock and the air-jump count are not updated by any transcribed
 writer yet, the friction is applied on every tick, and a KO only records the mask (the KO commit and the
 respawn of ko-11.00.md §5 / spawn_bot.py are not chained yet). Nothing here has been compared with the running game.
+
+`match_start` chains the start of a plain 1v1 replay (match_start.py, spawn_bot.py): the step at 272 ms
+(`_-n4k` = 16), the fighters in `_-5r` order (increasing entity id), R at that tick, the start placement
+(`one_v_one`), then `Drone.place` with the replay's `_-w35` (1024) and the drone phases until the fighter is
+let go (state 0, `_-P5S` = the drop speed). Its glue is [H]: the drone's first tick runs in the match-start
+step, `_-J1Y` (so `_-44x`) is a parameter, no game-mode test, no `_-S3h`, and the fighters are independent.
 """
 from dataclasses import dataclass, field
 
@@ -28,7 +34,9 @@ from .input_buffer import state_at
 from .ko import ko_mask
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
                    squat_start, wall_jump)
+from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
 from .smoke import FALL_CAP, GRAVITY, STEP, TICK_MS
+from .spawn_bot import IDLE, REPLAY_W35, Drone, scoring_rules, timing_flags
 from .step import clamp, fold_impulse, speed_cap
 
 DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFriction": 1.2,
@@ -184,3 +192,33 @@ def from_records(records, t0=0):
         before = state_at(records, t - TICK_MS)
         return bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT), bool(keys & JUMP and not before & JUMP)
     return inputs
+
+
+def match_start(entities, seed, points, camera, cells=None, team_type=0, j1y=False, start_xy=(0.0, 0.0),
+                standalone=False, max_ticks=1000):
+    """Start of a plain 1v1 replay. `entities`: replay.parse "entities" (the two players); `points`:
+    respawn_points.parse_respawns; `camera`: (x, y, width); `cells`: the replay's ScoringType cells; `j1y`:
+    `_-X6R._-J1Y`, which gives `_-44x` (open [H]: its writers are game-mode classes and an untyped `_-sW`);
+    `start_xy`: the fighter's position before the drone when `_-44x` is clear [H].
+    Returns [(entity, Fighter or None, t let go, state)] in `_-5r` order (None: no point or never let go)."""
+    n4k = time_base(step_times(0, STEP_MS))
+    t0 = match_start_step(n4k)
+    rng, _ = r_at_match_start(seed, len(entities))
+    placed, _ = one_v_one(rng, fighter_order(entities), points)
+    rules = scoring_rules(cells or {}, n4k=n4k)
+    by_id = {}
+    for e, point in placed:
+        f = {"x": start_xy[0], "y": start_xy[1], "state": 3, "vy": 0.0, "spawned": bool(j1y)}
+        d = Drone(f)
+        d.place(t0, None if point is None else (point["x"], point["y"]), standalone, REPLAY_W35, False, camera)
+        t, ready = t0, False
+        while point is not None and d.phase != IDLE and t <= t0 + STEP_MS * max_ticks:
+            d.tick(t, timing_flags(f["spawned"], False, None, t), rules, team_type, False)
+            if d.phase == IDLE:
+                ready = True
+                break
+            t += STEP_MS
+        ready = ready or (point is not None and f["state"] == 0)
+        by_id[id(e)] = (e, Fighter(f["x"], f["y"], p5s=f["vy"]) if ready else None, t if ready else None,
+                        f["state"])
+    return [by_id[id(e)] for e in fighter_order(entities)]

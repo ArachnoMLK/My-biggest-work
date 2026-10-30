@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 322 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 325 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -185,6 +185,22 @@ the ground 32 ms later with a first rise of (57 − 1.44) × 0.384; two air jump
 nothing; walking right reaches RunSpeed; walking off a narrow ledge ends in one ring-out below the
 bottom kill line; a fighter jumping into a tall block clings (`_-r51` = 2) and its jump there is a wall jump,
 pushed away and up. Static evidence only; not compared with the running game.
+
+**Match start, chained** (`harness.match_start`). For a plain 1v1 replay: the match-start step at 272 ms
+(`_-n4k` = 16), the fighters in `_-5r` order (increasing entity id), R at that tick (seed, one draw per
+player), the start placement (`one_v_one`: shuffle, first / last Initial candidate), then `Drone.place` with
+the replay's `_-w35` = 1024 (no instant bit) and the drone phases until it lets go. On the synthetic map of the
+tests, with the default scoring durations:
+
+| `_-J1Y` (gives `_-44x`) | Let go at | State | `_-P5S` |
+|---|---|---|---|
+| set | 6000 ms (272 + 5700, rounded up to the steps) | 0 | 30 |
+| clear | 4992 ms (272 + 4700, idem) | 5 | 70 |
+
+[H] Which case a replay is in: `_-J1Y` is set only by game-mode classes (`_-C20._-S4o`, `_-od._-b6O`), a
+snapshot read (`_-B5T`) and `_-X6R._-sW`, which has no typed caller; it is cleared after the match start. The
+KO gap check assumed the clear case (4700 ms). Also [H]: the drone's first tick runs in the match-start step,
+and the fighter's position before the drone when `_-44x` is clear.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 
