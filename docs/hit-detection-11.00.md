@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1095 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1103 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -659,8 +659,10 @@ target the item touched. `_-A3S` makes the line of sight ignore item-ignore line
 ### 8.0 Throwing an item (`items.throw_vector`, `throw_start`; `_-F5N._-M4Q` #1689) [V]
 
 When a fighter throws its item (`_-M4Q(t, charge)`):
-1. **Spawn.** A `_-p5k` is created at the thrower's (x, y − 30). In the air, `_-M4Q` may move it by
-   Height − 120 when `_-P4n` allows it (not read here).
+1. **Spawn** (`items.throw_spawn`). A `_-p5k` is created at the thrower's (x, y − 30). When the thrower
+   is airborne (`_-wn()`), h = Height − 120. If `Entity._-P4n(h)` #3070 allows it, the item goes to feet + h:
+   that is always the case for h < 0, otherwise only when a cast (0, h) down from the feet (hard | soft)
+   hits nothing.
 2. **Speed** (`_-F5N._-Fi` #1722, from the input bits `_-x10`: 1 up, 2 down, 4 left, 8 right):
    - a ProximityTrigger item (`_-r58`) cannot be thrown down from a hard ground line (bit 2 is dropped);
    - with no bit, the item goes the way the thrower faces (`_-r35()`);

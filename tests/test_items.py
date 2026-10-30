@@ -8,7 +8,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.items import (ITEM_DEFAULTS, after_sweep, bounce, expired, ground_walk, impact, item_type, sweep,  # noqa: E402
-                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path, rocket_homing, lerp, throw_speed, throw_vector, throw_start, impact_special,
+                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path, rocket_homing, lerp, throw_speed, throw_vector, throw_start, impact_special, throw_spawn,
                       target_gate, velocity)
 from bh.raycast import Line  # noqa: E402
 
@@ -293,6 +293,14 @@ class SpecialImpact(unittest.TestCase):
         self.assertEqual(impact_special(500, 1, boom, 1, 0, 0, 0, thrower=False), {"expire": True})
         tele = dict(ITEM_DEFAULTS, **{"76N": "Teleport", "o3Y": "Tp"})
         self.assertTrue(impact_special(100, 1, tele, 1, 0, 0, 0)["teleport_thrower"])
+
+class ThrowSpawn(unittest.TestCase):
+    def test_spawn(self):
+        floor = Line(-100.0, 50.0, 100.0, 50.0, 1, (0.0, -1.0))
+        self.assertEqual(throw_spawn([floor], 0, 0.0, 0.0, False, 200), (0.0, -30.0))   # on the ground
+        self.assertEqual(throw_spawn([floor], 0, 0.0, 0.0, True, 60), (0.0, -60.0))     # h < 0
+        self.assertEqual(throw_spawn([floor], 0, 0.0, 0.0, True, 160), (0.0, 40.0))     # room below
+        self.assertEqual(throw_spawn([floor], 0, 0.0, 0.0, True, 200), (0.0, -30.0))    # the floor is in the way
 
 if __name__ == "__main__":
     unittest.main()
