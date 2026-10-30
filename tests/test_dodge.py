@@ -8,7 +8,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms,  # noqa: E402
                       counter, dash, dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, gates, k64, kind,
-                      landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x, speed_y, standard_flag,
+                      landed_cooldown, moves, neutral_push, parse_types, pick, push, side_latch, speed_x, speed_y, standard_flag,
                       timers)
 
 
@@ -188,6 +188,21 @@ class Dodge(unittest.TestCase):
         self.assertEqual((g["dir"], g["is_fast"]), (1, False))
         g = gates(**dict(k, locked=True, r26=True, o5c=8, c2e=False, chase_h2l=2, n3h=True))
         self.assertFalse(g["is_fast"])
+
+    def test_parse_types(self):
+        xml = ("<DodgeTypes><DodgeType DodgeName='Template'><DodgeID>0</DodgeID><Set>Default</Set>"
+               "<Direction>Neutral</Direction><AirType>Both</AirType><IsFast>FALSE</IsFast></DodgeType>"
+               "<DodgeType DodgeName='A'><DodgeID>3</DodgeID><Set>Default</Set><Direction>SideUp</Direction>"
+               "<AirType>Air</AirType><IsFast>TRUE</IsFast><Duration>5</Duration><ExitX>0.5</ExitX>"
+               "<SpeedXFormula>NONE</SpeedXFormula></DodgeType>"
+               "<DodgeType DodgeName='StandardSpot'><DodgeID>1</DodgeID><Set>Default</Set>"
+               "<Direction>Neutral</Direction><AirType>Both</AirType><IsFast>FALSE</IsFast></DodgeType></DodgeTypes>")
+        rows, by_id = parse_types(xml)
+        self.assertEqual([r["DodgeName"] for r in rows], ["A", "StandardSpot"])
+        a = by_id[3]
+        self.assertEqual((a["kind"], a["where"], a["IsFast"], a["Duration"], a["ExitX"], a["SpeedXFormula"]),
+                         (3, 2, True, 5, 0.5, "NONE"))
+        self.assertEqual(pick(rows, 0, airborne=False, is_fast=False)["DodgeName"], "StandardSpot")
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)

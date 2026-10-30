@@ -11,6 +11,8 @@ Names: `dir` is Dodge's second argument (`keys & 15`: Up 1, Drop 2, Left 4, Righ
 `_-h3i._-26O(dir, airborne, local 8, team flag 64, local 10)`, a row of DodgeTypes.xml (`_-h3i._-i32`).
 [V] unless marked [H].
 """
+import xml.etree.ElementTree as ET
+
 from .movement import ABC_1100
 
 FRAME_MS = 16              # @1491 / @1507: `mDuration` and `_-53o` are in frames, x 16
@@ -116,6 +118,46 @@ def pick(rows, dir, airborne, is_fast, test_set=False):
         if r["Set"] == want_set and r["kind"] == k and r["where"] & mask and bool(r["IsFast"]) == bool(is_fast):
             return r
     return next((r for r in rows if r.get("DodgeName") == FALLBACK), None)
+
+
+UINT_COLUMNS = ("CancelLimit", "CancelStart", "Cooldown", "CooldownGround", "CooldownLanded", "DodgeID",
+                "Duration", "FromBackDashDelay", "FromDashDelay", "PostDodge", "Recover", "StartInvuln",
+                "ToDashDelay")                                   # `_-N2e._-vD` -> convert_u
+FLOAT_COLUMNS = ("AccelXMult", "AccelYMult", "ExitBackX", "ExitBackY", "ExitX", "ExitY", "SpeedXMaxMult",
+                 "SpeedXMult", "SpeedYMaxMult", "SpeedYMult")  # `_-N2e._-U13` -> convert_d
+DIRECTIONS = {"Neutral": 0, "Side": KIND_SIDE, "Up": KIND_UP, "Down": KIND_DOWN,
+              "SideUp": KIND_SIDE | KIND_UP, "SideDown": KIND_SIDE | KIND_DOWN}
+AIR_TYPES = {"Ground": WHERE_GROUND, "Air": WHERE_AIR, "Both": WHERE_BOTH}
+
+
+def parse_types(xml_text):
+    """DodgeTypes.xml as `_-h3i._-i32` #2767 / `_-I6L` #2768 load it: one row per DodgeType child, in file
+    order [H: `_-ET()` iterates in document order]. Unsigned columns are ints, the Mult / Exit columns floats,
+    IsFast is TRUE / FALSE (`_-Qr`, [H] case-insensitive), the rest strings; Direction -> "kind", AirType ->
+    "where". A row with DodgeID 0 (the Template) is dropped (@1450-1462); "StandardSpot" is the fallback
+    `_-Z6`. Returns (rows = `_-w14`, {DodgeID: row} = `_-Z4V`, a later duplicate id wins)."""
+    rows, by_id = [], {}
+    for node in ET.fromstring(xml_text):
+        r = {"DodgeName": node.get("DodgeName")}
+        for c in node:
+            text = (c.text or "").strip()
+            if c.tag in UINT_COLUMNS:
+                r[c.tag] = int(float(text)) & 0xFFFFFFFF if text else 0
+            elif c.tag in FLOAT_COLUMNS:
+                r[c.tag] = float(text) if text else 0.0
+            elif c.tag == "IsFast":
+                r[c.tag] = text.upper() == "TRUE"
+            else:
+                r[c.tag] = text
+        if "Direction" in r:
+            r["kind"] = DIRECTIONS[r["Direction"]]
+        if "AirType" in r:
+            r["where"] = AIR_TYPES[r["AirType"]]
+        if not r.get("DodgeID"):
+            continue
+        by_id[r["DodgeID"]] = r
+        rows.append(r)
+    return rows, by_id
 
 
 STANDARD_WINDOW_MS = 64    # `_-h3i._-M4C` (script148.<init> #2774 @186-189)
@@ -878,5 +920,16 @@ ANCHORS = {ABC_1100: {
         (3041, 334, "initproperty", "_-y1F"),
         (3041, 389, "pushbyte", "2"),
         (3041, 393, "initproperty", "_-I2g"),
+    ],
+    "DodgeTypes.xml load: _-i32 iterates the children into _-I6L; DodgeID 0 dropped; _-Z4V[id]; StandardSpot -> _-Z6; _-w14 push": [
+        (2767, 21, "initproperty", "_-w14"),
+        (2767, 67, "callpropvoid", "_-I6L, 2"),
+        (2768, 54, "callproperty", "get, 1"),
+        (2768, 1451, "getproperty", "_-B3q"),
+        (2768, 1462, "returnvoid", ""),
+        (2768, 1526, "pushstring", "'StandardSpot'"),
+        (2768, 1539, "initproperty", "_-Z6"),
+        (2768, 1557, "setproperty", "[rt]"),
+        (2768, 1570, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
     ],
 }}
