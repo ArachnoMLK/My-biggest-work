@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1103 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1109 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -925,6 +925,11 @@ map collision only run in states 0 and 5**.
 
 Chained powers start from `_-h1T` through the same `_-J5R`.
 
+**Secondary powers** (`_-F5N._-33h` #1704, 15 callers) [V]. They are built directly as `new _-l4X(...)` (7 arguments),
+with `_-x4I` = the given target and `_-SQ` = true, then pushed to `_-pX` (the running power list). None is
+made without a power type, or when the holder `_-H6K` has the `_-e3e` bit `_-a60`. Unlike `_-J5R`, they do not
+end the running power.
+
 ## 11. Still open
 
 - Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
@@ -934,7 +939,7 @@ Chained powers start from `_-h1T` through the same `_-J5R`.
 - `_-B5B`, the meaning of `_-q24`, and the exact gate on `_-L5r` per frame (§1); the cancel path of §1.1.
 - The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
 - Items: the per-target gates of §8 step 5, the item's own motion and map collision (`_-p5k._-8i` uses
-  `_-X2e`), and the other spawners `_-F5N._-33h` (15 callers) and `_-p5k._-u1I`.
+  `_-X2e`), `_-p5k._-u1I` is the item impact (§8.1); `_-F5N._-33h` spawns secondary powers (§10).
 - Respawn drone (§10.1): the idle and phase-4 handlers (`_-q15`, `_-Ck`), the
   scoring-type durations (`_-o2N`, `_-j57`, `_-C18`) and who calls `Respawn` after a KO [H].
 - Nothing has been checked against a running game. The next step towards the KO oracle

@@ -65,6 +65,7 @@ TRANSITIONS = {(None, 3): "Entity._-eR (KO commit)", (None, 7): "_-X6R._-U6W(eli
                (4, 0): "SpawnBot._-m1O (let go)", (4, 5): "SpawnBot._-m1O (let go, other case)", (3, 0): "SpawnBot._-P3o (instant)",
                (None, 0): "_-X6R.Respawn -> Entity._-hq", (None, 9): "_-d2C._-85Y -> Entity._-220"}
 
+SECONDARY_POWER = "_-F5N._-33h: new _-l4X, _-x4I = target, _-SQ = true, pushed to _-pX (refused without a power or with _-H6K._-e3e & _-a60)"
 POWER_START = ("_-i4Z._-rU / _-I35", "_-F5N._-C5S / _-A3Q / _-V5I", "_-F5N._-J5R", "_-O5u", "new _-l4X")
 
 
@@ -158,6 +159,14 @@ ANCHORS = {ABC_1100: {
         (3948, 227, "pushstring", "'Eliminated'"),
         (3948, 236, "pushbyte", "7"),
         (6778, 499, "callpropvoid", "_-P3o, 2"),
+    ],
+    "_-F5N._-33h: a secondary power new _-l4X (7 args) with _-x4I = target and _-SQ = true, pushed to _-pX; none without a power or when _-H6K has _-a60": [
+        (1704, 7, "ifne", "5"),
+        (1704, 46, "getproperty", "_-a60"),
+        (1704, 90, "constructprop", "_-l4X, 7"),
+        (1704, 102, "initproperty", "_-x4I"),
+        (1704, 108, "initproperty", "_-SQ"),
+        (1704, 114, "getproperty", "_-pX"),
     ],
 }}
 
