@@ -31,6 +31,23 @@ per-tick methods draw nothing; the other per-tick R users found by the typed cal
 special rules class, `_-K4x` == 2 (`_-Z36`, also in `Entity.<init>` @2830) or 3 (`_-q2i`, `_-99._-M6H` @23), or the
 eliminated states 7 / 8 (`_-F5N._-81Z` in `Entity._-k5H` @1618), or run on UI screens. So at the match-start
 tick R has drawn once per player. [H] The call graph under-approximates calls through untyped values.
+
+**Time base `_-n4k`** (the match start is the first step with t >= `_-n4k` + 256). `_-h3U._-01I` #3336, in a replay
+(`_-w35` & (1024 | 2048 | 8192), @372-402), takes the target time from `_-94N` and the done time from `_-73m`
+(@417-469), both rounded down to 16 ms (@471-493); it then runs floor((target - done) / 16) steps (@1863-1878),
+the k-th at t = done + 16 k (@1908-1915). On each step, when `_-n4k` == 0, `_-Y6a(t)` sets `_-n4k` = t (#3545 @157,
+@1926-1945). `_-h3U._-91N` #3559 resets `_-n4k`, `_-94N` and `_-73m` to 0, and replay start `_-T12` #3624 sets
+`_-94N` = `_-73m` = `_-717` = 0; the replay clock `_-L5y` #3310 copies `_-94N` into `_-73m` before moving it
+(@309-321), never rewinds below `_-n4k` (@1171-1181), and in frame-step mode starts it at 16 (@2002-2008). So a
+replay played from its start has `_-n4k` = 16 and its match-start step at t = 272. [H] No seek (`_-h5h` #3361)
+and no rollback (`_-717` > done, @1692-1821) happens before the first step.
+
+**Fighter order `_-5r`.** `_-T12` #3624 walks the replay's id list `_-hw` (@267-668); for each id with an entry in
+`_-j1p` it builds `Entity._-724(this, _-F2S[id], id, _-X5p | _-8, data)` (@339-380), whose constructor stores the id
+in `Entity._-11` (#2887 @1762-1767), and hands it to `_-63t` (@404). `_-h3U._-63t` #3645, when the entity is not in
+`_-5r` yet (@203-217), inserts it before the first entity with a larger `_-11` (`_-A6B._-p3g` #1102, an insert at
+an index) or else pushes it (@221-345). So `_-5r` is in increasing replay entity id order, equal ids in arrival
+order, whatever the order of `_-hw`.
 """
 from .movement import ABC_1100
 from .prng import Well512, js_mod, seed_from_header, shuffle, to_u32
@@ -55,6 +72,26 @@ def time_base(steps, n4k=0):
         if n4k == 0:
             n4k = t
     return n4k
+
+
+def insert_by_id(order, e, key=lambda e: e["id"]):
+    """`_-h3U._-63t` #3645 on `_-5r`: skip a present entity; insert before the first larger `_-11`, else push."""
+    if e in order:
+        return order
+    for i, x in enumerate(order):
+        if key(x) > key(e):
+            order.insert(i, e)
+            return order
+    order.append(e)
+    return order
+
+
+def fighter_order(entities, key=lambda e: e["id"]):
+    """`_-5r` after replay start: the entities (replay.parse "entities") inserted one by one with `insert_by_id`."""
+    order = []
+    for e in entities:
+        insert_by_id(order, e, key)
+    return order
 
 
 def match_start_step(n4k):
@@ -210,5 +247,23 @@ ANCHORS = {ABC_1100: {
         (3336, 1697, "getproperty", "_-717"),
         (3336, 1700, "greaterthan", ""),
         (3336, 1821, "setlocal", "5"),
+    ],
+    "_-5r order: _-T12 walks _-hw, skips ids without _-j1p, Entity._-724(this, _-F2S[id], id, ...) -> _-11 = id; _-63t: not present -> insert before first larger _-11 (_-p3g) else push": [
+        (3624, 291, "getproperty", "_-hw"),
+        (3624, 305, "getproperty", "_-j1p"),
+        (3624, 345, "getproperty", "_-F2S"),
+        (3624, 380, "callproperty", "_-724, 5"),
+        (3624, 404, "callpropvoid", "_-63t, 2"),
+        (2887, 1766, "getlocal_3", ""),
+        (2887, 1767, "initproperty", "_-11"),
+        (3645, 210, "callproperty", "http://adobe.com/AS3/2006/builtin::indexOf, 1"),
+        (3645, 215, "pushbyte", "-1"),
+        (3645, 279, "getproperty", "_-11"),
+        (3645, 284, "getproperty", "_-11"),
+        (3645, 288, "greaterthan", ""),
+        (3645, 306, "callpropvoid", "_-p3g, 3"),
+        (3645, 345, "callpropvoid", "http://adobe.com/AS3/2006/builtin::push, 1"),
+        (1102, 13, "callpropvoid", "http://adobe.com/AS3/2006/builtin::unshift, 1"),
+        (1102, 77, "setproperty", "[rt]"),
     ],
 }}

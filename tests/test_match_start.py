@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.match_start import match_start_step, one_v_one, r_at_match_start, step_times, time_base  # noqa: E402
+from bh.match_start import fighter_order, insert_by_id, match_start_step, one_v_one, r_at_match_start, step_times, time_base  # noqa: E402
 from bh.prng import Well512, shuffle  # noqa: E402
 from bh.respawn_points import parse_respawns  # noqa: E402
 
@@ -59,6 +59,18 @@ class TimeBase(unittest.TestCase):
     def test_match_start_step(self):
         self.assertEqual(match_start_step(16), 272)
         self.assertEqual(match_start_step(time_base(step_times(0, 16))), 272)
+
+class FighterOrder(unittest.TestCase):
+    def test_sorted_by_id_whatever_the_arrival(self):
+        ents = [{"id": 7}, {"id": 2}, {"id": 5}]
+        self.assertEqual([e["id"] for e in fighter_order(ents)], [2, 5, 7])
+
+    def test_equal_ids_keep_arrival_and_present_is_skipped(self):
+        a, b, c = {"id": 3, "n": "a"}, {"id": 3, "n": "b"}, {"id": 1, "n": "c"}
+        order = fighter_order([a, b, c])
+        self.assertEqual([e["n"] for e in order], ["c", "a", "b"])
+        insert_by_id(order, a)
+        self.assertEqual(len(order), 3)
 
 
 if __name__ == "__main__":

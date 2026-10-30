@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1444 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1460 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -934,6 +934,11 @@ map collision only run in states 0 and 5**.
   sets `_-n4k` = t. `_-91N` and replay start `_-T12` zero the clocks; the replay clock `_-L5y` #3310 copies
   `_-94N` into `_-73m` before moving it and never rewinds below `_-n4k`. So a replay played from its start has
   `_-n4k` = 16 and its match-start step at t = 272 ms (not 256).
+- **Fighter order `_-5r`** (match_start.py: `insert_by_id`, `fighter_order`) [V]. Replay start `_-T12` #3624
+  walks the replay's id list and builds one `Entity` per id with data (`Entity._-724`), whose constructor stores
+  the id in `_-11`; `_-h3U._-63t` #3645 then inserts it into `_-5r` before the first entity with a larger
+  `_-11` (`_-A6B._-p3g`, an insert at an index), or pushes it. So `_-5r`, the order the match start loops over
+  (and shuffles in 1v1), is the increasing order of the replay entity ids (`replay.parse` → `entities[i]["id"]`).
 - **Respawn point** (`_-X6R._-K5c` #6778, `respawn_index`). `_-G5X` holds the respawn point counters, so
   the two draws above pick where the rotation starts [V]. Each respawn takes the candidate list from `_-x22`
   and adds 1 to a counter:
