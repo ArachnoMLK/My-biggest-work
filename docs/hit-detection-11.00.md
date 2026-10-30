@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1007 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1035 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -698,7 +698,18 @@ order]:
         |launch| × 0.0533 / distance, then is capped at |launch|.
      4. **Catch.** Once turned, the item is removed when it is back behind the target
         (dot(launch, pos − target) < 0).
-   - RocketHoming (4) is not transcribed yet.
+   - **RocketHoming** (`items.rocket_homing`, @3119–4340) [V]. Positions use `_-p5a()` / `_-d5F()`, the x and
+     centre y (y − Height/2) committed by the last `_-x1M`.
+     - **No target** (`_-P6U` = 0). Before 1000 ms (`_-N4Q`), the speed is lerped toward 0 by
+       ((t − `_-O13`) / 1000)² (`_-A6B._-a2s` = a + (b − a) k). After that, the closest entity of `_-5r` in
+       state 0 or 6 becomes the target, by squared distance, strictly closer wins, the thrower included;
+       `_-74O` = t.
+     - **Lost target.** A target that left states 0 / 6 is dropped (`_-74O` = `_-P6U` = 0).
+     - **Steering** under the mode bit `_-d3Y._-Z2Y & 64`. The wanted angle points at the target. The
+       current angle is the speed's, or the wanted one when both parts are within 1e-4 of 0. The difference,
+       wrapped to [−π, π], is turned at most `_-83w` = π/180 × 1800/1000 (1.8°) per tick. The speed is
+       |launch| × min((t − `_-74O`)/1000, 1)/2, with the rounded cos / sin.
+     - **Otherwise**, each part is lerped 1 % per tick toward |launch| aimed at the target.
 7. **Gravity.** Without `_-BG`, gravity is added unless the item rests on a flat line (`_-Lu` = `_-33c` = 0,
    normal y = −1). It is `ThrownGravity` while thrown (`_-r5B` ≠ 0, `_-o2O` false), else `Gravity` (both
    3.75 by default), times 0.384. The cap is applied before gravity, not after.
