@@ -11,10 +11,12 @@ import re
 
 from .air_move import _back_off, air_move
 from .level_collision import Grid, compute_normals, static_lines
+from .platforms import bind, dynamic_lines, move, parse_platforms
 
 GRAVITY = 3.75        # `Entity._-84Q` (Entity.<init> #2887 @133)
 STEP = 0.384          # `_-z2k._-Vj`
 FALL_CAP = 70.0       # `Entity._-8i` fall cap without the Drop bit (movement-11.00.md)
+TICK_MS = 16
 DYNAMIC = re.compile(r"<(DynamicCollision|MovingPlatform)\b")   # lines this static test leaves out
 
 
@@ -29,11 +31,25 @@ def respawns(xml):
     return out
 
 
-def map_grid(xml):
-    """Static lines with their normals, in a candidate grid (dynamic lines left out)."""
+def map_grid(xml, with_platforms=False):
+    """Static lines with their normals in a candidate grid. With `with_platforms`, the DynamicCollision lines
+    are added as the grid's dynamic list (`_-82D`, tested on every query) and the result is (grid, movers):
+    each mover is (Platform, its lines bound to the platform's first point), moved before the fighter each
+    tick (section 9 of hit-detection-11.00.md: platforms move first)."""
     lines = static_lines(xml)
-    compute_normals(lines)
-    return Grid(lines)
+    if not with_platforms:
+        compute_normals(lines)
+        return Grid(lines)
+    dyn = dynamic_lines(xml)
+    every = [ln for group in dyn.values() for ln in group]
+    compute_normals(lines, every)
+    movers = []
+    for plat in parse_platforms(xml):
+        group = dyn.get(plat.plat_id)
+        if group:
+            bind(group, plat.points[0])
+            movers.append((plat, group))
+    return Grid(lines, every), movers
 
 
 def line_y(line, x):
@@ -41,10 +57,16 @@ def line_y(line, x):
     return line.sy + (line.ey - line.sy) * (x - line.sx) / (line.ex - line.sx)
 
 
-def fall(grid, x, y, max_ticks=1000, team=0):
-    """Ticks of gravity + free move from rest. Returns (ticks, MoveResult of the contact) or (max_ticks, None)."""
+def fall(grid, x, y, max_ticks=1000, team=0, movers=(), t0=0):
+    """Ticks of gravity + free move from rest. Returns (ticks, MoveResult of the contact) or (max_ticks, None).
+
+    `movers` (from `map_grid(..., True)`) are placed at their position for t = t0 + 16 x tick before the
+    fighter moves. [H] t0 = 0 with the match start at 0: the phase of the platforms at a real respawn
+    depends on the match clock, which this test does not model."""
     p5s = 0.0
     for tick in range(1, max_ticks + 1):
+        for plat, lines in movers:
+            move(lines, plat.at(t0 + TICK_MS * tick))
         if p5s < FALL_CAP:
             p5s += GRAVITY * STEP
         r = air_move(grid, team, x, y, 0.0, p5s, False)
@@ -67,17 +89,20 @@ def check_landing(r):
     return kind, hy - line_y(g, hx)
 
 
-def run(level_xmls, max_ticks=1000):
+def run(level_xmls, max_ticks=1000, with_platforms=False):
     """Aggregate counts over many maps (no coordinates, no names)."""
     c = {"maps": 0, "respawns": 0, "contact": 0, "flat": 0, "slope": 0, "wall": 0, "no_contact": 0,
          "no_contact_dynamic_map": 0,
          "within_1e-6": 0, "max_abs_error": 0.0, "max_ticks": 0}
     for xml in level_xmls:
         c["maps"] += 1
-        grid = map_grid(xml)
         for x, y in respawns(xml):
             c["respawns"] += 1
-            ticks, r = fall(grid, x, y, max_ticks)
+            if with_platforms:              # fresh lines per fall: the movers keep their last position
+                grid, movers = map_grid(xml, True)
+            else:
+                grid, movers = map_grid(xml), ()
+            ticks, r = fall(grid, x, y, max_ticks, movers=movers)
             if r is None:
                 c["no_contact"] += 1
                 c["no_contact_dynamic_map"] += bool(DYNAMIC.search(xml))

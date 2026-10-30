@@ -16,6 +16,13 @@ EMPTY = '<LevelDesc><Respawn X="0" Y="0" /></LevelDesc>'
 MOVING = '<LevelDesc><MovingPlatform PlatID="1"><HardCollision X1="-9" X2="9" Y="9" /></MovingPlatform>' \
          '<Respawn X="0" Y="0" /></LevelDesc>'
 
+PLATFORM = ('<LevelDesc NumFrames="8"><MovingPlatform PlatID="1" X="0" Y="0"><Animation>'
+            '<KeyFrame FrameNum="1" X="0" Y="0"/><KeyFrame FrameNum="5" X="20" Y="0"/></Animation></MovingPlatform>'
+            '<DynamicCollision PlatID="1" X="0" Y="0"><HardCollision X1="-200" X2="200" Y="300"/>'
+            '<HardCollision X1="200" X2="-200" Y="340"/><HardCollision X="-200" Y1="300" Y2="340"/>'
+            '<HardCollision X="200" Y1="340" Y2="300"/></DynamicCollision>'
+            '<Respawn X="0" Y="0" /></LevelDesc>')
+
 
 class Fall(unittest.TestCase):
     def test_respawns(self):
@@ -37,6 +44,17 @@ class Fall(unittest.TestCase):
 
     def test_no_ground(self):
         self.assertEqual(smoke.fall(smoke.map_grid(EMPTY), 0.0, 0.0, max_ticks=50), (50, None))
+
+    def test_moving_platform(self):
+        grid, movers = smoke.map_grid(PLATFORM, True)
+        self.assertEqual(len(movers), 1)
+        ticks, r = smoke.fall(grid, 0.0, 0.0, movers=movers)
+        self.assertIsNotNone(r)
+        self.assertAlmostEqual(r.y, 300.0 - 1.01)
+        self.assertAlmostEqual(smoke.check_landing(r)[1], 0.0)
+        self.assertIsNone(smoke.fall(smoke.map_grid(PLATFORM), 0.0, 0.0, max_ticks=200)[1])   # static only
+        c = smoke.run([PLATFORM], with_platforms=True)
+        self.assertEqual((c["contact"], c["within_1e-6"]), (1, 1))
 
     def test_run_counts(self):
         c = smoke.run([FLAT, EMPTY, MOVING], max_ticks=200)

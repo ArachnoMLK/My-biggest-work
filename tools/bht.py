@@ -440,7 +440,7 @@ def cmd_smoke_fall(a):
     files = sorted(glob.glob(os.path.join(folder, "LevelDesc_*.xml")))
     if not files:
         sys.exit("no LevelDesc files; run swz-dump first (or pass --swz)")
-    counts = smokemod.run([rendermod.read_text(f) for f in files])
+    counts = smokemod.run([rendermod.read_text(f) for f in files], with_platforms=not a.static_only)
     for k, v in counts.items():
         print(f"  {k:<24} {v}")
     print("static bytecode evidence only: not compared with the running game (tools/bh/smoke.py)")
@@ -716,7 +716,8 @@ def main():
     add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
     add("input-buffer-verify", cmd_input_buffer_verify, abc)
     add("knockback-verify", cmd_knockback_verify, abc)
-    add("smoke-fall", cmd_smoke_fall, (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
+    add("smoke-fall", cmd_smoke_fall, (["--swz"], {"help": "swz-dump folder (default work/swz)"}),
+        (["--static-only"], {"action": "store_true", "help": "leave the moving platforms' lines out"}))
     add("power-columns", cmd_power_columns, abc, (["--markdown"], {"action": "store_true"}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
