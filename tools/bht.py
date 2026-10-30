@@ -16,7 +16,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
-from bh import anm as anmmod, collision as collisionmod, commands as commandsmod  # noqa: E402
+from bh import anm as anmmod, collision as collisionmod, commands as commandsmod, ko as komod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
@@ -319,6 +319,10 @@ def cmd_prng_order_verify(a):
 
 def cmd_step_verify(a):
     """Check the pinned order of operations of Entity._-8i; exit 1 on mismatch, 2 on unknown ABC."""
+
+
+def cmd_ko_verify(a):
+    """Check the pinned static evidence of the KO bounds test; exit 1 on mismatch, 2 on unknown ABC."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
     if not os.path.exists(p):
         sys.exit("run `abc-extract` first (or pass --abc)")
@@ -338,6 +342,19 @@ def cmd_step_verify(a):
     for group in stepmod.ANCHORS[sha]:
         print(f"  ok  {group}")
     print("static bytecode evidence only: no execution, no runtime oracle (docs/entity-step-11.00.md)")
+    if sha not in komod.ANCHORS:
+        print(f"no KO anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in komod.ANCHORS)})")
+        sys.exit(2)
+    bad = komod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    anchors, slots = komod.counts(sha)
+    print(f"ABC {sha[:8]}...  anchors {anchors}  slot types {slots}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in komod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/ko-11.00.md)")
 
 
 def cmd_swz_key(a):
@@ -553,6 +570,7 @@ def main():
     add("prng-verify", cmd_prng_verify, abc, seeds, (["--draws"], {"type": _bounded_int(1, 100000), "default": 256}))
     add("prng-order-verify", cmd_prng_order_verify, abc)
     add("step-verify", cmd_step_verify, abc)
+    add("ko-verify", cmd_ko_verify, abc)
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
