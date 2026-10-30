@@ -19,6 +19,9 @@ from bh import abc as abcmod  # noqa: E402
 from bh import anm as anmmod, collision as collisionmod, commands as commandsmod, input_buffer as inputbufmod, ko as komod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import oracle as oraclemod  # noqa: E402
+from bh import knockback as knockbackmod  # noqa: E402
+from bh import movement as movementmod  # noqa: E402
+from bh import powertypes as powertypesmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
@@ -328,6 +331,10 @@ def cmd_ko_verify(a):
 
 def cmd_input_buffer_verify(a):
     """Check the pinned shape of the input buffer (#6313, #6323); exit 1 on mismatch, 2 on unknown ABC."""
+
+
+def cmd_knockback_verify(a):
+    """Check the pinned shape of the damage / knockback formula (#1674, #1675); exit 1 on mismatch, 2 on unknown ABC."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
     if not os.path.exists(p):
         sys.exit("run `abc-extract` first (or pass --abc)")
@@ -372,6 +379,41 @@ def cmd_input_buffer_verify(a):
     for group in inputbufmod.ANCHORS[sha]:
         print(f"  ok  {group}")
     print("static bytecode evidence only: no execution, no runtime oracle (docs/input-buffer-11.00.md)")
+    if sha not in knockbackmod.ANCHORS:
+        print(f"no knockback anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in knockbackmod.ANCHORS)})")
+        sys.exit(2)
+    bad = knockbackmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    print(f"ABC {sha[:8]}...  anchors {knockbackmod.count(sha)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in knockbackmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/knockback-11.00.md)")
+
+
+def cmd_power_columns(a):
+    """Print the powerTypes column -> PowerType field map rebuilt from the ABC (#6483); no game data is read."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha != movementmod.ABC_1100:
+        print(f"the parser id #{powertypesmod.PARSER} is pinned to patch 11.00 (ABC {movementmod.ABC_1100[:8]}...)")
+        sys.exit(2)
+    cmap = powertypesmod.column_map(abcmod.Abc(data))
+    if a.markdown:
+        print("| Column | Fields |")
+        print("|---|---|")
+        for col in sorted(cmap):
+            print(f"| {col} | {', '.join('`' + x + '`' for x in cmap[col]) or '—'} |")
+    else:
+        for col in sorted(cmap):
+            print(f"{col:28} {' '.join(cmap[col]) or '-'}")
+    print(f"{len(cmap)} columns", file=sys.stderr)
 
 
 def cmd_swz_key(a):
@@ -617,6 +659,8 @@ def main():
     add("ko-verify", cmd_ko_verify, abc)
     add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
     add("input-buffer-verify", cmd_input_buffer_verify, abc)
+    add("knockback-verify", cmd_knockback_verify, abc)
+    add("power-columns", cmd_power_columns, abc, (["--markdown"], {"action": "store_true"}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
