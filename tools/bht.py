@@ -16,7 +16,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
-from bh import anm as anmmod, commands as commandsmod  # noqa: E402
+from bh import anm as anmmod, collision as collisionmod, commands as commandsmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
@@ -286,6 +286,14 @@ def cmd_anm_info(a):
     print(" ".join(f"{k} {v}" for k, v in total.items()))
 
 
+def cmd_collision_verify(a):
+    """Check the pinned anchors of the level collision flags (Q6) and print the type compositions."""
+    _verify_anchors(a, collisionmod.ANCHORS)
+    for name, value in collisionmod.TYPES.items():
+        bits = [f for f, b in collisionmod.FLAGS.items() if value & b]
+        print(f"  {name:<27} {value:4d}  {' | '.join(bits)}")
+
+
 def cmd_prng_order_verify(a):
     """Check the pinned static evidence of PRNG draw order (Q3); exit 1 on mismatch, 2 on unknown ABC."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
@@ -530,6 +538,7 @@ def main():
         (["--stance"], {"type": int, "default": 0}), (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
     add("anm-info", cmd_anm_info, game, (["--file"], {}), (["--anim"], {"help": "animation name to print"}),
         (["--verbose"], {"action": "store_true"}))
+    add("collision-verify", cmd_collision_verify, abc)
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
