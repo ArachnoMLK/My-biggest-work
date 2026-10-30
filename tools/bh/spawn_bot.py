@@ -23,6 +23,18 @@ so `_-44x` is set when the match start (phase 4 of the 272 ms step) calls `_-P3o
 matter here: it is set only by the BRAWLBALL and TAG rules (`_-C20._-S4o` from `_-f40`, `_-od._-b6O`; built
 in `_-99._-76j`), a snapshot read `_-B5T`, and `_-X6R._-sW`, which nothing references. The same `_-k5H` ticks
 the drone first (`_-k5S._-i1H(t)`, @45-66), so its first tick is in phase 5 of the match-start step.
+
+`_-44x` after the match start [V; H: `_-99._-h2k` is a round reset that a plain stock game does not reach]: in
+states 0 and 5 (lookupswitch -> @240) `_-k5H` clears `_-44x` whenever `_-P4K` is false (@495-511); states 3 / 4
+(-> @207) set `_-P4K` false. `_-P4K` is set true only by `Entity._-s2U` #3038 (which also sets `_-44x`), called
+only from `_-99._-h2k` #7148 @399, and by the BRAWLBALL / TAG / `_-y3M` rules. So on the first in-play tick
+`_-44x` is cleared, and a respawn after a KO takes the not-spawned path: `_-P3o` leaves the fighter where it
+is, the durations use flags 0 (4700 ms by default), and the drop gives state 5 and `_-P5S` = 70 outside team
+types 1 / 2.
+
+Eliminated (`Entity._-19` #3016, the third argument of `Respawn` in the KO commit): false with the `_-e3e`
+bit `_-B6B`; true in state 7; true when the lives `_-V` are 0 and `_-d3Y._-81d` > 0 (@0-81); the cases after
+@82 (`_-s3D._-F3O`) are not read.
 """
 from .movement import ABC_1100
 from .platforms import ease
@@ -37,6 +49,7 @@ F_TIMED = 4        # `_-H1g._-S3h` exists and its `_-w1s` >= t
 INSTANT_MASK = 32768 | 16   # `_-N1k._-w35` bits that skip the drone outside a standalone client
 REPLAY_W35 = 1024           # `_-w35` from replay start `_-T12`
 SPAWNED_AT_MATCH_START = True   # `_-44x`, from `_-k5H` in state 2 on the steps before
+SPAWNED_IN_PLAY = False         # `_-44x` once in state 0 / 5 (`_-P4K` false), so after a KO
 REPLAY_END_W35 = 2048       # `_-w35` after the replay's end (`_-331._-G5C` + 2500)
 DROP_SPEED = 30.0           # `_-P5S` (vertical speed, see movement.py) when the drone lets go
 DROP_SPEED_FAST = 70.0      # in the other team-type case, with `_-F5c` set
@@ -147,6 +160,15 @@ class Drone:
     def standalone(dev_flags):
         """`DevSettings.IsStandaloneClient()` #2563 from the set of dev flags."""
         return 3 in dev_flags and 27 not in dev_flags
+
+    @staticmethod
+    def eliminated(lives, lives_mode, state=0, b6b=False):
+        """`Entity._-19` #3016 @0-81 (`lives_mode` is `_-d3Y._-81d` > 0); the `_-F3O` cases are not read."""
+        if b6b:
+            return False
+        if state == 7:
+            return True
+        return lives == 0 and lives_mode
 
     def place(self, t, point, standalone, w35, f3o, camera):
         """`SpawnBot._-P3o` #11873. `point` = (x, y); `camera` = (x, y, width) of `_-I1f._-8I`."""
@@ -366,5 +388,20 @@ ANCHORS = {ABC_1100: {
         (6783, 6, "initproperty", "_-J1Y"),
         (6786, 41, "initproperty", "_-J1Y"),
         (6777, 168, "initproperty", "_-J1Y"),
+    ],
+    "_-44x in play: states 0 / 5 clear it unless _-P4K (_-k5H @495-511); 3 / 4 clear _-P4K; _-s2U sets both, only from _-99._-h2k; _-19 eliminated": [
+        (2991, 498, "getproperty", "_-P4K"),
+        (2991, 510, "pushfalse", ""),
+        (2991, 511, "initproperty", "_-44x"),
+        (2991, 232, "pushfalse", ""),
+        (2991, 233, "initproperty", "_-P4K"),
+        (3038, 49, "pushtrue", ""),
+        (3038, 50, "initproperty", "_-44x"),
+        (7148, 399, "callpropvoid", "_-s2U, 1"),
+        (3016, 12, "getproperty", "_-B6B"),
+        (3016, 32, "pushbyte", "7"),
+        (3016, 47, "getproperty", "_-V"),
+        (3016, 68, "getproperty", "_-81d"),
+        (3016, 74, "greaterthan", ""),
     ],
 }}

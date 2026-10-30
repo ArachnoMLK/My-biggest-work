@@ -70,6 +70,13 @@ class Phases(unittest.TestCase):
         d.place(272, (20.0, 30.0), standalone=False, w35=REPLAY_W35, f3o=False, camera=(0, 0, 100))
         self.assertEqual((f["x"], f["y"], d.phase), (0, -200, COME_DOWN))   # left edge: 20 < 0 + 50
 
+    def test_eliminated(self):
+        self.assertTrue(Drone.eliminated(0, True))
+        self.assertFalse(Drone.eliminated(0, False))
+        self.assertFalse(Drone.eliminated(1, True))
+        self.assertTrue(Drone.eliminated(3, False, state=7))
+        self.assertFalse(Drone.eliminated(0, True, b6b=True))
+
     def test_not_spawned_keeps_fighter(self):
         f = dict(fighter(), spawned=False)
         d = Drone(f)
