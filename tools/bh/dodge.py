@@ -115,6 +115,68 @@ def pick(rows, dir, airborne, is_fast, test_set=False):
     return next((r for r in rows if r.get("DodgeName") == FALLBACK), None)
 
 
+STANDARD_WINDOW_MS = 64    # `_-h3i._-M4C` (script148.<init> #2774 @186-189)
+
+
+def standard_flag(t, airborne, i5a, p5y):
+    """`_-h3i._-B15` #2771 @73-142 (local 7, the `_-K64` argument): `_-wn()`, `_-I5A` != 0, `_-P5Y()` == 0 and
+    `_-I5A` + 64 >= t (a jump squat started within 64 ms)."""
+    return airborne and i5a != 0 and p5y == 0 and i5a + STANDARD_WINDOW_MS >= t
+
+
+def formula_mult(formula, vx, k64, dir):
+    """`_-h3i._-B15(t, formula, fighter)` #2771: the speed multiplier of a SpeedX / SpeedY formula.
+
+    "StandardHorizontal": k = `_-K64(standard_flag)` (negated with Left), span = |2 k|; unless vx is already
+    past k on k's side, d = min(|k - vx|, span), else d = 0; x = 1 - d / span; 0.6 + 0.4 x^2 when x >= 0.5,
+    else 0.7 + 0.8 (x - 0.5)^3. "MomentumHorizontal": (1 + |vx| / 60) / 2. Anything else: 1. vx is `_-v1D`.
+    [H] span == 0 divides by zero as in AS3 (inf / NaN); not reached with a running fighter.
+    """
+    if formula == "StandardHorizontal":
+        span = abs(k64 * 2)
+        k = -k64 if dir & LEFT else k64
+        d = 0.0
+        if not ((k < 0 and vx < k) or (k > 0 and vx > k)):
+            d = min(abs(k - vx), span)
+        x = 1 - d / span
+        if x >= 0.5:
+            return 0.6 + x * x * 0.4
+        y = x - 0.5
+        return 0.7 + y * y * y * 0.8
+    if formula == "MomentumHorizontal":
+        return (1 + abs(vx) / 60.0) / 2
+    return 1.0
+
+
+def speed_x(base, a5a, e2a, dir, vx, z2v):
+    """`_-h3i._-F6w(t, fighter)` #2763 -> `_-T5L`. base = formula_mult(SpeedXFormula, ...). With Left / Right
+    and SpeedXMaxMult (`_-E2A`) != 0: r = |vx| / `_-z2v` clamped to [0.33, 0.57], r = (r - 0.33) /
+    0.23999999999999994, base x (SpeedXMult + r (SpeedXMaxMult - SpeedXMult)); else base x SpeedXMult (`_-a5a`)."""
+    if dir & (LEFT | RIGHT) and e2a != 0:
+        r = min(max(abs(vx) / z2v, 0.33), 0.57)
+        r = (r - 0.33) / 0.23999999999999994
+        return base * (a5a + r * (e2a - a5a))
+    return base * a5a
+
+
+def speed_y(base, eu, d1a, dir, vy):
+    """`_-h3i._-S6F(t, fighter)` #2762 -> `_-WL`. With Up / Drop and SpeedYMaxMult (`_-D1A`) != 0: with Up,
+    r = min(vy, 0) / -40, else r = max(vy, 0) / 70; r clamped to [0.5, 0.75], r = (r - 0.5) / 0.25, base x
+    (SpeedYMult + r (SpeedYMaxMult - SpeedYMult)); else base x SpeedYMult (`_-EU`). vy is `_-P5S`."""
+    if dir & 3 and d1a != 0:
+        r = min(vy, 0.0) / -40.0 if dir & 1 else max(vy, 0.0) / 70.0
+        r = min(max(r, 0.5), 0.75)
+        r = (r - 0.5) / 0.25
+        return base * (eu + r * (d1a - eu))
+    return base * eu
+
+
+def cooldown_ms(cooldown, cooldown_ground, air_or_wall):
+    """`Entity._-Z4S(type, flag)` #3109: (flag ? Cooldown : CooldownGround) x 16, in `_-y1F`. Dodge passes
+    `_-wn()` or `_-r51` != 0 or (IsFast and `_-64H`) (@1562-1618)."""
+    return (cooldown if air_or_wall else cooldown_ground) * FRAME_MS
+
+
 ANCHORS = {ABC_1100: {
     "Entity.Dodge gates: _-C2E(t, dir), _-46I + 64 / + 96 windows, IsDodgeLocked(t), chained dodge (_-H2b, _-14W, _-y1F), _-26R, Dash": [
         (3125, 23, "callproperty", "_-C2E, 2"),
@@ -191,6 +253,49 @@ ANCHORS = {ABC_1100: {
         (15351, 27965, "pushbyte", "1"),
         (15351, 27968, "pushbyte", "2"),
         (15351, 27972, "initproperty", "_-I6u"),
+    ],
+    "Dodge speeds: _-T5L = type._-F6w(t, this), _-WL = type._-S6F(t, this); _-B15 formula (StandardHorizontal, MomentumHorizontal); _-M4C = 64": [
+        (3125, 1457, "callproperty", "_-F6w, 2"),
+        (3125, 1462, "initproperty", "_-T5L"),
+        (3125, 1473, "callproperty", "_-S6F, 2"),
+        (3125, 1478, "initproperty", "_-WL"),
+        (2771, 35, "pushstring", "'StandardHorizontal'"),
+        (2771, 127, "getproperty", "_-M4C"),
+        (2771, 147, "callproperty", "_-K64, 1"),
+        (2771, 157, "pushbyte", "2"),
+        (2771, 302, "pushdouble", "0.5"),
+        (2771, 309, "pushdouble", "0.6"),
+        (2771, 317, "pushdouble", "0.4"),
+        (2771, 339, "pushdouble", "0.7"),
+        (2771, 350, "pushdouble", "0.8"),
+        (2771, 364, "pushstring", "'MomentumHorizontal'"),
+        (2771, 393, "pushdouble", "60.0"),
+        (2774, 186, "pushbyte", "64"),
+        (2774, 189, "initproperty", "_-M4C"),
+    ],
+    "Dodge speed multipliers: _-F6w |vx| / _-z2v in [0.33, 0.57] toward _-E2A; _-S6F vy / -40 or / 70 in [0.5, 0.75] toward _-D1A; _-Z4S Cooldown / CooldownGround x 16": [
+        (2763, 13, "findproperty", "_-W5m"),
+        (2763, 52, "getproperty", "_-E2A"),
+        (2763, 87, "getproperty", "_-z2v"),
+        (2763, 96, "pushdouble", "0.57"),
+        (2763, 115, "pushdouble", "0.33"),
+        (2763, 134, "pushdouble", "0.23999999999999994"),
+        (2763, 144, "getproperty", "_-a5a"),
+        (2762, 16, "findproperty", "_-E3y"),
+        (2762, 57, "getproperty", "_-D1A"),
+        (2762, 74, "getproperty", "_-P5S"),
+        (2762, 116, "pushdouble", "-40.0"),
+        (2762, 141, "pushdouble", "70.0"),
+        (2762, 149, "pushdouble", "0.75"),
+        (2762, 168, "pushdouble", "0.5"),
+        (2762, 187, "pushdouble", "0.25"),
+        (3109, 6, "getproperty", "_-p2U"),
+        (3109, 15, "getproperty", "_-S6E"),
+        (3109, 22, "pushbyte", "16"),
+        (3093, 26, "getproperty", "_-z2v"),
+        (3093, 35, "getproperty", "_-u5j"),
+        (3093, 48, "getproperty", "_-M1U"),
+        (3093, 57, "getproperty", "_-04K"),
     ],
     "Entity.Dodge counter _-6K: count >>> 16 cleared unless _-E6P() or chained; low half 2 / 1 under _-f2b(); count + 1": [
         (3125, 483, "callproperty", "_-E6P, 0"),
