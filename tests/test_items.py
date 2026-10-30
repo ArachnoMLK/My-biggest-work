@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.items import ITEM_DEFAULTS, expired, item_type, sweep_mask, velocity  # noqa: E402
+from bh.items import ITEM_DEFAULTS, expired, item_type, sweep_mask, target_gate, velocity  # noqa: E402
 
 
 class Ground:
@@ -54,6 +54,40 @@ class Motion(unittest.TestCase):
         self.assertEqual((r["T2P"], r["z4P"], r["G6o"], r["T30"], r["h5M"]), (1.5, 3, 900, True, 0.15))
         self.assertEqual(item_type({"PathType": "Other"})["z4P"], 0)
 
+
+def cand(**kw):
+    c = {"bit": 4, "entity": True, "hitstun": False, "overlap": True}
+    c.update(kw)
+    return c
+
+
+class Gates(unittest.TestCase):
+    def test_first_contact_hits(self):
+        self.assertEqual(target_gate(cand(), ITEM_DEFAULTS, 1100, 1000, 10.0, 0.0, 0, 0), (True, 0))
+
+    def test_grace_after_throw(self):
+        self.assertEqual(target_gate(cand(), ITEM_DEFAULTS, 1031, 1000, 10.0, 0.0, 0, 0), (False, 4))
+        self.assertEqual(target_gate(cand(), ITEM_DEFAULTS, 1040, 1000, 1.0, 10.0, 0, 0), (False, 4))  # 64 on y
+        self.assertTrue(target_gate(cand(hitstun=True), ITEM_DEFAULTS, 1001, 1000, 1.0, 0.0, 0, 0)[0])
+
+    def test_contact_and_repeats(self):
+        self.assertEqual(target_gate(cand(), ITEM_DEFAULTS, 1100, 1000, 1.0, 0.0, 0, 4), (False, 4))
+        self.assertEqual(target_gate(cand(overlap=False), ITEM_DEFAULTS, 1100, 1000, 1.0, 0.0, 0, 6), (False, 2))
+        self.assertFalse(target_gate(cand(), ITEM_DEFAULTS, 1100, 1000, 1.0, 0.0, 4, 0)[0])        # already hit
+        rep = dict(ITEM_DEFAULTS, A4s=True)
+        self.assertTrue(target_gate(cand(), rep, 1100, 1000, 1.0, 0.0, 4, 0)[0])
+        self.assertFalse(target_gate(cand(), rep, 1100, 1000, 1.0, 0.0, -1, 0)[0])
+
+    def test_other_gates(self):
+        st = dict(ITEM_DEFAULTS, N59=True)
+        self.assertFalse(target_gate(cand(), st, 1100, 1000, 1.0, 0.0, 0, 0)[0])
+        self.assertFalse(target_gate(cand(thrower_stunned_by=True), ITEM_DEFAULTS, 1100, 1000, 1.0, 0.0, 0, 0)[0])
+        self.assertTrue(target_gate(cand(thrower_stunned_by=True), ITEM_DEFAULTS, 1400, 1000, 1.0, 0.0, 0, 0)[0])
+        self.assertEqual(target_gate(cand(catch=True, catch_dir=False), ITEM_DEFAULTS, 1100, 1000, 1.0, 0.0, 0, 0),
+                         (False, 4))
+        boom = dict(ITEM_DEFAULTS, z4P=1)
+        self.assertEqual(target_gate(cand(u4b=900), boom, 1500, 1000, 1.0, 0.0, 0, 4), (True, 0))   # re-armed
+        self.assertEqual(target_gate(cand(u4b=1200), boom, 1500, 1000, 1.0, 0.0, 0, 4), (False, 4))
 
 if __name__ == "__main__":
     unittest.main()

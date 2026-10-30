@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(825 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(851 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -613,13 +613,26 @@ Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not po
 4. **Swept test.** When the fine test misses, a swept capsule from the previous position (`_-X2D`,
    `_-14l` − h/2) to the current one is tried, with radius min(w, h)/2 of the item type (@1234–1282). A
    fast item cannot pass through a target between two ticks.
-5. **Per-target gates.** Gates per target run on the bit `1 << _-03K()` of `_-Io` / `_-x5G`. They
-   involve:
-   - catch windows `_-O13 + 400`;
-   - 32 or 64 ms depending on whether the item moves mostly along x (`_-Lu`) or y (`_-33c`);
-   - `_-K3V`, `_-J5Z`, `_-66f`, `_-I1E`.
+5. **Per-target gates** (`items.target_gate`) [V; names of `_-J5Z` / `_-66f` / `_-I1E` are H]. Each candidate
+   has a bit `1 << _-03K()`. `_-Io` holds the targets already hit (−1 = all), `_-x5G` the targets still in
+   contact. In order:
+   - **Only stunned.** With `OnlyStunnedTrigger` (`_-N59`), a fighter that is not in hitstun is skipped.
+   - **Already hit.** A target in `_-Io` is skipped, unless `AllowRepeatedCollision` (`_-A4s`) is set and
+     `_-Io` ≠ −1.
+   - **400 ms after the throw** (`_-O13 + 400`), a fighter is skipped in two cases: the thrower is in
+     hitstun from that fighter's last power, and that power is not a ThrownItem (TargetMethod 11); or
+     `_-I1E(candidate)` is true.
+   - **No overlap** (steps 3–4): the bit is cleared from `_-x5G`, no hit.
+   - **Catch.** If the fighter can catch (`_-J5Z(t, false, true)`), there is no hit. The bit is cleared when
+     `_-66f(_-Lu, _-33c)` is true, set otherwise.
+   - **Grace after the throw.** A fighter not in hitstun is not hit during the first 32 ms after the throw,
+     or 64 ms when the item moves more along y than x. The bit is set.
+   - **Boomerang** (PathType 1). The bit is cleared again once t − max(`_-u4B`, `_-O13`) ≥ 500 ms
+     (`_-p5k._-K3V`).
+   - **Still in contact.** A target whose bit is set is not hit again, unless `_-f4i` and an
+     `OnExplodePower` exist.
 
-   These are read but **not transcribed** [V shape; meanings H].
+   Otherwise the candidate is kept. The last candidate kept is the one that is hit.
 6. **Hit.** The last target that passes is handed to `_-Q3h(t, holder, target)` (@1792). That calls
    `_-R58` (#15230 @242), which spawns a power of the thrower with `_-F5N._-q5` (#15209 @1829). `_-q5`
    builds a new `_-l4X` with **`_-x4I = the hit target`** and `_-A3S = true`, adds it to `_-pX` and runs
