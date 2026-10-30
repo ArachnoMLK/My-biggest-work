@@ -6,7 +6,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.jump import air_jump, dash_window, ground_jump, ground_tail, wall_jump  # noqa: E402
+from bh.jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate,  # noqa: E402
+                     squat_on_landing, squat_start, wall_jump)
 
 
 class Jump(unittest.TestCase):
@@ -46,6 +47,26 @@ class Jump(unittest.TestCase):
         self.assertEqual(air_jump(0, 2, 0.0, 12.0, True, True, 8.0)[2], 8.0)     # held left: a rightward vx is capped at max
         self.assertEqual(air_jump(0, 2, 0.0, -12.0, True, True, 8.0)[2], -12.0)  # a leftward vx is kept
         self.assertEqual(air_jump(0, 2, 0.0, -12.0, False, True, 8.0)[2], -8.0)
+
+    def test_squat(self):
+        self.assertTrue(squat_gate(1000, False, False, None, 0, False, 0))
+        self.assertFalse(squat_gate(1000, False, True, None, 0, False, 0))      # third argument: the real jump
+        self.assertFalse(squat_gate(1000, True, False, None, 0, False, 0))
+        self.assertFalse(squat_gate(1000, False, False, object(), 0, False, 0))  # a power runs
+        self.assertFalse(squat_gate(1000, False, False, None, 808, False, 0))   # 808 + 192 > 1000 is false
+        self.assertTrue(squat_gate(1001, False, False, None, 808, False, 0))
+        self.assertFalse(squat_gate(1000, False, False, None, 0, True, 0))      # dash window: jumps at once
+        self.assertTrue(squat_gate(1000, False, False, None, 0, True, 2))
+        g = object()
+        self.assertEqual(squat_start(500, g, 0), (1, 500))
+        self.assertEqual(squat_start(500, None, 1), (2, 500))
+        self.assertEqual(squat_start(500, None, 0), (3, 500))
+        self.assertFalse(squat_due(531, 1, 500))
+        self.assertTrue(squat_due(532, 1, 500))
+        self.assertFalse(squat_due(900, 0, 500))
+        self.assertEqual(squat_on_landing(3, 500, True), 564)
+        self.assertEqual(squat_on_landing(0, 500, True), 500)
+        self.assertEqual(squat_on_landing(3, 500, False), 500)
 
 
 if __name__ == "__main__":

@@ -597,9 +597,22 @@ in movement-11.00.md, PR #16) [V]. The grounded branch is taken when `_-96f` is 
 - event `'jump.Air'`.
 - With no air jump left (@2427): local 12 = `_-e3e` & `Entity._-8` ≠ 0, `_-I5A` = 0.
 
-Not yet read: the pre-jump path @223–506 (when neither the second nor the third argument is set and no
-power runs: `_-w4c`, `_-n5b`, then `_-Xb` = 1 / 2 / 3 for ground / wall / air and `_-I5A` = t, return) — it
-looks like the jump squat that stores the pending kind before the real jump [H].
+**Jump squat** (`Entity.Jump` @223–506, `Entity._-8i` #2984, `Entity._-A2X` #3131) [V]. The input
+(`_-i4Z._-51o` #6313) calls `Jump(t)` with one argument; a power calls `Jump(t, true)` (`_-F5N._-C5S` #1700,
+hence k = 0.86).
+- **Gate** (@223–320): no second nor third argument, no running power (`_-Kc._-o3I`), the jump lock over
+  (`_-532` == 0 or t > `_-532` + `Entity._-z3C`, 192), and no dash window or `_-L3a` == 2.
+- **Start** (@324–506): if `_-w3i` + `Entity._-k5G` (192) ≥ t, `_-w4c(t, false, false, _-R5q._-66U)` and, in the
+  air, `_-y1U(t, false)`; then `_-n5b(t, airborne, on a wall, false)`, the pending kind `_-Xb` = 1 (ground),
+  2 (`_-r51` ≠ 0) or 3 (air), `_-I5A` = t, and Jump returns without any impulse.
+- **Release** (`_-8i` @2674–2718): once `_-Xb` ≠ 0 and t ≥ `_-I5A` + 32, `_-A2X(t)`: `_-g38()` when no power
+  runs, `_-P5S` = 0, `_-I5A` = 0, then `Jump(t, false, true)`, which takes the ground / wall / air branch above.
+  So a jump leaves the ground 32 ms (2 ticks of 16 ms) after the press [H on the tick count].
+- **Landing** (`_-8i` @13427–13510): when the fighter was airborne before the move (local 37 = `_-wn()`), is
+  not after it, and `_-96p()` [H]: `_-t4D` = t, and a pending jump waits 64 ms more (`_-I5A` += 64).
+- In the dash window with `_-L3a` ≠ 2, there is no squat: the jump (170) happens at the press.
+- Not read: where `_-Xb` goes back to 0, and the `_-H5F(t, third)` guard @36–59 (return when it is true and
+  there is no second argument).
 
 **Horizontal speed** ([`tools/bh/horizontal.py`](../tools/bh/horizontal.py), `_-8i` @519–2659; first read in
 horizontal-11.00.md, PR #23) [V]. Before the walk, `_-v1D` goes through friction, then acceleration:

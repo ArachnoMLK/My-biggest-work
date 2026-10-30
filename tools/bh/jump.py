@@ -8,9 +8,13 @@ for the 192 ms lock and the air-jump count). [V] unless marked [H]. `_-141()` is
 from .movement import ABC_1100
 
 GROUND_IMPULSE = 57.0      # @643
-GROUND_K = 0.86            # @579: when Jump's second argument is true (`Entity._-A2X` #3131)
+GROUND_K = 0.86            # @579: when Jump's second argument is true (`_-F5N._-C5S` #1700 @423)
 DASH_IMPULSE = 170.0       # @698
 DASH_WINDOW_MS = 160       # @84: `_-26T` + 160 > t
+JUMP_LOCK_MS = 192         # `Entity._-z3C` (script157.<init> #3173 @893): @281, t > `_-532` + 192
+SQUAT_MS = 32              # `Entity._-8i` #2984 @2702: `_-A2X(t)` once t >= `_-I5A` + 32
+LANDING_DELAY_MS = 64      # #2984 @13505: a pending jump is pushed back by 64 ms on landing
+XB_GROUND, XB_WALL, XB_AIR = 1, 2, 3   # @444 / @475 / @490: the pending kind `_-Xb`
 TAIL_SLOWDOWN = 4          # @1143 / @1173: `_-M3V` and |vx| > 4 -> |vx| -= 4
 TAIL_BOOST_K = 0.5         # @1315: `_-84` += `_-13G` x 0.5
 BOOST_13G = 30.0           # `_-13G` = `Entity._-32g` (Entity.<init> #2887 @149; 30.0 in #15351 @30045)
@@ -42,6 +46,36 @@ def ground_jump(t, dash_timer, ground, xb, a4a, second_arg=False):
     if dash:
         impulse = DASH_IMPULSE
     return a4a - impulse, 0.0, None, dash
+
+
+def squat_gate(t, second_arg, third_arg, power, lock_start, dash, l3a):
+    """@223-320: a press with neither the second nor the third argument, no running power `_-Kc._-o3I`, the
+    jump lock over (`_-532` == 0 or t > `_-532` + 192) and (no dash window or `_-L3a` == 2) does not jump yet."""
+    return (not third_arg and not second_arg and power is None
+            and (lock_start == 0 or t > lock_start + JUMP_LOCK_MS) and (not dash or l3a == 2))
+
+
+def squat_start(t, ground, r51):
+    """@392-506: the jump squat. `_-n5b(t, airborne, on a wall, false)`, then the pending kind `_-Xb` = 1 on the
+    ground, 2 on a wall (`_-r51` != 0), else 3, and `_-I5A` = t; Jump returns. (Before that, when `_-w3i` +
+    `Entity._-k5G` (192) >= t, `_-w4c(t, false, false, _-R5q._-66U)` and, in the air, `_-y1U(t, false)`; not
+    modelled.) Returns (xb, i5a)."""
+    if ground is not None:
+        return XB_GROUND, t
+    return (XB_WALL if r51 != 0 else XB_AIR), t
+
+
+def squat_due(t, xb, i5a):
+    """`Entity._-8i` #2984 @2674-2718: with a jump pending (`_-Xb` != 0) and t >= `_-I5A` + 32, `_-A2X(t)` runs:
+    `_-g38()` when no power runs, `_-P5S` = 0, `_-I5A` = 0, then `Jump(t, false, true)` (the third argument skips
+    the squat; the kind of jump is then picked from `_-96f`, `_-r51` and the stored `_-Xb`)."""
+    return xb != 0 and t >= i5a + SQUAT_MS
+
+
+def squat_on_landing(xb, i5a, landed):
+    """#2984 @13427-13510: on landing (airborne before the move, `_-wn()` false after, and `_-96p()` [H]),
+    `_-t4D` = t and a pending jump waits 64 ms more."""
+    return i5a + LANDING_DELAY_MS if landed and xb != 0 else i5a
 
 
 def ground_tail(left, m3v, v1d, h84, max_speed, boost=BOOST_13G):
@@ -180,5 +214,65 @@ ANCHORS = {ABC_1100: {
         (3052, 2414, "pushstring", "'jump.Air'"),
         (3052, 2437, "getproperty", "_-8"),
         (3052, 2455, "initproperty", "_-I5A"),
+    ],
+    "Entity.Jump squat @223-506: no 2nd / 3rd argument, no power, t > _-532 + _-z3C (192), no dash window or _-L3a == 2; _-Xb = 1 / 2 / 3, _-I5A = t, return": [
+        (3052, 227, "getlocal_3", ""),
+        (3052, 234, "getlocal_2", ""),
+        (3052, 245, "coerce", "_-l4X"),
+        (3052, 260, "getproperty", "_-532"),
+        (3052, 285, "getproperty", "_-z3C"),
+        (3052, 291, "greaterthan", ""),
+        (3052, 311, "getproperty", "_-L3a"),
+        (3052, 320, "iffalse", "183"),
+        (3052, 334, "getproperty", "_-k5G"),
+        (3052, 364, "callpropvoid", "_-w4c, 4"),
+        (3052, 388, "callpropvoid", "_-y1U, 2"),
+        (3052, 421, "callpropvoid", "_-n5b, 4"),
+        (3052, 444, "pushbyte", "1"),
+        (3052, 475, "pushbyte", "2"),
+        (3052, 490, "pushbyte", "3"),
+        (3052, 502, "initproperty", "_-I5A"),
+        (3052, 506, "returnvoid", ""),
+    ],
+    "Entity._-8i squat release @2674-2718: _-Xb != 0 and t >= _-I5A + 32 -> _-A2X(t)": [
+        (2984, 2679, "getproperty", "_-Xb"),
+        (2984, 2698, "getproperty", "_-I5A"),
+        (2984, 2702, "pushbyte", "32"),
+        (2984, 2707, "greaterequals", ""),
+        (2984, 2718, "callpropvoid", "_-A2X, 1"),
+    ],
+    "Entity._-A2X: _-g38 without power; _-P5S = 0; _-I5A = 0; Jump(t, false, true)": [
+        (3131, 8, "getproperty", "_-o3I"),
+        (3131, 31, "callpropvoid", "_-g38, 0"),
+        (3131, 44, "getproperty", "_-P5S"),
+        (3131, 59, "initproperty", "_-I5A"),
+        (3131, 68, "pushfalse", ""),
+        (3131, 69, "pushtrue", ""),
+        (3131, 70, "callpropvoid", "Jump, 3"),
+    ],
+    "Entity._-8i landing: not _-wn() and local 37 and _-96p(): _-t4D = t; _-Xb != 0 -> _-I5A += 64": [
+        (2984, 13139, "setlocal", "37"),
+        (2984, 13430, "callproperty", "_-wn, 0"),
+        (2984, 13440, "getlocal", "37"),
+        (2984, 13458, "callproperty", "_-96p, 0"),
+        (2984, 13472, "initproperty", "_-t4D"),
+        (2984, 13480, "getproperty", "_-Xb"),
+        (2984, 13505, "pushbyte", "64"),
+        (2984, 13510, "initproperty", "_-I5A"),
+    ],
+    "Jump callers: input _-i4Z._-51o Jump(t); power _-F5N._-C5S Jump(t, true); constants _-z3C = _-k5G = 192, _-S4O = 53, _-32g = 30": [
+        (6313, 2567, "callpropvoid", "Jump, 1"),
+        (1700, 422, "pushtrue", ""),
+        (1700, 423, "callpropvoid", "Jump, 2"),
+        (3173, 893, "pushuint", "192"),
+        (3173, 895, "initproperty", "_-z3C"),
+        (3173, 1950, "pushuint", "192"),
+        (3173, 1952, "initproperty", "_-k5G"),
+        (15351, 30045, "pushdouble", "30.0"),
+        (15351, 30048, "initproperty", "_-32g"),
+        (15351, 30055, "pushdouble", "53.0"),
+        (15351, 30058, "initproperty", "_-S4O"),
+        (2887, 146, "getproperty", "_-32g"),
+        (2887, 149, "initproperty", "_-13G"),
     ],
 }}
