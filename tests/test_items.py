@@ -8,7 +8,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.items import (ITEM_DEFAULTS, after_sweep, bounce, expired, ground_walk, impact, item_type, sweep,  # noqa: E402
-                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path, rocket_homing, lerp, throw_speed, throw_vector, throw_start,
+                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path, rocket_homing, lerp, throw_speed, throw_vector, throw_start, impact_special,
                       target_gate, velocity)
 from bh.raycast import Line  # noqa: E402
 
@@ -279,6 +279,20 @@ class Throw(unittest.TestCase):
         st = throw_start((10.0, -2.0), dict(ITEM_DEFAULTS, I2d=1.5, z4P=1), 3, 1, 2500, 9000)
         self.assertEqual((st["Lu"], st["33c"], st["launch"]), (15.0, -3.0, (15.0, -3.0)))
         self.assertEqual((st["W6M"], st["BG"], st["state"], st["O13"]), (True, True, 1, 9000))
+
+class SpecialImpact(unittest.TestCase):
+    def test_cases(self):
+        self.assertEqual(impact_special(100, 1, ITEM_DEFAULTS, 1, 0, 0, 0), {})
+        weapon = dict(ITEM_DEFAULTS, G3X=True)
+        self.assertEqual(impact_special(100, 657, weapon, 1, 4, 0, 0), {"state": 6, "l45": 367})
+        self.assertEqual(impact_special(100, 657, weapon, 1, 0, 0, 0), {})           # has not hit anyone
+        boom = dict(ITEM_DEFAULTS, Q3g=True, o3Y="Boom")
+        self.assertEqual(impact_special(500, 1, boom, 1, 0, 0, 0),
+                         {"expire": True, "power": "Boom", "late_flag": True})
+        self.assertEqual(impact_special(500, 1, boom, 0, 0, 0, 0), {})               # not thrown, not armed
+        self.assertEqual(impact_special(500, 1, boom, 1, 0, 0, 0, thrower=False), {"expire": True})
+        tele = dict(ITEM_DEFAULTS, **{"76N": "Teleport", "o3Y": "Tp"})
+        self.assertTrue(impact_special(100, 1, tele, 1, 0, 0, 0)["teleport_thrower"])
 
 if __name__ == "__main__":
     unittest.main()
