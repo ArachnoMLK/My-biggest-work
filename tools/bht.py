@@ -480,7 +480,7 @@ def cmd_ko_gap_check(a):
 
 
 def cmd_replay_start_check(a):
-    """Match start + each fighter alone with its own inputs on local 1v1 replays (aggregate counts only)."""
+    """Match start, both fighters in lockstep with their own inputs, KO commit and respawn, on local 1v1 replays (aggregate counts only)."""
     from collections import Counter
     swz = replaysetupmod.Swz(a.swz or os.path.join(WORK, "swz"))
     c = Counter()
@@ -498,14 +498,14 @@ def cmd_replay_start_check(a):
             c[f"skipped ({e})"] += 1
             continue
         c["replays run"] += 1
-        for _, t_go, ko in out:
-            c["fighters let go" if t_go is not None else "fighters never let go"] += 1
-            if t_go is not None:
-                c["let go at 6000 ms" if t_go == 6000 else "let go at another time"] += 1
-                c["first ring-out predicted" if ko is not None else "no ring-out in the window"] += 1
+        for r in out.values():
+            c["fighters let go at least once"] += bool(r["let_go"])
+            c["first let-go at 6000 ms"] += bool(r["let_go"]) and r["let_go"][0] == 6000
+            c["predicted KOs"] += len(r["kos"])
+            c["respawns let go"] += max(len(r["let_go"]) - 1, 0)
     for k, v in sorted(c.items()):
         print(f"  {k:<28} {v}")
-    print("one-sided run, not compared with the replays' KOs yet; nothing is published (tools/bh/replay_setup.py)")
+    print("both fighters in lockstep, no hits; not compared with the replays' KOs yet; nothing is published (tools/bh/replay_setup.py)")
 
 
 def cmd_smoke_fall(a):
@@ -815,7 +815,7 @@ def main():
     add("input-buffer-verify", cmd_input_buffer_verify, abc)
     add("knockback-verify", cmd_knockback_verify, abc)
     add("replay-start-check", cmd_replay_start_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
-        (["--swz"], {"help": "swz-dump folder (default work/swz)"}), (["--ticks"], {"type": int, "default": 1500}))
+        (["--swz"], {"help": "swz-dump folder (default work/swz)"}), (["--ticks"], {"type": int, "default": 6000}))
     add("ko-gap-check", cmd_ko_gap_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
         (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
     add("smoke-fall", cmd_smoke_fall, (["--swz"], {"help": "swz-dump folder (default work/swz)"}),

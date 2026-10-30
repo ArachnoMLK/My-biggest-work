@@ -33,11 +33,13 @@ from .horizontal import (acceleration, apply_acceleration, apply_friction, frict
                          reversal_factor)
 from .input_buffer import state_at
 from .ko import ko_mask
+from .respawn_points import candidates
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
                    squat_start, wall_jump)
+from .entity_states import respawn_index
 from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
 from .smoke import FALL_CAP, GRAVITY, STEP, TICK_MS
-from .spawn_bot import IDLE, REPLAY_W35, SPAWNED_AT_MATCH_START, Drone, scoring_rules, timing_flags
+from .spawn_bot import IDLE, REPLAY_W35, SPAWNED_AT_MATCH_START, SPAWNED_IN_PLAY, Drone, scoring_rules, timing_flags
 from .step import clamp, fold_impulse, speed_cap
 
 DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFriction": 1.2,
@@ -224,3 +226,68 @@ def match_start(entities, seed, points, camera, cells=None, team_type=0, spawned
         by_id[id(e)] = (e, Fighter(f["x"], f["y"], p5s=f["vy"]) if ready else None, t if ready else None,
                         f["state"])
     return [by_id[id(e)] for e in fighter_order(entities)]
+
+
+def ko_reset(f):
+    """`Entity._-p1Y` #3034 on the harness fighter: velocities, impulses, ring-out mask, wall flag, ground."""
+    f.v1d = f.p5s = f.h84 = f.a4a = 0.0
+    f.a3d = f.r51 = 0
+    f.ground = None
+
+
+def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id, cells=None, lives=3,
+         lives_mode=True, team_type=0, standalone=False, ticks=6000):
+    """Both fighters of a plain 1v1 replay in lockstep from the match-start step. Per tick, in `_-5r` order:
+    phase 5 (`_-k5H`: the drone first, then movement in states 0 / 5, which clears `_-44x`), then phase 6
+    (`_-eR`: a ring-out mask -> KO commit at t, lives - 1, then `Respawn`: state 7 when eliminated, else the
+    next point of the shared `_-G5X` counter and the drone). Returns {entity id: {"kos": [t], "let_go": [t]}}.
+    [H] the glue of `match_start` and replay_setup.py; no hits; inputs only feed the movement."""
+    n4k = time_base(step_times(0, STEP_MS))
+    t0 = match_start_step(n4k)
+    rng, _ = r_at_match_start(seed, len(entities))
+    placed, g5x = one_v_one(rng, fighter_order(entities), points)
+    counters = list(g5x)
+    rules = scoring_rules(cells or {}, n4k=n4k)
+    players = []
+    for e, point in placed:
+        body = {"x": 0.0, "y": 0.0, "state": 3, "vy": 0.0, "spawned": SPAWNED_AT_MATCH_START}
+        d = Drone(body)
+        d.place(t0, None if point is None else (point["x"], point["y"]), standalone, REPLAY_W35, False, camera)
+        players.append({"e": e, "body": body, "drone": d, "f": None, "lives": lives, "kos": [], "let_go": []})
+    by_order = {id(e): i for i, e in enumerate(fighter_order(entities))}
+    players.sort(key=lambda p: by_order[id(p["e"])])
+    for k in range(ticks):
+        t = t0 + STEP_MS * k
+        for p in players:                                   # phase 5
+            body, d = p["body"], p["drone"]
+            if d.phase != IDLE:
+                d.tick(t, timing_flags(body["spawned"], False, None, t), rules, team_type, False)
+                if d.phase == IDLE and body["state"] in (0, 5):
+                    st = stats_by_id.get(p["e"]["id"])
+                    p["f"] = Fighter(body["x"], body["y"], p5s=body["vy"], stats=dict(st) if st else dict(DEFAULT_STATS))
+                    p["let_go"].append(t)
+            if body["state"] in (0, 5) and p["f"] is not None:
+                body["spawned"] = SPAWNED_IN_PLAY
+                records = inputs_by_id.get(p["e"]["id"], [])
+                keys, before = state_at(records, t), state_at(records, t - STEP_MS)
+                tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT),
+                     bool(keys & JUMP and not before & JUMP), 0, bounds)
+        for p in players:                                   # phase 6
+            f, body = p["f"], p["body"]
+            if f is None or body["state"] not in (0, 5) or not f.a3d:
+                continue
+            p["kos"].append(t)
+            ko_reset(f)
+            body.update(x=f.x, y=f.y, vy=0.0, state=3)
+            p["lives"] -= 1
+            if Drone.eliminated(p["lives"], lives_mode, body["state"]):
+                body["state"] = 7
+                continue
+            alive = sum(1 for q in players if q["body"]["state"] not in (7, 8))
+            cands = candidates(points, alive, body["spawned"])
+            point = cands[respawn_index(counters, 0, len(cands), False)] if cands else None
+            p["drone"].place(t, None if point is None else (point["x"], point["y"]), standalone, REPLAY_W35, False,
+                             camera)
+        if all(p["body"]["state"] == 7 for p in players):
+            break
+    return {p["e"]["id"]: {"kos": p["kos"], "let_go": p["let_go"]} for p in players}

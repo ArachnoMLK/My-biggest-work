@@ -123,5 +123,31 @@ class MatchStart(unittest.TestCase):
                                   parse_respawns('<LevelDesc><Respawn X="0" Y="0" /></LevelDesc>'), (0, 0, 100))
         self.assertEqual([f for _, f, _, _ in out], [None, None])
 
+class Play(unittest.TestCase):
+    XML = ('<LevelDesc><HardCollision X1="-300" X2="300" Y="500" /><HardCollision X1="300" X2="-300" Y="600" />'
+           '<HardCollision X="-300" Y1="500" Y2="600" /><HardCollision X="300" Y1="600" Y2="500" />'
+           '<Respawn Initial="true" X="-200" Y="400" /><Respawn Initial="true" X="200" Y="400" />'
+           '<Respawn X="0" Y="400" /></LevelDesc>')
+    CAM = (-1000.0, -600.0, 1000.0, 900.0)
+    KILL = {"LeftKill": 200, "RightKill": 200, "TopKill": 200, "BottomKill": 200,
+            "HardLeftKill": False, "HardRightKill": False, "SoftTopKill": False}
+
+    def play(self, inputs, lives=3, ticks=3000):
+        return harness.play([{"id": 2}, {"id": 1}], 7, parse_respawns(self.XML), (-1000, -600, 2000),
+                            smoke.map_grid(self.XML), (self.CAM, self.KILL), {}, inputs, lives=lives, ticks=ticks)
+
+    def test_walker_loses_its_lives_and_is_eliminated(self):
+        out = self.play({1: [(0, 8)]}, lives=2)
+        walker, still = out[1], out[2]
+        self.assertEqual(len(walker["kos"]), 2)
+        self.assertEqual(len(walker["let_go"]), 2)              # the match start, then one respawn
+        self.assertGreaterEqual(walker["let_go"][1] - walker["kos"][0], 4700)   # not-spawned trip
+        self.assertEqual((still["kos"], still["let_go"]), ([], [6000]))
+
+    def test_respawn_uses_the_shared_counter(self):
+        out = self.play({1: [(0, 8)], 2: [(0, 4)]}, lives=3, ticks=1200)
+        self.assertTrue(out[1]["kos"] and out[2]["kos"])
+
+
 if __name__ == "__main__":
     unittest.main()

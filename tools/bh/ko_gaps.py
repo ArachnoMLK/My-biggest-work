@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 
 from . import oracle
 from .match_start import STEP_MS, match_start_step
-from .spawn_bot import F_SPAWNED, SPAWNED_AT_MATCH_START, respawn_ms, scoring_rules
+from .spawn_bot import F_SPAWNED, SPAWNED_AT_MATCH_START, SPAWNED_IN_PLAY, respawn_ms, scoring_rules
 
 
 def scoring_cells(xml_text):
@@ -38,7 +38,7 @@ def victim_gaps(rep):
     return gaps
 
 
-def check(replays, cells, flags=F_SPAWNED):
+def check(replays, cells, flags=F_SPAWNED if SPAWNED_IN_PLAY else 0):
     """Aggregate over parsed 11.00 replays: gaps, violations (gap < predicted drone time), smallest margin."""
     c = {"replays": 0, "scoring_types": 0, "gaps": 0, "below_floor": 0, "smallest_margin_ms": None,
          "first_kos": 0, "first_ko_below_floor": 0, "first_ko_smallest_margin_ms": None,

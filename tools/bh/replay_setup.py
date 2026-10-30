@@ -8,8 +8,8 @@ the state dispatch), so its first harness tick is the let-go step.
 
 The glue is [H]: the HeroType is found by HeroID; the fighter uses its first hero; the drone's camera
 rectangle `_-I1f._-8I` is the CameraBounds at the match start; only the static lines (no moving platforms);
-the fighters do not interact (no hits, no grabs); the harness reads only the Speed family fields; a ring-out
-stops the run (the KO commit and the respawn are not chained yet).
+the fighters do not interact (no hits, no grabs); the harness reads only the Speed family fields; the lives
+come from the settings' `starting_lives`.
 """
 import os
 import re
@@ -105,20 +105,11 @@ def setup(rep, swz):
             "cells": swz.scoring.get(rep["settings"]["scoring_type_id"], {})}
 
 
-def run(rep, swz, ticks=3000):
-    """Match start, then each fighter alone with its own inputs until its first ring-out or `ticks` ticks.
-    Returns [(entity id, let-go t, ring-out t or None)] in `_-5r` order."""
+def run(rep, swz, ticks=6000):
+    """Both fighters in lockstep (`harness.play`) with their own inputs: {entity id: {"kos", "let_go"}} (times
+    in ms). Lives from the settings' `starting_lives` [H: `_-V` and `_-d3Y._-81d` are not traced to them]."""
     s = setup(rep, swz)
-    started = harness.match_start(rep["entities"], rep["random_seed"], s["points"], s["drone_camera"], s["cells"])
-    out = []
-    for e, f, t_go, _ in started:
-        if f is None:
-            out.append((e["id"], None, None))
-            continue
-        f.stats = dict(s["stats"][e["id"]])
-        inputs = harness.from_records(rep["inputs"].get(e["id"], []), t_go - harness.TICK_MS)
-        trace = harness.run(f, s["grid"], inputs, ticks, t0=t_go - harness.TICK_MS,
-                            bounds=(s["cam"], s["kill"]), stop_on_ko=True)
-        ko = trace[-1][0] if trace and f.a3d else None
-        out.append((e["id"], t_go, ko))
-    return out
+    lives = rep["settings"].get("starting_lives", 0)
+    return harness.play(rep["entities"], rep["random_seed"], s["points"], s["drone_camera"], s["grid"],
+                        (s["cam"], s["kill"]), s["stats"], rep["inputs"], s["cells"], lives=lives,
+                        lives_mode=lives > 0, ticks=ticks)

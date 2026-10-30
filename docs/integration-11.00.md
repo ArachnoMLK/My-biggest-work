@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 1491 | 0 |
+| `hit-detection-verify` | 1504 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 330 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 333 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -206,31 +206,38 @@ KO gap check now uses the 5700 ms first trip. [H] the `_-vs` gate of the normal 
 
 For each local 1v1 replay of patch 11.00: the map (static lines of the LevelDesc), the KO bounds (CameraBounds
 and the LevelType kills), the legend stats of each fighter's first hero and stance (stats.py), the scoring
-durations, then `harness.match_start` and, from the let-go step, each fighter alone with its own inputs until
-its first ring-out (`harness.run`, `from_records`). The drone ticks first in `Entity._-k5H` and the state
-dispatch follows in the same call, so the first harness tick is the let-go step [V].
+durations, then `harness.play`: both fighters in lockstep from the match-start step, each tick in `_-5r` order
+
+- phase 5 (`Entity._-k5H`): the drone first, then, in states 0 / 5, the movement with the fighter's own inputs
+  (which also clears `_-44x`, spawn_bot.py `SPAWNED_IN_PLAY`);
+- phase 6 (`Entity._-eR`, ko-11.00.md §5): a ring-out mask is a KO at this tick; `_-p1Y` reset, state 3,
+  lives − 1, then `Respawn`: state 7 when eliminated (`Entity._-19`), else the next point of the shared `_-G5X`
+  counter (`respawn_index`, `candidates` with `_-44x` clear) and the drone, which leaves the fighter where it
+  is, takes 4700 ms by default and lets go in state 5 with `_-P5S` = 70.
 
 Glue [H]: the HeroType by HeroID, the first hero only, the drone's camera rectangle = CameraBounds, no moving
-platforms, no interaction between the fighters, only the Speed family fields used, the run stops at the first
-ring-out (no KO commit or respawn yet).
+platforms, no hits or grabs between the fighters, only the Speed family fields used, the lives from the
+settings' `starting_lives`, the state 5 → 0 timer not modelled (movement is the same in both).
 
-Local run (aggregate only):
+Local run (aggregate only, 6000 ticks = 96 s from the match start):
 
 | | |
 |---|---|
 | 1v1 replays run | 266 (490 others skipped: not 1v1) |
-| Fighters let go | 532 (472 at 6000 ms, 60 at another time: other scoring durations) |
-| First ring-out predicted within 24 s | 434 (98 with none) |
+| Fighters let go | 532 (472 first let go at 6000 ms, the others under other scoring durations) |
+| Predicted KOs | 1,389 |
+| Respawns let go | 928 |
 
-This only shows that the chain runs on real data. The predicted ring-outs are **not** compared with the
-replays' KO faces yet: that is plan step 5.
+This only shows that the chain runs on real data. The predicted KOs are **not** compared with the replays'
+KO faces yet: that is plan step 5.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 
 The KO commit calls `Respawn` in the same tick, and the drone then comes down, carries and drops the fighter
 (spawn_bot.py, PR #30). So two KO faces of the same victim (oracle.py, PR #27) are at least `respawn_ms`
 apart. That time comes from the durations of the replay's scoring type (ScoringTypes.xml, by `ScoringID`).
-With the defaults and a spawned fighter, it is 2000 + 3000 + 700 = 5700 ms.
+After a KO `_-44x` is clear (spawn_bot.py `SPAWNED_IN_PLAY`), so with the defaults it is 1500 + 2500 + 700 =
+4700 ms (it was 5700 ms, the spawned case, before that was read).
 
 Local result (756 patch 11.00 replays, aggregate only):
 
@@ -239,7 +246,7 @@ Local result (756 patch 11.00 replays, aggregate only):
 | Scoring types with at least one gap | 4 |
 | Gaps between two KOs of the same victim | 3,241 |
 | Gaps shorter than the predicted drone time | **0** |
-| Smallest margin | 172 ms |
+| Smallest margin | 1,172 ms (172 ms against the 5700 ms floor used before) |
 | Replays with a first KO | 688 |
 | First KOs before match start (272 ms: `_-n4k` = 16, match_start.py) + the first drone trip (5700 ms by default: `_-44x` is set, spawn_bot.py) | **0** (smallest margin 2,252 ms, a loose bound) |
 

@@ -60,14 +60,18 @@ class ReplaySetup(unittest.TestCase):
                                                      self.swz.stat_types))
 
     def test_standing_fighters_never_ring_out(self):
-        out = replay_setup.run(self.rep(), self.swz, ticks=200)
-        self.assertEqual([(i, t) for i, t, _ in out], [(1, 6000), (3, 6000)])
-        self.assertEqual([ko for _, _, ko in out], [None, None])
+        out = replay_setup.run(self.rep(), self.swz, ticks=400)
+        self.assertEqual(list(out), [1, 3])
+        self.assertEqual([(r["let_go"], r["kos"]) for r in out.values()], [([6000], []), ([6000], [])])
 
-    def test_walking_off_the_ledge_rings_out(self):
+    def test_walking_off_the_ledge_rings_out_and_respawns(self):
         walk = [(0, 8)]   # MoveRight held from the start
-        out = replay_setup.run(self.rep({1: walk, 3: walk}), self.swz, ticks=600)
-        self.assertTrue(all(ko is not None and ko > 6000 for _, _, ko in out), out)
+        out = replay_setup.run(dict(self.rep({1: walk, 3: walk}), settings={"scoring_type_id": 2,
+                                                                          "starting_lives": 3}), self.swz, ticks=2000)
+        for r in out.values():
+            self.assertTrue(r["kos"] and r["kos"][0] > 6000, r)
+            self.assertGreaterEqual(len(r["let_go"]), 2, r)
+            self.assertGreaterEqual(r["let_go"][1] - r["kos"][0], 4700)
 
     def test_skips(self):
         with self.assertRaises(ValueError):
