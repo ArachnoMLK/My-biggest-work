@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1109 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1156 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -570,6 +570,25 @@ Wall details (`wall_contact`) [V]:
   - On a no-slide wall, `_-v1D` = 0.
   - Otherwise, with no power and not `_-M5t`, `_-v1D` = ±10 toward the wall.
 
+
+**Horizontal speed** ([`tools/bh/horizontal.py`](../tools/bh/horizontal.py), `_-8i` @519–2659; first read in
+horizontal-11.00.md, PR #23) [V]. Before the walk, `_-v1D` goes through friction, then acceleration:
+- **Max speed** (@519–615): RunSpeed (`_-M1U`) × `_-Kc._-04K`, × 1.16 under `_-w47`, on the ground; AirRunSpeed
+  (`_-z2v`) × `_-Kc._-u5j` in the air.
+- **Friction** (@782–1340), only when `!_-E6P()` or `local8` [H: `_-H6t()`]. The last rule that applies wins:
+  1. `AirFriction` in the air, `Friction` on the ground;
+  2. within 640 ms of the dash timer `_-26T`: 3.534 in the air, 5.655 on the ground;
+  3. with a power: 4.013 on the ground if `_-7E`; else, when its PowerType has `_-y25`, 5.655 in the dash
+     window or `Friction`;
+  4. in hitstun: 4.0;
+  5. on a surface (`local8`), by the bits `_-R5q._-66U` and the sign of `_-v1D`: 9.0 along it, else 3.25.
+
+  Then |`_-v1D`| loses F × 0.384, clamped at 0.
+- **Acceleration** (@1928–2648): Acceleration (`_-m3Q`) × `_-Kc._-E16` on the ground, AirAcceleration (`_-i3E`) ×
+  `_-Kc._-R4I` in the air. Acceleration and max are both × 1.25 under the mode hook `_-m47._-43P`. In the air,
+  against the current motion, it is × max(1 − |vx|/50, 0) (with conditions on `_-5q`, `_-M3V`, `_-ud` from #23).
+  Then `_-v1D` moves toward the held side (`_-141()` = left) by a × 0.384, only while below the max, and is
+  clamped at it. A faster fighter is slowed only by friction.
 
 **Ground walk** (`ground_walk`, `Entity._-8i` @3114–4217) [V]. On a ground line, the x step `local12`
 (= `_-v1D` × 0.384) is walked along the line before the free move. Each pass:
