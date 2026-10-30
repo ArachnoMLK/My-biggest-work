@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1491 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1504 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -982,6 +982,13 @@ map collision only run in states 0 and 5**.
     them: put off camera, first trip 2000 + 3000 + 700 ms with the defaults, let go in state 0. `_-J1Y` only
     comes from the BRAWLBALL / TAG rules, a snapshot read and the unreferenced `_-X6R._-sW`. `_-k5H` ticks
     the drone first (`_-i1H`), so its first tick is in phase 5 of the match-start step.
+  - **`_-44x` after the match start** (spawn_bot.py `SPAWNED_IN_PLAY`) [V; H: `_-99._-h2k` is a round reset a
+    plain stock game does not reach]: in states 0 / 5 `_-k5H` clears `_-44x` unless `_-P4K` (@495-511), and
+    `_-P4K` is set only by `Entity._-s2U` (from `_-99._-h2k`) and the BRAWLBALL / TAG / `_-y3M` rules. So the
+    respawn after a KO takes the not-spawned path: the fighter stays where it was, 1500 + 2500 + 700 = 4700 ms
+    by default, let go in state 5 with `_-P5S` = 70.
+  - **Eliminated** (`Entity._-19` #3016, `Drone.eliminated`) [V @0-81]: lives `_-V` = 0 with `_-d3Y._-81d` > 0,
+    or state 7; never with the `_-B6B` bit. Then `Respawn` gives state 7 instead of the drone.
 - **Per tick `SpawnBot._-i1H` #11858**: a lookupswitch on the phase `_-T1X`: 0 `_-q15` (idle), 1 `_-82`, 2 `_-31s`,
   3 `_-m1O`, 4 `_-Ck`. While the phase is 2 the fighter is moved onto the drone afterwards (`_-x1M(_-J2c, _-b3h)`).
   `_-Y6i(p)` sets the phase and clears its start time `_-A6k` [V].
