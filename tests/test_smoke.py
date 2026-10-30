@@ -37,6 +37,13 @@ class Fall(unittest.TestCase):
         self.assertEqual(smoke.check_landing(r)[0], "flat")
         self.assertAlmostEqual(smoke.check_landing(r)[1], 0.0)
 
+    def test_stands_still_after_landing(self):
+        grid = smoke.map_grid(FLAT)
+        ticks, r = smoke.fall(grid, 0.0, 0.0)
+        kept, drift = smoke.stand(grid, r, ticks)
+        self.assertEqual(kept, 60)
+        self.assertLessEqual(drift, 1e-9)
+
     def test_soft_platform_from_above(self):
         ticks, r = smoke.fall(smoke.map_grid(SOFT), 0.0, 0.0)
         self.assertIsNotNone(r)

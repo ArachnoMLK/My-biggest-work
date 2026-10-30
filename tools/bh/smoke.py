@@ -3,13 +3,14 @@
 It chains pieces from several PRs: the gravity step (movement-11.00.md, `_-P5S += 3.75 x 0.384` below the fall
 cap 70), the free move against the map (air_move.py, PR #30), the LevelDesc lines, normals and grid
 (level_collision.py) and the ray cast (raycast.py). The fighter starts at rest; the step order is the one of
-entity-step-11.00.md (gravity, then the sweeps). Landing itself (@8869-) is not transcribed yet, so the test
-stops at the first ground contact and checks the feet against the line: the feet plus the 1.01 back-off must
-be on the line. Static evidence only; nothing here has been compared with the running game.
+entity-step-11.00.md (gravity, then the sweeps). At the first ground contact it checks the feet
+against the line (the feet plus the 1.01 back-off must be on the line), then runs 60 more ticks standing:
+the step-start landing (`_-P5S` = 0) and no gravity on a ground line (air_move.py `ground_reset`,
+`gravity_applies`). Static evidence only; nothing here has been compared with the running game.
 """
 import re
 
-from .air_move import _back_off, air_move
+from .air_move import _back_off, air_move, gravity_applies, ground_reset
 from .level_collision import Grid, compute_normals, static_lines
 from .platforms import bind, dynamic_lines, move, parse_platforms
 
@@ -76,6 +77,25 @@ def fall(grid, x, y, max_ticks=1000, team=0, movers=(), t0=0):
     return max_ticks, None
 
 
+def stand(grid, r, start_tick, ticks=60, team=0, movers=(), t0=0):
+    """After the contact `r`, more ticks with no input: the step start lands on `_-96f` (`ground_reset`:
+    `_-P5S` = 0), gravity is skipped while a ground line is set (`gravity_applies`), and the move is the 2.02
+    ground push. Returns (ticks with a ground line, largest |y - contact y|)."""
+    x, y0, ground, p5s = r.x, r.y, r.ground, 0.0
+    y, kept, drift = y0, 0, 0.0
+    for tick in range(start_tick + 1, start_tick + ticks + 1):
+        for plat, lines in movers:
+            move(lines, plat.at(t0 + TICK_MS * tick))
+        p5s, on_ground = ground_reset(ground, False, 0, False, p5s)
+        if gravity_applies(False, ground, 0, t0 + TICK_MS * tick, False, GRAVITY) and p5s < FALL_CAP:
+            p5s += GRAVITY * STEP
+        m = air_move(grid, team, x, y, 0.0, p5s, ground is not None)
+        x, y, ground = m.x, m.y, m.ground
+        kept += ground is not None
+        drift = max(drift, abs(y - y0))
+    return kept, drift
+
+
 def check_landing(r):
     """(kind, error): kind is "flat" / "slope" / "wall"; error = how far the hit point (feet + back-off) is
     from the line, in y. The back-off is `_back_off` of air_move.py: along the move, or along -normal for a
@@ -93,7 +113,8 @@ def run(level_xmls, max_ticks=1000, with_platforms=False):
     """Aggregate counts over many maps (no coordinates, no names)."""
     c = {"maps": 0, "respawns": 0, "contact": 0, "flat": 0, "slope": 0, "wall": 0, "no_contact": 0,
          "no_contact_dynamic_map": 0,
-         "within_1e-6": 0, "max_abs_error": 0.0, "max_ticks": 0}
+         "within_1e-6": 0, "max_abs_error": 0.0, "max_ticks": 0,
+         "stand_60_on_ground": 0, "stand_static_ground_still": 0, "stand_static_ground": 0}
     for xml in level_xmls:
         c["maps"] += 1
         for x, y in respawns(xml):
@@ -114,4 +135,10 @@ def run(level_xmls, max_ticks=1000, with_platforms=False):
             c["max_abs_error"] = max(c["max_abs_error"], abs(err))
             if abs(err) <= 1e-6:
                 c["within_1e-6"] += 1
+            on_static = r.ground not in grid.dynamic
+            kept, drift = stand(grid, r, ticks, movers=movers)
+            c["stand_60_on_ground"] += kept == 60
+            if on_static:
+                c["stand_static_ground"] += 1
+                c["stand_static_ground_still"] += drift <= 1e-6
     return c
