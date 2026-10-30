@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 305 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 306 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -167,6 +167,11 @@ After the free move the tick follows `_-8i` @8869–13169: `_-r51` is saved and 
 through `respond` (ceiling, slope, or `wall_contact` + slide on a vertical line, which sets `_-r51` = 1 / 2),
 and the stop line is dropped from `_-96f` when its normal does not point up or it is steep (@13029–13127,
 `_-X3S.y` ≥ 0 or `_-S1A`), so a wall never stays the ground line and the jump there takes the wall branch.
+
+Replay inputs: `harness.from_records(rep["inputs"][entity])` reads the key word at each tick time
+(`input_buffer.state_at`); left / right are MoveLeft (4) / MoveRight (8), and a jump press is bit 16 set on the
+tick and clear 16 ms before. [H] The 5-tick press buffer and the `_-532` lock of input-buffer-11.00.md (#28)
+are not modelled yet.
 
 Every piece is [V] in its own module; the glue is [H]. Not modelled yet: powers, hitstun, bounce, the `_-532` lock and the air-jump counter writers (the harness resets the count on landing [H]),
 the facing flip of the wall jump, the KO commit and respawn after a ring-out, and real legend stats

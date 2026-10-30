@@ -80,6 +80,18 @@ class Harness(unittest.TestCase):
         self.assertLess(tr[i][2], tr[i - 1][2])                         # and up
         self.assertIsNone(f.ground)                                     # a wall never stays in _-96f
 
+    def test_inputs_from_records(self):
+        records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
+        inputs = harness.from_records(records)
+        self.assertEqual(inputs(10), (False, False, False))             # t = 160
+        self.assertEqual(inputs(63), (False, True, False))              # t = 1008: MoveRight
+        self.assertEqual(inputs(81), (False, True, True))               # t = 1296: jump edge
+        self.assertEqual(inputs(82), (False, True, False))              # t = 1312: still held, no new press
+        self.assertEqual(inputs(94), (True, False, True))               # t = 1504: MoveLeft and a new press
+        f, tr = landed(inputs, 120)
+        self.assertEqual([e for _, e in f.events][1:3], [("press", "squat"), ("release", "ground")])
+        self.assertEqual(f.events[1][0], 1296)
+
 
 if __name__ == "__main__":
     unittest.main()

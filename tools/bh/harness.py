@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from .air_move import WallState, air_move, gravity_applies, ground_reset, ground_walk, respond, steep, wall_contact
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
+from .input_buffer import state_at
 from .ko import ko_mask
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
                    squat_start, wall_jump)
@@ -33,6 +34,7 @@ from .step import clamp, fold_impulse, speed_cap
 DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFriction": 1.2,
                  "Acceleration": 3.0, "AirAcceleration": 2.0}   # synthetic defaults; real ones from stats.py
 AIR_JUMPS = 2       # [H] `_-56T()`: not read yet
+MOVE_LEFT, MOVE_RIGHT, JUMP = 4, 8, 16   # replay.INPUT_BITS: bit i = 1 << i
 
 
 @dataclass
@@ -168,3 +170,17 @@ def run(f, grid, inputs, ticks, t0=0, team=0, bounds=None, stop_on_ko=False):
         if stop_on_ko and any(e[0] == "ko" for e in ev):
             break
     return out
+
+
+def from_records(records, t0=0):
+    """Inputs of one entity of a replay (`replay.parse(...)["inputs"][entity]`, (time ms, key word) at every
+    change) as `run` wants them: tick i reads the key word at t = t0 + 16 i (`input_buffer.state_at`).
+    Left / right are MoveLeft / MoveRight; the jump press is bit 16 set at t and clear at t - 16.
+    [H] The input buffer of #28 (a press kept up to 5 ticks, the 192 ms `_-532` lock) is not modelled: only
+    the edge on the tick itself counts."""
+    def inputs(i):
+        t = t0 + TICK_MS * i
+        keys = state_at(records, t)
+        before = state_at(records, t - TICK_MS)
+        return bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT), bool(keys & JUMP and not before & JUMP)
+    return inputs
