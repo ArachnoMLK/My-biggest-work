@@ -165,5 +165,17 @@ class GroundStart(unittest.TestCase):
         self.assertFalse(gravity_applies(False, None, 0, 100, False, 0))
 
 
+class Lava(unittest.TestCase):
+    def test_lava_hits_with_cooldown(self):
+        from bh.air_move import lava_contact
+        self.assertEqual(lava_contact(1000, 1, "P", 0, 3, None, 0), (False, None, 0))       # not lava
+        self.assertEqual(lava_contact(1000, 657, "P", 0, 3, None, 0), (True, 3, 1000))      # credited to self
+        self.assertEqual(lava_contact(1000, 657, "P", 5, 3, None, 0), (True, 5, 1000))      # last attacker
+        self.assertEqual(lava_contact(1000, 657, "P", 20, 3, None, 0)[1], 3)                # >= 16: self
+        self.assertEqual(lava_contact(1100, 657, "P", 0, 3, "P", 1000), (False, 3, 1000))   # within 240 ms
+        self.assertEqual(lava_contact(1240, 657, "P", 0, 3, "P", 1000), (True, 3, 1240))
+        self.assertTrue(lava_contact(1100, 657, "P", 0, 3, "P", 1000, power_x1n=True)[0])
+        self.assertTrue(lava_contact(1100, 657, "Q", 0, 3, "P", 1000)[0])
+
 if __name__ == "__main__":
     unittest.main()

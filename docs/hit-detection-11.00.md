@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(714 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(728 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -561,6 +561,22 @@ Wall details (`wall_contact`) [V]:
   `_-y1L` hold (`_-y1L` = 0 or <= t), the power has no CancelGravity (`_-q1G`) and `_-84Q` is non-zero. So a
   fighter standing on a line gets no gravity; its move is only the 2.02 ground push, which the sweep stops
   on the line again.
+
+**Lava** (`lava_contact`, `Entity._-ao` #3116 @621–997) [V]: whenever the ground line has the game-mode bit
+128 (`_-J6w`), `_-8i` calls `_-ao(t, flag)`. It does so during the ground walk (@3722), after the move (@9331,
+@10747) and at @13080. For a lava line (type & 512, `_-s2O`):
+- the power named by the line (`PowerType._-p4G(line._-S14)`) hits the fighter through `OnHit` (17
+  arguments, the damage / knockback chain of #29);
+- the hit is credited to `_-W6D` when 0 < `_-W6D` < 16 (the last attacker), else to the fighter's own `_-11`;
+- the same power (`_-K1e` = its `_-H4O`) cannot hit again before `_-k2j` + 240 ms, unless it has `_-x1N`.
+
+So a fighter that lands on lava is hit by it, rather than standing. The RING scoring type takes another
+branch first (@73–620), which is not read here.
+
+[H] **Gentle slopes.** With no input, the transcribed step gives a slow creep on a hard slope. The ground
+push (0, 2.02) stops against the line after a tiny move (<= 1.02), so the 1.01 back-off goes along −normal
+(@7544–7770). That is about 0.02 per tick in y on the 11.3° slopes of the local maps. Either the game creeps
+the same way, or a part not read yet compensates. A real game is needed to tell.
 
 ## 8. Thrown items and projectiles (`_-p5k`)
 
