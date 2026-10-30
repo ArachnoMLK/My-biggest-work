@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1278 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1289 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -527,6 +527,10 @@ above.
 | 6 | anything else (floors) | pressure plates `_-U5a` | no |
 
 At the end, `_-O6z` = `_-96f`.
+Before the branches, `_-r51` is saved (local 27) and set to 0 (@8869–8886) [V]. After them (@13029–13127)
+[V], when `_-96f` is still set and its normal does not point up (`_-X3S.y` ≥ 0) or it is steep (`_-S1A`), a
+game-mode line first calls `_-ao(t, true)`, then `_-96f` = null. So walls, ceilings and steep lines never stay
+the ground line: `_-wn()` (@13169) reads the fighter as airborne, and a jump there takes the wall branch.
 
 **Entity flags used here.** Several of the fighter's booleans are camouflaged: `_-wn()`, `_-t46()`, `_-5q()`
 and `_-81n()` each read bit `(v >>> 24) & 31` of an int field. `Entity._-W2b` #3002 picks that bit index
