@@ -341,3 +341,6 @@ Then the knockback decay `_-V12` (in hitstun while v² >= 2500, instead of frict
 press kept 4 ticks) feeds Jump, DodgeDash, LightAttack and HeavyAttack, and a press counts as handled once its
 action ran (`_-C51` for the dodge; [H] for the others), so a refused press is retried on the next ticks. Rerun:
 10 late, **1 off by one tick** (the first near-exact first KO), 4 within 1 s, harness life 14.0 s (median).
+With the window widenings of #6313 §2 (9 ticks while dodging, within 32 ms of `_-I5A`, before `_-f6R`; the dodge
+exit now writes `_-f6R` = t + PostDodge × 16 off a wall) and [H] the `_-322` / `_-P50` / `_-M3V` cases left out:
+225 early, 11 late, 1 off by one tick, 5 within 1 s, harness life 13.2 s (median; p90 26.6 s).

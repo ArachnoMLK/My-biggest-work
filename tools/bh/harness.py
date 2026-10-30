@@ -99,6 +99,7 @@ class Fighter:
     facing_left: bool = False  # `_-n3h`
     i46: int = 0              # `_-46I`, last hit (no hits here)
     e3: int = 0               # `_-3E`
+    f6r: int = 0              # `_-f6R`, end of PostDodge
     moves: dict = None        # {"hero": hero_powers row, "weapon": item_slots row, "powers": power_rows}
     power: dict = None        # the running power: {"name", "steps": power_steps, "tl": Timeline}
     w22: float = 0.0          # `_-W22`, damage taken
@@ -197,6 +198,8 @@ def dodge_tick(f, t, a, held):
     mv = moves(row.get("kind", 0), row.get("where", 0))
     if f.h2b + f.uy + f.c1d <= t:
         f.e6p = False                                           # `_-w5G(false)`
+        if f.r51 == 0:                                          # @458-550: `_-f6R` = t + PostDodge x 16
+            f.f6r = t + row.get("PostDodge", 0) * 16
         if not f.u5e:
             f.v1d, f.p5s, cv = exit_velocity(f.v1d, f.p5s, a, mv, held, f.l4a, f.g5e, f.t5l, row.get("ExitX", 1.0),
                                              row.get("ExitBackX", 1.0), row.get("ExitY", 1.0),
@@ -548,7 +551,9 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 body["spawned"] = SPAWNED_IN_PLAY
                 records = inputs_by_id.get(p["e"]["id"], [])
                 keys = state_at(records, t)
-                bp = buffered_presses(records, t) or {}         # #6313: presses kept 4 ticks (window 5)
+                f = p["f"]                                      # #6313 @122-209: window 9 while dodging,
+                wide = f.e6p or t <= f.i5a + 32 or t <= f.f6r   # in a jump squat or before `_-f6R`, else 5
+                bp = buffered_presses(records, t, 9 if wide else 5) or {}   # [H] `_-322`, `_-P50` / `_-M3V` cases
                 done = p.setdefault("handled", {})
                 fresh = {a: bp[a] for a in ("Jump", "DodgeDash", "LightAttack", "HeavyAttack")
                          if a in bp and bp[a] > done.get(a, -1)}
