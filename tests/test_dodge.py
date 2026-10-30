@@ -6,9 +6,10 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (attack_air_offset, cancel_flags, clears_velocity, cooldown_ms, counter, dash,  # noqa: E402
-                      dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, k64, kind, landed_cooldown,
-                      moves, neutral_push, pick, push, side_latch, speed_x, speed_y, standard_flag, timers)
+from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms,  # noqa: E402
+                      counter, dash, dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, k64, kind,
+                      landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x, speed_y, standard_flag,
+                      timers)
 
 
 class Dodge(unittest.TestCase):
@@ -155,6 +156,14 @@ class Dodge(unittest.TestCase):
         self.assertEqual(attack_air_offset(False, True, False, True), (3, False))
         self.assertEqual(attack_air_offset(True, False, False, True), (0, True))
         self.assertEqual(attack_air_offset(False, False, False, True), (0, False))
+
+    def test_cancel_end(self):
+        k = dict(t5l=1.0, wl=0.5, ax_mult=0.5, ay_mult=1.0, o5c=4, gc=False, uy=96, cooldown=10, airborne=True)
+        self.assertEqual(cancel_end(40.0, -50.0, **k), {"_-T2R": 0, "_-v1D": -30.0, "_-P5S": 30.0})
+        self.assertEqual(cancel_end(20.0, 10.0, **k), {"_-T2R": 0})
+        self.assertEqual(cancel_end(80.0, 0.0, **dict(k, ax_mult=2.0, o5c=8))["_-v1D"], 60.0)
+        w = cancel_end(0.0, 0.0, **dict(k, gc=True))
+        self.assertEqual((w["_-a1h"], w["_-y1F"], w["power_I2g_or_2"]), (True, 256, True))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)

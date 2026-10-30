@@ -359,6 +359,33 @@ def cancel_flags(t, in_dodge, f2b, light, heavy, taunt, pickup, dodge_press, h2b
     return False, False, False
 
 
+CANCEL_CAP = 60.0          # `Entity._-bC` #3041 @83-107
+
+
+def cancel_end(vx, vy, t5l, wl, ax_mult, ay_mult, o5c, gc, uy, cooldown, airborne):
+    """`Entity._-bC(t, gc)` #3041, called by `_-rU` when a move starts in the cancel window (gc = local 33).
+    With no DodgeType (`_-Q42`) it returns at once (not modelled here). cx = min(60 `_-T5L` AccelXMult, 60), cy = min(60 `_-WL`
+    AccelYMult, 60); |vx| > |cx|: vx = ±cx by `_-O5C` (Left -, Right +, else 0); |vy| > |cy|: vy = cy (no sign).
+    `_-w5G(false)`, `_-T2R` = 0, `_-51c(true, true)`. With gc: `_-a1h` = true (so `landed_cooldown` no longer
+    caps), `_-y1F` = `_-Uy` + Cooldown x 16, and in the air the running power's `_-I2g` |= 2. Returns a dict."""
+    cx = 60.0 * t5l * ax_mult
+    if cx > CANCEL_CAP:
+        cx = CANCEL_CAP
+    cy = 60.0 * wl * ay_mult
+    if cy > CANCEL_CAP:
+        cy = CANCEL_CAP
+    w = {"_-T2R": 0}
+    if abs(vx) > abs(cx):
+        w["_-v1D"] = -cx if o5c & LEFT else cx if o5c & RIGHT else 0.0
+    if abs(vy) > abs(cy):
+        w["_-P5S"] = cy
+    if gc:
+        w["_-a1h"] = True
+        w["_-y1F"] = uy + cooldown * FRAME_MS
+        w["power_I2g_or_2"] = bool(airborne)
+    return w
+
+
 AIR_OFFSET = 3             # `_-i4Z._-rU` #6334 @128: the air moves are 3 slots after the ground ones
 
 
@@ -744,5 +771,23 @@ ANCHORS = {ABC_1100: {
         (6334, 799, "initproperty", "_-96f"),
         (2768, 447, "initproperty", "_-GX"),
         (2768, 477, "initproperty", "_-M4L"),
+    ],
+    "Entity._-bC cancel end: caps 60 x _-T5L / _-WL x AccelMult at 60, signed by _-O5C; _-T2R = 0; with gc _-a1h, _-y1F = _-Uy + Cooldown x 16, _-I2g |= 2 in the air": [
+        (3041, 51, "getproperty", "_-T5L"),
+        (3041, 56, "getproperty", "_-r4O"),
+        (3041, 70, "getproperty", "_-WL"),
+        (3041, 76, "getproperty", "_-k4q"),
+        (3041, 91, "pushdouble", "60.0"),
+        (3041, 130, "callproperty", "abs, 1"),
+        (3041, 182, "negate", ""),
+        (3041, 214, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (3041, 273, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (3041, 290, "initproperty", "_-T2R"),
+        (3041, 298, "callpropvoid", "_-51c, 2"),
+        (3041, 311, "initproperty", "_-a1h"),
+        (3041, 324, "getproperty", "_-p2U"),
+        (3041, 334, "initproperty", "_-y1F"),
+        (3041, 389, "pushbyte", "2"),
+        (3041, 393, "initproperty", "_-I2g"),
     ],
 }}
