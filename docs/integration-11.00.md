@@ -24,7 +24,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 1103 | 0 |
+| `hit-detection-verify` | 1109 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
