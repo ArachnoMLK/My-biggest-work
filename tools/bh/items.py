@@ -401,6 +401,21 @@ def throw_vector(charge, bits, facing_left, item, ground_type, v1d, p5s):
     return x + v1d, y + p5s * 0.25
 
 
+def throw_spawn(lines, team, fx, fy, airborne, height):
+    """`_-F5N._-M4Q` #1689 @321-461: where a thrown item starts. (fx, fy - 30); when the thrower is airborne
+    (`_-wn()`), h = Height - 120 and, if `Entity._-P4n(h)` allows it, y = fy + h. `_-P4n` #3070 is true for
+    h < 0, else when a cast (0, h) down from the feet (hard | soft) hits nothing."""
+    y = fy - SPAWN_RISE
+    if airborne:
+        h = height - 120.0
+        if h < 0:
+            return fx, fy + h
+        cands = lines.candidates(fx, fy, fx, fy + h) if hasattr(lines, "candidates") else lines
+        if ray_cast(cands, team, fx, fy, 0.0, h, 1 | 2, 0) is None:
+            return fx, fy + h
+    return fx, y
+
+
 def throw_start(direction, item, thrower, team, charge, t):
     """`_-p5k._-q54` #15197 as `_-F5N._-M4Q` #1689 calls it: the item's state right after a throw.
 
@@ -903,5 +918,15 @@ ANCHORS = {ABC_1100: {
         (4974, 1200, "initproperty", "_-Q3g"),
         (4974, 3347, "pushstring", "'Weapon'"),
         (4974, 3363, "initproperty", "_-G3X"),
+    ],
+    "Throw spawn in the air: _-wn -> h = Height - 120, _-P4n(h): h < 0 or a (0, h) cast down hits nothing -> y = feet + h": [
+        (1689, 381, "callproperty", "_-wn, 0"),
+        (1689, 399, "getproperty", "_-S2O"),
+        (1689, 417, "callproperty", "_-P4n, 1"),
+        (1689, 461, "callpropvoid", "_-e2q, 1"),
+        (3070, 5, "ifnlt", "2"),
+        (3070, 144, "pushbyte", "1"),
+        (3070, 150, "callproperty", "_-X2e, 10"),
+        (3070, 169, "equals", ""),
     ],
 }}
