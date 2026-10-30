@@ -1,0 +1,1115 @@
+# Hit detection — patch 11.00
+
+Which entities a power's hit area touches on one frame. This closes the gap left open in
+[knockback-11.00.md](knockback-11.00.md) (PR #29): how the candidate list `_-F5N._-U5S` of
+`_-F5N._-T5A` is filled.
+
+Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
+(1616 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+**[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
+
+## 0. Chain
+
+```text
+_-l4X._-R63 #46            power update, once per tick
+  for frame in the window _-51i(t) .. + _-R2x(t)      (§1)
+    _-l4X._-L5r #65        hit area of that frame, by TargetMethod      (§2)
+      _-h3U._-R6C #3538 -> _-h3U._-G2C #3539         every entity, team mask, capsule test   (§3)
+        Entity._-N2t #3142 -> _-x3p._-bg #4777       target hurtbox capsule  (§4)
+        _-n36._-h2Z #1271 -> _-Q3r._-h2Z #6298       capsule against capsule  (§5)
+    -> list _-l4X._-U6i
+    _-F5N._-T5A #1731 (17 arguments; arg 7 = that list)
+      _-F5N._-U5S = copy of arg 7, arg 7 cleared                            [V]
+      for each candidate: direction _-JQ, damage and knockback (knockback-11.00.md)
+```
+
+## 1. Frames scanned per update
+
+`_-R63` @2053–2107 loops from `_-V6B._-51i(_-X2G)` for `_-V6B._-R2x(_-X2G)` frames. `_-X2G` is the power's
+time [H]. `PowerType._-51i(t)` is `_-q24[t] & 0xFFFF`, and `_-R2x(t)` is `_-q24[t] >>> 16`. With no `_-q24`
+table, the result is `t` and 1 [V]. So one update can test several frame indices of the power's lists.
+`frame_window` models this.
+
+At each index, `_-L5r` is called when one of these holds [V]:
+- the frame is inside `_-B5B` frames of the start;
+- `_-I4F` is set;
+- the TargetMethod is 2.
+
+The call is `_-L5r(power, _-X2G, index, owner x, owner y, list)`. The owner position is read from the
+fighter store `_-Z2G` with the keys `_-M43` and `_-E3d` [V].
+
+### 1.1 Which step fires on which tick ([`tools/bh/power_timeline.py`](../tools/bh/power_timeline.py))
+
+The power is a list of **steps**, one per CastTime entry (`_-a2`, in ticks). `_-l4X._-R63` #46 runs once
+per tick. Each call [V]:
+
+1. **Tick number.** It computes `round((t − t mod 16) / 16)`. On the first update (`_-k4b == 0`) it runs
+   the start set-up `_-f14`: start tick, then `_-82O = start + CastTime[0]` (entity-step-11.00.md).
+2. **Gate.** A step fires only when it is not already running (`_-d38`) and the tick has reached `_-82O`.
+   It then sets `_-d38`, and the step's hit detection runs over its frame window (§1).
+3. **Advance.** If there is a next step (and, when `_-t3b` is set, the step is below `_-Q1n`), then
+   `_-X2G += 1`, `_-82O += max(CastTime[_-X2G], 1)` and `_-d38` is cleared. Otherwise the power stays on its
+   last step.
+4. **End.** Each fired step asks `_-l4X._-O5N` #56 for an end reason (`ends_now`):
+
+   | Code | Meaning |
+   |---|---|
+   | 5 | not a ground pound or meteor (TargetMethod 6 / 9): nothing to end |
+   | 1 | EndOnHit (`_-a3G`) and at least one hit (only reached for TargetMethod 6 / 9, after the 5 test) |
+   | 2 | landed on a walkable line (the owner's ground line `_-96f`, or the `_-N20` look-ahead line) |
+   | 4 | the ground line is a wall |
+   | 0 | continue |
+
+   The power ends (`_-m2j`) on 1, 2 or 4, once MinCancelTime `_-i2o` is 0 or has elapsed [V].
+
+The cap `_-Q1n` comes from the power constructor `_-l4X.<init>` #39 (`step_cap`) [V]. For a charged power
+(`_-t3b`) it is `ceil(held / _-I6c × len(CastTime))`, at least `_-L2X`, where held is constructor argument
+5, `_-a6i` [H: the charge time]. A longer charge therefore plays more steps. The constructor also sets
+`_-qm` = |x speed| / 60, at most 1, when the fighter moves the way it faces (`momentum`).
+
+So **each step fires once**, on the tick it starts. A 0-tick step still takes 1 tick. `_-X2G` is the step
+index, which indexes BaseDamage, `_-q24`, CenterOffset and AoERadius [V].
+
+### 1.2 Reading the power data ([`tools/bh/power_data.py`](../tools/bh/power_data.py))
+
+`PowerType.static._-A3R` #6483 turns the powerTypes cells into the per-step lists used above [V]:
+
+**CastTime.** Comma-separated entries:
+- `D`, `D@F` or `D:R[@F[-G]]`, where D is a duration in ticks and R adds R extra steps of 0 ticks;
+- F and G only feed `_-g1x`, which is not modelled;
+- an empty cell counts as "0".
+
+**Related columns** (VariableImpulse, FixedImpulse, AoERadiusX/Y, CenterOffsetX/Y, BaseDamage,
+ImpulseOffsetX/Y, FixedStunTime, …) have one cell per CastTime entry, or one cell for all. When AoERadiusY
+is empty it uses AoERadiusX. `_-42F` #6484 expands each cell over its entry's steps:
+
+| Cell | Steps get |
+|---|---|
+| `v` | v on every step |
+| `tN` | N / steps each |
+| `a\|b` | alternating a, b, … |
+| `a~b~c` | linear ranges between the points |
+| `a&b` | k simultaneous values (k hitboxes) |
+
+Most of these lists are `Vector.<int>`: values are truncated, and NaN becomes 0.
+
+**Frame windows.** When any cell uses `&`, `_-q24[step] = (k << 16) | first` (`_-v5o` #6463). Every other
+step gets a window of 1 at its place in the AoERadiusX list. This is the frame window of §1.
+
+**`_-D6M`.** It is the sum of the BaseDamage expansions. Its sign picks the team mask of §2.
+
+Local check (aggregate): all 3,768 powers parse with no error, and the lists of steps without `&` always
+have the CastTime length:
+
+| Powers | Count |
+|---|---|
+| use `&` | 1,141 |
+| use ranges `~` | 258 |
+| use totals `t` | 214 |
+| use alternation `\|` | 1 |
+
+### 1.3 Animation frame of a power (`_-l4X._-54L` #86, [`tools/bh/anim_frames.py`](../tools/bh/anim_frames.py))
+
+The start set-up `_-f14` #59 calls `_-54L` once. It builds `_-cA`, a sparse table from ticks since cast to
+an animation frame [V]. Each update, `_-o4b` #45 reads `_-cA[tick − _-k4b]`. When that entry exists and is
+> 0, it becomes `_-c2l`, the frame that picks the target's hurtbox row (§4). Between entries, `_-c2l` keeps
+its value [V].
+
+**Inputs** [V]:
+- **Key frames** `_-942`. Each entry is `frame << 16 | step` (`PowerType._-g1x` #6462). The step is read by
+  `_-y2b` and the frame by `_-P5A` (bits 16–27). An end key also has `0xF0000000` set, and `_-P5A` then adds
+  0.99. The keys come from CastTime markers (`_-A3R` @11337–11696). With s = index of the entry's first step:
+  - "D@F" gives (s, F);
+  - "D:R@F" gives (s, F);
+  - "D:R@F-G" gives (s, F), then the end key (s + R, G).
+
+  A key with step < 0 or frame <= 0 is skipped.
+- **CastAnim** "FLAGS:Name". The name goes to `_-94J._-HT`, and the flags are letters: "L" sets `_-6b`,
+  "R" `_-9v`, "F" `_-JL`. With "L", and when the fighter's animation of that name exists (`_-pr._-04T()._-Y3`),
+  the cast part loops between the animation's `_-T6` and `_-W1n`. Those are the 2nd and 3rd header u32 of
+  the `.anm` animation (`_-y1v.static._-B5I` #147 → `<init>` #138). PR #19 names the 3rd one
+  "recovery_start" [H]. This use shows it is where the loop wraps.
+- **"Keep the animation"** = `_-V6B._-W28` or no CastAnim name. The start frame `_-D6j`, when not set, is
+  `_-c2l + 0.384 + 1` in that case, otherwise 1. `_-cA[0] = floor(_-D6j − 1)`.
+- **Timing:** CastTime `_-a2` and its total `_-wj`. `_-wj` adds each entry's D (max 1 after the first entry)
+  plus R. Also used: RecoverTime `_-Sp`, FixedRecoverTime `_-f5c`, the power's RecoverMod `_-01d` with its
+  gate `_-s5C`, and the end `_-E5S − _-k4b` (PR #26). `_-z2k._-Vj` = **0.384** frames per tick, i.e.
+  24 frames per second over a 16 ms tick (script61.<init> #1227).
+
+**Algorithm** [V, bytecode order]:
+1. For each key i (step k_i, frame F_i), count the ticks from the previous key's step + 1 to k_i:
+   - a CastTime step of 0 or 1 counts 1, except step 0 of the first key;
+   - a longer step counts its duration;
+   - once past the end of CastTime, the recovery counts once: `floor(_-Sp × _-01d)` (under `_-s5C`) or
+     `_-Sp`, plus `_-f5c`.
+
+   With "keep the animation", the first key at step 0 counts one more tick.
+2. The frame then moves linearly from the previous key frame − 1 to F_i − 1 over those ticks. A value within
+   1e-5 below an integer is snapped up to it. An entry is written only where the integer part changes.
+   Each range starts one tick after the previous one ends (the first one at tick 1), except that with
+   "keep the animation" the first range starts at tick 0 and ends one tick earlier.
+   For an end key (fractional frame) that is the last key, the fractional value itself is stored at the
+   range end.
+3. After the last key (or from tick 1 without keys, or tick 0 with "keep"), the frame advances by 0.384 per
+   tick up to the end. After `_-wj + _-f5c` the rate becomes 0.384 / `_-01d`, under `_-s5C` and a non-zero
+   `_-Sp`. With the "L" loop, a frame above `_-W1n` is put back to `_-T6` while the tick is <= `_-wj`.
+
+[H] The table holds frame − 1 for key frames, and `_-P6e` (§4) maps a frame to a 1-based row. Whether the
+two indexings agree needs a check on real data.
+
+Local check (aggregate counts only): the tables of all 3,768 powers build with 0 errors; 1,997 have key
+frames, 903 an end key, and 687 have the CastAnim "L" flag. A CastTime duration that `parseInt` cannot read
+is null, and a null pushed into the `Vector.<uint>` reads 0 [V].
+
+## 2. Hit area of one frame (`_-L5r` #65)
+
+The power's per-frame lists are read at the frame index [V]:
+
+| Column | Field | Use |
+|---|---|---|
+| CenterOffsetX | `_-T5q` | x offset, negated when the owner faces left (`_-L0`) |
+| CenterOffsetY | `_-j4n` | y offset |
+| AoERadiusX | `_-a4C` | half width of the area |
+| AoERadiusY | `_-W2S` | half height of the area |
+
+The team mask is `_-z2k._-I33` when `_-D6M < 0`, otherwise `_-z2k._-p3C | _-z2k._-V3W`. It becomes 0 when
+CanDamageEveryone (`_-g14`) is set [V]. [H]: `p3C` = enemies, `I33` = allies, `V3W` = an extra filter flag.
+
+The point is `_-H2U` when set, otherwise the owner position. Then a `lookupswitch` on `_-g4i` (TargetMethod)
+decides what to do [V]:
+
+| `_-g4i` | TargetMethod strings (parser #6483 @8709–9845) | Query |
+|---|---|---|
+| 0 | (missing) | list cleared |
+| 1 | SmashRelease, PBAoE, PBAoEHB, Grab | area at owner + offset |
+| 2 | Ranged, GrabHit, GrabRelease, GroundCheckGrabHit | list = [`_-x4I`] (held object) |
+| 3 | Path | area at the point, no offset |
+| 4 | Self | list = [owner] |
+| 5 | RangedAoE, RangedGrab, PathExplosion | area at point + offset |
+| 6 | GroundPound, GroundPoundHB, GroundCheck | area at owner + offset |
+| 7 | GroundPoundRecover | list cleared |
+| 8 | Smash, SmashGrab | area at owner + offset |
+| 9 | MeteorGrab, MeteorPound | area at owner + offset |
+| 10 | MeteorPoundRelease | area at owner + offset |
+| 11 | ThrownItem | list = [`_-x4I`] |
+| 12 | Nobody, Taunt, TauntRelease, TeamTaunt(Release), AssistTaunt(Release), UITauntOverride | list cleared |
+| 13 | Collider | area at point + offset[index] − offset[current], only when index ≠ current frame |
+| 14 | Stance | area at owner + offset |
+
+A leading `SmashRelease` sets `_-w46` and is stripped before matching. On its own it gives 1 [V].
+
+The other flags these strings set (`_-ZR`, `_-K2s`, `_-u3H`, `_-H8`, `_-o5W`, `_-I4F`, …) are not modelled.
+
+Local data check (aggregate counts only, no values published): every TargetMethod cell of the 3,768 powers
+maps to a known value:
+
+| Query | Powers |
+|---|---|
+| area at owner + offset | 1,971 |
+| list cleared | 904 |
+| area at point + offset | 452 |
+| held object | 279 |
+| area at the point | 107 |
+| Collider | 34 |
+| Self | 21 |
+
+So the attack hit area is the **AoE capsule of the power data**, not the animation's hitboxes [V for the
+code path; H that no other path adds candidates for these powers].
+
+## 3. Entity loop (`_-h3U._-G2C` #3539)
+
+The loop goes over every entity of `_-5r`.
+
+**Team filter.** The candidate counts as an opponent when [V]:
+- there is no owner;
+- or its team `_-25G` differs from the owner's;
+- or it is another entity of the same team and `_-d3Y._-Z2Y & 2` is set (@218–262). [H]: friendly fire.
+
+The owner itself never counts as an opponent. The mask bits then decide [V]:
+- `p3C` keeps opponents;
+- `I33` keeps non-opponents;
+- no bit set keeps everyone.
+
+Then one of the following must hold for the entity:
+- `_-94F`: `_-55E`;
+- `_-34m`: `_-E2I`;
+- otherwise: `_-AP(owner, false, V3W)`.
+
+It must also pass a `_-s3D._-H1g._-sZ._-r1o` exclusion [V; meaning H].
+
+**Hit area capsule.** `_-Q3r._-KX(2·rx, 2·ry)` turns the area into a capsule. Then
+`Entity._-N2t(cx + p.x, cy + ry + p.y, q.x, q.y, r)` is called. With §5 this gives a capsule centred on
+(cx, cy) that fills the 2rx × 2ry box [V].
+
+## 4. Hurtbox of the target (`_-x3p._-bg` #4777)
+
+**Which hurtbox type** (`Entity._-p3N` #3100) [V]:
+1. the active power's own hurtbox, `_-24N`. It is set at the power start from column **Hurtbox**
+   (`_-c5b`) by name.
+2. otherwise, when the fighter touches a wall (`_-r51`, see entity-step-11.00.md), `<Weapon>WallCling`,
+   or `UnarmedWallCling`.
+3. otherwise `DEFAULT`. Soccer, Volley Battle and Horde use `SoccerBall`, `VolleyBall` and `Horde` for
+   some entities.
+
+**Which row.** The animation frame is `_-o3I._-c2l` of the active power (§1.3), or 0. The row is
+`_-P6e[frame] − 1`, where `_-P6e` maps a frame to a row number (1-based) built from the **Frames** column
+(1-based Flash frames, "a" or "a-b") [V].
+
+The entry is read through `convert_u`. So a frame with no entry (a hole), a frame past the end, or an
+entry of 0 falls back to the `DEFAULT` type [V]. With no Frames list, the row is 0.
+
+**Row lists.** Width `_-Q4m`, Height `_-X5S`, OffsetX `_-C1u` and OffsetY `_-01R` are comma lists. A list
+shorter than the row count repeats its first entry [V].
+
+**Capsule.** `x = ex + p.x + OffsetX` (OffsetX negated when facing left) and `y = ey + p.y + OffsetY`, with
+`(p, q, r) = KX(Width, Height)`. Unlike the hit area, there is no `+ h/2`. So the hurtbox spans
+`[ey + OffsetY − Height, ey + OffsetY]` vertically [V]. The parser's "extends below ground" warning tests
+`OffsetY + Height / 2 > 80`, which reads OffsetY as a centre. Only the warning uses that reading; the
+collision code does not [V].
+
+Local data check (aggregate):
+
+| | |
+|---|---|
+| Powers with a Hurtbox name | 2,485 |
+| … that resolve to a hurtbox type | 2,482 |
+| Hurtbox types | 916 |
+| … with no Frames list | 20 |
+| … with holes before their first frame (DEFAULT there) | 370 |
+| Parse errors | 0 |
+
+## 5. Capsule geometry (`_-Q3r`, #6295–#6299)
+
+**Box to capsule.** `KX(w, h)` [V]:
+- `w < h`: r = w/2, p = (0, −r), q = (0, w − h);
+- otherwise: r = h/2, p = (−w/2 + r, −h/2), q = (w − h, 0).
+
+**Touch test.** Two capsules (start, segment, radius) touch when [V]:
+- their segments cross (`_-R5v`: the usual ua / ub test in [0, 1], computed as `(1/d) · …`, with
+  d == 0 counting as no cross);
+- or the squared segment distance (`_-rR`, the smallest of the four endpoint-to-segment distances from
+  `_-w5n`) is ≤ (ra + rb)².
+
+The Python keeps the bytecode's order of operations.
+
+## 6. Re-hit rule (`_-T5A` #1731, `_-R63` #46, `_-v57`)
+
+Each power keeps a hit record `_-G6N`, a `_-v57` with entity ids `_-x3r` and times `_-E5Y` [V]:
+- `Set(id, t, overwrite)` appends a new id, and replaces the time of a known id only when `overwrite`;
+- `_-168(id)` returns the stored time, or 0.
+
+**Skip.** Before a candidate is processed, `_-T5A` skips it when its id (`_-03K()`) is in the record and
+either [V]:
+- MinTimeBetweenHits (`_-ue`) is 0: one hit per target per cast;
+- or `last + _-ue > now` (argument 2): the target can be hit again `_-ue` after the last hit.
+
+The test is @321–413 for Entity targets and @652–744 for the others.
+
+**Accept.** Accepted targets are pushed back into the list (argument 7), which `_-T5A` cleared at the
+start. Its return value counts them; grabs (`_-K2s`) on some targets are written straight into the record
+instead [V].
+
+**Record.** After the pass, `_-R63` @2433–2547 stores every target left in the list with
+`Set(id, now, true)`, when all of these hold [V]:
+- the count is not 0;
+- IsMultihit (`_-s5N`) is false, or `_-ue != 0`;
+- `_-l4X._-T49()` is true.
+
+`_-T49` is true when:
+- `_-538` or `_-w4x` is non-zero;
+- or else the BaseDamage list `_-L69` has a non-zero entry at `_-X2G`;
+- or else `_-X2G` is past the end of `_-L69` and `_-D6M != 0`.
+
+With no list it is false [V]. Since `_-T49` indexes BaseDamage with `_-X2G`, `_-X2G` is a step index of
+the power, not a time [H]. The unit of `now` (argument 2 of `_-R63`) is open [H: ms].
+
+So a non-multihit power with no MinTimeBetweenHits hits each target at most once per cast. A multihit power
+without `_-ue` records nothing here, and hits again on every frame where its area touches.
+
+## 7. Line of sight (`_-T5A` @1115–2710)
+
+A target inside the area is still skipped when map geometry blocks it. The source S is argument 5 of
+`_-T5A`, or argument 6 for Collider. The target centre T is `_-W3o`. Each ray goes through
+`_-N1k._-b1x._-X2e`, the map ray cast, which is not transcribed here. Its mask is `_-z2k._-M4J` when
+`_-l4X._-A3S` is set, otherwise 0. The tries run in this order, each one only while the target is still
+blocked [V]:
+
+1. **S → T.** Flags (1|2, 1|2|8). The target is blocked when all of these hold:
+   - the power does not skip the test (`_-x28`);
+   - the ray hits something;
+   - the hit's `type` is not 2.
+
+   The parser sets `_-x28` for TargetMethod 2, 3 and 11 (Ranged, Path, ThrownItem), and later overrides it
+   for some powers by name.
+2. **Detour through (Sx, Sy ± 100).** The sign follows `Ty − Sy`. Both legs use flags (1, 8). This try is
+   skipped for CannotAttackAroundCorners (`_-y2`).
+3. **Detour through (Sx ± 100, Sy).** Same condition as step 2.
+4. **Rays to the hurtbox edges.** Straight rays to `(Tx, Ty − q.y/2)`, `(Tx, Ty + q.y/2)`,
+   `(Tx − q.x/2, Ty)` and `(Tx + q.x/2, Ty)`, where q is the target hurtbox segment vector (`_-w2s`, `_-S2O`).
+
+**Result.** A blocked Entity target is skipped, except in Volleyball when `_-s3D._-H1g._-06A._-Z3E(_-11)`
+holds. A blocked non-Entity target is always skipped. Then `Entity._-AP(owner, _-f3B)` must hold;
+otherwise `_-W1G(power, target, true)` runs and the target is skipped [V].
+
+`line_of_sight_blocked` takes the ray cast as a callback. `map_ray(lines, team, item_ignore)` builds that
+callback over map lines with the ray cast of §7.1.
+
+### 7.1 The map ray cast (`_-CX._-X2e` #1581, [`tools/bh/raycast.py`](../tools/bh/raycast.py))
+
+Line flags and the candidate order (grid cells of 100, then dynamic lines) are in
+collision-11.00.md (PR #20). `ray_cast` takes the candidates already in that order.
+
+**Arguments as `_-T5A` uses them.**
+
+| Parameter | Value |
+|---|---|
+| 1 (owner) | the attacker's team `_-25G`, compared with the line owner `_-r1H` |
+| 9 (mask) | 1 \| 2 on the first ray (hard and soft lines), 1 on the others (hard only) |
+| 10 (options) | 1 \| 2 \| 8 on the first ray, 8 on the others |
+| 12 (excluded) | item-ignore (32) when `_-A3S` is set |
+
+The options [V]:
+- 1: soft lines block from both sides;
+- 2: skip lines that have an owner;
+- 8: two-sided;
+- 4: drops some results at the end.
+
+**Per candidate.** In order, a line is skipped when [V]:
+- it fails the mask;
+- it is disabled;
+- it belongs to the owner;
+- it has an excluded flag;
+- option 2 is set and the line has an owner;
+- it is the ignored line;
+- the hard-then-soft floor exception applies.
+
+With none of the options 8, 4 and 1, a line with a normal is passed through when the motion goes the way
+its normal points (it is left through its back). A soft line is skipped from its negative side (`_-PK`)
+when the mask includes soft and option 1 is clear.
+
+**Side and hit.** `_-PK` #1017 computes the unit normal `(−dy, dx) · (−1/|d|)` and the side
+`(p − s) · n`. `_-R5v` then tests the line against the ray, which is shortened to each hit point. So the
+result is the nearest line, and on equal distances the later candidate wins.
+
+So the first straight ray of the line of sight sees soft platforms from both sides. A soft line of type
+exactly 2 does not block, because only `type != 2` counts. Bouncy soft (66) and soft pressure plates (258)
+do block [V; the effect in game is H]. The detour and edge rays only see hard lines.
+
+### 7.2 Map lines and the candidate grid ([`tools/bh/level_collision.py`](../tools/bh/level_collision.py))
+
+**One collision element.** `_-139._-J1j` #5295 turns one element into lines [V]:
+- `X` / `Y` set both ends. Otherwise `X1` and `X2` (`Y1` and `Y2`) are used only when both exist; a
+  missing pair stays 0.
+- The ends are swapped so that start.x ≤ end.x.
+- The element name gives the type flags (table of PR #20). `Flag` goes to `_-Z2Y` through `_-R15._-c1N`.
+  `Team` becomes the line owner `_-r1H`, which the ray cast compares with the attacker's team.
+- With `AnchorX` and `AnchorY`, `_-l49._-d1H` #1594 builds a quadratic curve. It has n straight lines,
+  n = round(Manhattan size / 125) clamped to 4..10, each oriented left to right, with no normal.
+- Otherwise there is one `_-R15(start, end, type, flag, team)`. It gets a normal only when `NormalX` or
+  `NormalY` is present (the missing one is 0), normalised by `_-q3q`. `_-q3q` also sets `_-S1A` when
+  `ny < 0` and `|nx / ny| ≥ 5/3`.
+
+**The grid.** Static lines go into a grid of 100-unit cells (`_-43i` → `_-CX._-u2z` #1585). Each line is
+appended to the bucket of every cell its segment crosses, in the cell order of `_-A6B._-t2D` #1028:
+- the segment is made shallow, oriented left to right, and mirrored when it goes down;
+- it is walked column by column, at most one step up per column.
+
+The bucket key is `_-a2E` #1587: `((⌊x+0.01⌋·0.01 + 16000) << 16) | (⌊y+0.01⌋·0.01 + 16000)`.
+
+Lines inside `DynamicCollision` and `MovingPlatform` blocks go to the dynamic list instead (`_-Z2B`).
+`_-936` #1582 gathers the candidates of a ray: the buckets of the cells the ray crosses, then every
+dynamic line. There is no de-duplication and no sort [V]. `map_ray` accepts a `Grid` and gathers the
+candidates per ray the same way.
+
+**Default normals.** Most lines have no normal in the file. When the level is set up (`_-139._-c6s` →
+`_-a2j._-u8(W, H)` #5222), every line still without one gets one, static lines first, then dynamic ones.
+W × H is the box around every line (`_-43i` bounds, started at ±MAX_VALUE in `_-y39`) [V]:
+- a trigger line gets (0, 0);
+- otherwise the start is n = (|Δy|, |Δx|);
+- a soft line points up (y negated; x negated when its end is higher than its start);
+- a hard line casts one ray from its midpoint, snapped to `v + 5 − v mod 10`: to the right (W + 10) when it
+  is vertical, down (H + 10) otherwise. The ray is two-sided and sees hard lines only, ignores the line
+  itself, and counts every line it crosses. The parity of that count flips the normal so that it points
+  out of the solid (vertical: odd → x negated; otherwise, by the slope, y or x negated);
+- the normal is then normalised (`_-q3q`).
+
+`compute_normals` transcribes it. Local check: on the 122 maps, the flat hard lines without a normal get
+296 "up" (tops of blocks) and 271 "down" (undersides), with 0 errors.
+
+Local check (aggregate): the 122 LevelDescs parse with no error. They give 1,747 static lines, 61 of
+them with a normal. That file order is the game's insertion order is [H].
+
+### 7.3 Moving platforms and dynamic lines ([`tools/bh/platforms.py`](../tools/bh/platforms.py))
+
+**Key frames.** `_-139._-Jb` #5298 walks the `Animation` of a `MovingPlatform` [V]:
+- each `KeyFrame` becomes `_-A2j(x, y, frame, rotation, centre, cx, cy, easeIn, easeOut, power, respawnOff)`
+  (#6029). Missing attributes take the Animation's values; the default EasePower is 2. The frame is
+  `FrameNum` (default 0) plus the Phase start.
+- a `Phase` walks its children with its `StartFrame`. When its first key frame starts later than the Phase
+  and differs from the previous key frame, a hold of the previous one at the Phase start is inserted
+  (`_-yo`).
+
+**One point per frame.** `_-Y61` #5299 builds one point per frame [V]:
+- frames are numbered from 1;
+- key frame i runs until the next key frame's frame; the last one wraps to the first, until
+  NumFrames + 1 (NumFrames defaults to the LevelDesc's, else 0);
+- progress is linear `(f − f0)/(f1 − f0)`, or eased by `_-A6B._-D2g` #1131 (EaseIn, EaseOut, both = in-out,
+  power 2 quadratic, otherwise power p);
+- with a centre, the platform follows an arc between axis-aligned angles (0, π/2, π, 3π/2, 2π). The radii
+  are `|x0 − x1|` and `|y0 − y1|`. It uses `_-K6l` / `_-b4l`: cos / sin of the angle reduced to [0, 2π),
+  each rounded to 1/1000;
+- each point is rounded to 1/100, then the platform X / Y offset is added [H: X / Y of the MovingPlatform
+  element, passed as the sprite position].
+
+**Time → position.** `_-V39` #6016 gives the frame
+`StartFrame + ((t − n4k)·0.05 mod (1000·n/60·SlowMult)) / period · n`. SlowMult defaults to the LevelDesc's,
+else 1. `_-I4v` #6018 blends point k and point k + 1, modulo n [V].
+
+**Lines.**
+- `DynamicCollision` children get the block's X / Y added at parse time (`_-J1j` arguments 2–3).
+- `_-D19` #6027 stores each line's offset from the platform's first point.
+- Each update, `_-Y3I` #6014 keeps the old start in `_-X1H` / `_-q1k` (the `_-X1H` of the ray-cast floor
+  exception), then puts the line at offset + position. It is called from `_-p4E._-d4u` for every platform
+  [V].
+- A block whose PlatID has no animated platform does not move. That the link is by PlatID is [H].
+
+Local check (aggregate): all 122 LevelDescs give 173 platforms and 0 errors. One file lacks a space between
+two attributes, which the game's reader accepts; the parser accepts it too.
+
+**Carry of the entities that touch a moving line** (`carry_offset`, `carry`; `_-p4E._-d4u` #7436 @1082–1961) [V].
+In step 1 of the tick, once every platform has moved its lines, each entity is carried. Entities in state 3,
+7 or 8 are skipped (lookupswitch @1042).
+- **Which lines.** `_-u3j` lists the lines the entity touched during its last step. It is cleared at the
+  step start (@3057–3082) and filled by the ground walk, the ceiling checks and the walls. At the step end,
+  the ground line `_-96f` goes into `_-O6z` and, if not already there, into `_-u3j` (@12918–13024).
+- **Offset `_-s2h`.** Only dynamic lines count (`_-O2N`). Each one adds its displacement since `_-Y3I`. In x
+  that is `start + _-e2l − _-t5b − _-E2x`, which equals `start − _-X1H` because `_-E2x` = old start +
+  `_-e2l` − `_-t5b`. The y part is added only for a line that is not vertical.
+- **Lava push.** On a lava line whose power has a push (`_-p4E._-k4L` #7443: `_-is` / `_-96U` non-zero),
+  the offset is set to that push instead.
+- **Sweeps.** Two sweeps, from the feet and then from 120 above. Both ignore the entity's `_-96f`, use the
+  hard | soft mask and options 4, and go along the offset. A hit line stops the carry 1.01 off it:
+  - a vertical line on x, when its x is inside the swept range (`_-A6B._-f6f` #1059 = clamp);
+  - a horizontal line on y (a soft one only from above);
+  - a sloped line by adding 1.01 along its normal to the full offset.
+
+  The entity is then placed at the result (@1933–1961).
+
+### 7.4 Free move against the map ([`tools/bh/air_move.py`](../tools/bh/air_move.py))
+
+The fighter's own movement uses the same ray cast. `Entity._-8i` #2984 @6620–8865 (step 6 of
+entity-step-11.00.md, PR #26) moves the feet point (`_-11W`, `_-75K`) by U = (x step, `_-P5S` × 0.384),
+plus 2.02 on y while a ground line `_-96f` is set [V]. Every sweep is a 10-argument `_-X2e(team, x, y, d,
+out, null, null, null, mask, 0)`: one-sided lines count only when moved into, and soft lines only from
+above.
+
+1. **Feet sweep.** Mask hard | soft, or hard only when dropping through a soft platform (local 3 = 1,
+   @1780–1791).
+2. **Head sweep.** From 120 above the feet, hard lines only. When it stops sooner, it takes over. Its line
+   becomes the stop line only if that line's normal points down or sideways (ny ≥ 0).
+3. **Attack sweep.** During some attacks (`_-wn()` with the power's `_-V67 ≠ 0`), a sweep from
+   120 + `_-V67` above, on no-slide lines (16), takes over when its line faces down and it stops sooner.
+4. **Ceiling check.** At the provisional stop, backed off 1.01, a sweep of (0, −120) on hard lines looks for
+   a ceiling. If one is found, it is kept in `_-u3j` and steps 1–2 are redone with the x part set to 0.
+5. **Placement.** The feet move by the chosen vector. The stop line becomes `_-96f`. The fighter is backed
+   off by 1.01: along −normal when the line is hard and the move was tiny (|x|, |y| ≤ `_-u4H` = 1.02),
+   otherwise straight back along the move.
+
+**After the stop** (@8869–12927, `respond`). When `_-96f` is set, the branches run in this order [V]:
+
+| # | Condition | Effect | Transcribed |
+|---|---|---|---|
+| 1 | bounce state (`_-e3e & _-B6B`, or `_-5q() && !_-e36()`) | `_-048` bounce; impact effect when the speed changed by > 50 | yes (`bounce`) |
+| 2 | head stop on a flat line, or on a down-facing no-slide line | **ceiling**: an upward `_-P5S` becomes 0; the power's `_-K3` is set when it has `_-4A` | yes |
+| 3 | head stop on a non-vertical line, or a steep line (`_-S1A`: ny < 0 and \|nx/ny\| ≥ 5/3) | **slope**: the missing y (move.y − wanted.y) is replayed along the line, the x speed `_-v1D` is pushed to at least 15 in that direction, with a hard-line sweep and a 1.01 back-off | yes |
+| 4 | game-mode line with `_-ao` | mode-specific | no |
+| 5 | vertical line | wall cling, ledge assist (probe from 5 below the top, ±2.02 / 6), sticky-wall timers (`_-y1L`, 5000 ms), slide damping `_-84Q` × 0.85 × 0.384, `_-r51` (PR #26); then **the remaining y continues along the wall** (feet and head sweeps, ±1.01 back-off) | yes (`wall_contact` + slide), with the fighter state passed in (`WallState`) |
+| 6 | anything else (floors) | pressure plates `_-U5a` | no |
+
+At the end, `_-O6z` = `_-96f`.
+Before the branches, `_-r51` is saved (local 27) and set to 0 (@8869–8886) [V]. After them (@13029–13127)
+[V], when `_-96f` is still set and its normal does not point up (`_-X3S.y` ≥ 0) or it is steep (`_-S1A`), a
+game-mode line first calls `_-ao(t, true)`, then `_-96f` = null. So walls, ceilings and steep lines never stay
+the ground line: `_-wn()` (@13169) reads the fighter as airborne, and a jump there takes the wall branch.
+
+**Entity flags used here.** Several of the fighter's booleans are camouflaged: `_-wn()`, `_-t46()`, `_-5q()`
+and `_-81n()` each read bit `(v >>> 24) & 31` of an int field. `Entity._-W2b` #3002 picks that bit index
+and the other bits with the global generator `_-A6B._-PW` (seeded from Math.random, not the replay
+PRNG), so only the decoded value matters (`packed_flag`) [V]. What they hold:
+- `_-wn()`: airborne after the previous move (`_-v2J(_-96f == null)`, #2984 @13169) [V];
+- `_-5q()`: set when a hit is applied (`_-26u._-L3f`), cleared when `_-Nj` runs out (`_-Re`). [H] in hitstun;
+- `_-t46()`: set and cleared by the running power (`_-l4X._-o4b` / `_-VY`) [H];
+- `_-81n()`: `_-O5C ≠ 0` in the input handler `_-1L` [H];
+- `_-e36()`: the ground line is lava (`type & 512`) [V].
+
+Bounce details (`bounce`, `Entity._-048` #3151) [V]:
+- **Elasticity e.** `_-7c` (0.8 for a fighter, set in `Entity.<init>`); 1.0 when `_-050()`; 0.9 on bouncy
+  lines (64); 1.2 in the `_-m1t` state. Game-mode lines use `_-h40`.
+- **Thresholds.** `_-OI` = `_-J4r` = 25, or 0.5 in the `_-m1t` state.
+- **Real speed.** When a real flight speed is kept (`_-J1m` / `_-d4x`, above 250, PR #29), the velocity is
+  first rescaled to its length.
+- **Vertical line.** x speed × −e. A horizontal line does the same on y. Below the threshold, the speed is
+  set to 0.
+- **Slanted line.** The velocity is reflected on the normal: the tangential part loses 2.5 (not below 0),
+  the normal part is scaled by e, and the result is kept only if it is at least 25.
+- **Afterwards.** For an axis whose real speed was kept, a speed above 250 (`_-y4Q` = 62500 = 250²) is
+  capped to ±250 again and the real one stored; otherwise it is cleared.
+- **Skips.** `_-83l` stops the fighter. `_-m5a` skips down-facing no-slide lines.
+
+Wall details (`wall_contact`) [V]:
+- **Ledge assist.** It runs when `_-wn()` holds and the wall is not no-slide:
+  1. a hard-line probe at head height reaches 2.02 past the wall;
+  2. if it finds no vertical line there, the feet are within 60 (`_-w2p`) below the wall top, and `_-P5S` is
+     above −35 (`_-w5U`), a second probe goes from 5 above the top, (±2.02, 6), toward the wall;
+  3. if that probe lands on a walkable line (not vertical, not steep), the fighter is put on it with a
+     1.01 back-off, and `_-P5S` becomes `_-84Q` × 0.384.
+- **Contact.** It runs when `_-t46()` is false, the head is on a wall or the fighter was already on one, and
+  the fighter did not climb onto the ledge:
+  - `_-r51` = 1 (wall at or left of the feet) or 2;
+  - on first contact, a falling `_-P5S` becomes 0, and `_-y1L` = t + 112 when below the wall's bottom;
+  - on a sticky wall with `_-G1T` set, the hold lasts 5000 ms (`_-P5S` = 0), then `_-G1T` is cleared;
+  - otherwise a fall faster than `_-84Q` × 0.85 × 0.384 is reduced by (`_-84Q` + this step's gravity) ×
+    0.85 × 0.384.
+- **After the contact.**
+  - On a no-slide wall, `_-v1D` = 0.
+  - Otherwise, with no power and not `_-M5t`, `_-v1D` = ±10 toward the wall.
+
+
+**Ground and dash jumps** ([`tools/bh/jump.py`](../tools/bh/jump.py), `Entity.Jump` #3052; values first read
+in movement-11.00.md, PR #16) [V]. The grounded branch is taken when `_-96f` is set or `_-Xb` == 1:
+- the impulse is 57 × k, with k = 0.86 when the second argument is true, else 1;
+- in the dash window (`_-26T` + 160 > t, with a ground line or `_-Xb` == 1), it is 170 instead;
+- then `_-P5S` = 0, `_-96f` = null and `_-A4A` −= impulse, which the next fold adds to `_-P5S`.
+
+- **After a ground jump** (@1066–1537), when a side is held (`_-81n()`) or local 6 (the dash window with the
+  `_-R5q._-66U` bits 4 / 8 matching the side), with M = `_-K64()`. Held left (`_-141()`): with `_-M3V` and
+  vx > 4, vx −= 4; else a positive vx becomes 0; else at vx ≤ −M, `_-84` −= `_-13G` × 0.5 (`_-13G` = 30, so
+  15). Held right is the mirror. [H] `_-84` is the horizontal impulse, folded like `_-A4A`.
+
+**Wall jump** (@1545–2014) [V], when the grounded branch is not taken and `_-r51` ≠ 0 or `_-Xb` == 2:
+- `_-31A()`, `_-96f` = null, `_-A4A` −= `Entity._-S4O` × k (53 × k), `_-v1D` = 0;
+- `_-P5S` takes the value returned by the `_-v1D` write [H: 0; `_-N5C` is an interface, #3199 has no body];
+- with no side held, `_-CV(_-r35())` [H: turn away from the wall];
+- `_-84` += 48 on a wall `_-r51` == 1 (× 0.9 when held left), else −= 48 (× 0.9 when held right): the push
+  is weaker when the held side points back at the wall [H on the side meaning];
+- event `'jump.Wall'`.
+
+**Air jump** (@2018–2423) [V], when `_-P5Y()` < `_-56T()` [H: air jumps used < allowed]:
+- `_-31A()`, impulse 57 × k, or 65 × k with the second argument; `_-P5S` = 0; `_-A4A` −= impulse;
+  `_-k1j(_-P5Y() + 1)`; a stat counter `_-K53._-G5O`++ under `_-i2H._-A1S`;
+- with a side held and M = `_-K64(false)`: held left, vx > M becomes M; held right, vx < −M becomes −M;
+- event `'jump.Air'`.
+- With no air jump left (@2427): local 12 = `_-e3e` & `Entity._-8` ≠ 0, `_-I5A` = 0.
+
+**Jump squat** (`Entity.Jump` @223–506, `Entity._-8i` #2984, `Entity._-A2X` #3131) [V]. The input
+(`_-i4Z._-51o` #6313) calls `Jump(t)` with one argument; a power calls `Jump(t, true)` (`_-F5N._-C5S` #1700,
+hence k = 0.86).
+- **Gate** (@223–320): no second nor third argument, no running power (`_-Kc._-o3I`), the jump lock over
+  (`_-532` == 0 or t > `_-532` + `Entity._-z3C`, 192), and no dash window or `_-L3a` == 2.
+- **Start** (@324–506): if `_-w3i` + `Entity._-k5G` (192) ≥ t, `_-w4c(t, false, false, _-R5q._-66U)` and, in the
+  air, `_-y1U(t, false)`; then `_-n5b(t, airborne, on a wall, false)`, the pending kind `_-Xb` = 1 (ground),
+  2 (`_-r51` ≠ 0) or 3 (air), `_-I5A` = t, and Jump returns without any impulse.
+- **Release** (`_-8i` @2674–2718): once `_-Xb` ≠ 0 and t ≥ `_-I5A` + 32, `_-A2X(t)`: `_-g38()` when no power
+  runs, `_-P5S` = 0, `_-I5A` = 0, then `Jump(t, false, true)`, which takes the ground / wall / air branch above.
+  So a jump leaves the ground 32 ms (2 ticks of 16 ms) after the press [H on the tick count].
+- **Landing** (`_-8i` @13427–13510): when the fighter was airborne before the move (local 37 = `_-wn()`), is
+  not after it, and `_-96p()` [H]: `_-t4D` = t, and a pending jump waits 64 ms more (`_-I5A` += 64).
+- In the dash window with `_-L3a` ≠ 2, there is no squat: the jump (170) happens at the press.
+- `_-Xb` goes back to 0 right after that call (`_-A2X` @82), in `Entity._-Re` #2981 @440 (with `_-I5A` = 0 while
+  `_-5q()`, hitstun [H]) and in `_-p1Y` #3034 @298 (with `_-r51` = 0).
+- Not read: the `_-H5F(t, third)` guard @36–59 (Jump returns when it is true and there is no second argument).
+
+**Horizontal speed** ([`tools/bh/horizontal.py`](../tools/bh/horizontal.py), `_-8i` @519–2659; first read in
+horizontal-11.00.md, PR #23) [V]. Before the walk, `_-v1D` goes through friction, then acceleration:
+- **Max speed** (@519–615): RunSpeed (`_-M1U`) × `_-Kc._-04K`, × 1.16 under `_-w47`, on the ground; AirRunSpeed
+  (`_-z2v`) × `_-Kc._-u5j` in the air.
+- **Friction** (@782–1340), only when `!_-E6P()` or `local8` [H: `_-H6t()`]. The last rule that applies wins:
+  1. `AirFriction` in the air, `Friction` on the ground;
+  2. within 640 ms of the dash timer `_-26T`: 3.534 in the air, 5.655 on the ground;
+  3. with a power: 4.013 on the ground if `_-7E`; else, when its PowerType has `_-y25`, 5.655 in the dash
+     window or `Friction`;
+  4. in hitstun: 4.0;
+  5. on a surface (`local8`), by the bits `_-R5q._-66U` and the sign of `_-v1D`: 9.0 along it, else 3.25.
+
+  Then |`_-v1D`| loses F × 0.384, clamped at 0.
+- **Acceleration** (@1928–2648): Acceleration (`_-m3Q`) × `_-Kc._-E16` on the ground, AirAcceleration (`_-i3E`) ×
+  `_-Kc._-R4I` in the air. Acceleration and max are both × 1.25 under the mode hook `_-m47._-43P`. In the air,
+  against the current motion, it is × max(1 − |vx|/50, 0) (with conditions on `_-5q`, `_-M3V`, `_-ud` from #23).
+  Then `_-v1D` moves toward the held side (`_-141()` = left) by a × 0.384, only while below the max, and is
+  clamped at it. A faster fighter is slowed only by friction.
+
+**Ground walk** (`ground_walk`, `Entity._-8i` @3114–4217) [V]. On a ground line, the x step `local12`
+(= `_-v1D` × 0.384) is walked along the line before the free move. Each pass:
+1. `_-N3a` points along the line (end − start), normalised to `local12`; a negative step walks backwards.
+2. A sweep runs with the current line ignored (mask `local3`). The fighter moves by what it leaves, and that
+   length is taken off `local12`.
+3. A **non-vertical hit line** becomes `_-96f` (pushed to `_-u3j`, 1.01 back-off), and the walk goes on along
+   it: this is how slopes and joined segments are followed.
+4. A **wall** ends the walk:
+   - in hitstun (`_-5q()`), `local12` is kept and becomes the x of the free move;
+   - otherwise `_-v1D` = 0 and `local12` = 0. For a game-mode line this happens only when `_-ao(t, false)`
+     returns false; a pressure plate also calls `_-U5a`.
+5. With **no hit**, the walk ends. If `_-A4A` is 0, a 50-unit probe goes down with no line ignored. When it
+   finds another line within 10, it adds 50 to `_-A4A` (a push down to follow the step), but only if that
+   line or the ground is not flat, or their heights differ by 1 or more.
+
+**Landing and gravity on the ground** (`ground_reset`, `gravity_applies`) [V]:
+- At the **start** of the next step (@290–408), the ground line `_-96f` left by the previous move counts as a
+  landing. This holds only when `_-5q()` (hitstun [H]) is false and the `_-e3e` bit `_-B6B` is clear. `_-P5S`
+  becomes 0, unless the power holds `_-564` and `_-P5S` <= 0 (a rise is kept). The flag `_-G1T` (on the
+  ground) is set. Then the power's `_-C3x()` runs, unless `_-r51` is set and `_-x2C` >= 9 (@411–467).
+- Gravity (@5172–5353) is added only when `_-E6P()` is false, **there is no ground line**, there is no
+  `_-y1L` hold (`_-y1L` = 0 or <= t), the power has no CancelGravity (`_-q1G`) and `_-84Q` is non-zero. So a
+  fighter standing on a line gets no gravity; its move is only the 2.02 ground push, which the sweep stops
+  on the line again.
+
+**Lava** (`lava_contact`, `Entity._-ao` #3116 @621–997) [V]: whenever the ground line has the game-mode bit
+128 (`_-J6w`), `_-8i` calls `_-ao(t, flag)`. It does so during the ground walk (@3722), after the move (@9331,
+@10747) and at @13080. For a lava line (type & 512, `_-s2O`):
+- the power named by the line (`PowerType._-p4G(line._-S14)`) hits the fighter through `OnHit` (17
+  arguments, the damage / knockback chain of #29);
+- the hit is credited to `_-W6D` when 0 < `_-W6D` < 16 (the last attacker), else to the fighter's own `_-11`;
+- the same power (`_-K1e` = its `_-H4O`) cannot hit again before `_-k2j` + 240 ms, unless it has `_-x1N`.
+
+So a fighter that lands on lava is hit by it, rather than standing. The RING scoring type takes another
+branch first (@73–620), which is not read here.
+
+[H] **Gentle slopes.** With no input, the transcribed step gives a slow creep on a hard slope. The ground
+push (0, 2.02) stops against the line after a tiny move (<= 1.02), so the 1.01 back-off goes along −normal
+(@7544–7770). That is about 0.02 per tick in y on the 11.3° slopes of the local maps. Either the game creeps
+the same way, or a part not read yet compensates. A real game is needed to tell.
+
+## 8. Thrown items and projectiles (`_-p5k`)
+
+Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not powers. Each update,
+`_-p5k._-h20` #15239 runs these steps [V]:
+
+1. **Early exits.** It returns early in states `_-5T` 5 and 7, and when the item type `_-93n` has none of
+   `_-o3Y`, `_-64N`, `_-n2m`.
+2. **Broad query.** `_-R6C` around the item, with half sizes **1050 × 1050** (@492, @623). The mask is
+   `_-34m`, or `_-p3C | _-34m`, depending on a timing flag (@419–571).
+3. **Fine test.** For each candidate other than the item itself, the item capsule is tested against
+   the candidate (`candidate._-N2t`). The capsule starts at (x + `_-86n`.x, y + `_-86n`.y), with segment
+   `_-CB` and radius `_-SW`. While the item is held as a power (`_-gT`), the holder's hurtbox is used
+   instead.
+4. **Swept test.** When the fine test misses, a swept capsule from the previous position (`_-X2D`,
+   `_-14l` − h/2) to the current one is tried, with radius min(w, h)/2 of the item type (@1234–1282). A
+   fast item cannot pass through a target between two ticks.
+5. **Per-target gates** (`items.target_gate`) [V; names of `_-J5Z` / `_-66f` / `_-I1E` are H]. Each candidate
+   has a bit `1 << _-03K()`. `_-Io` holds the targets already hit (−1 = all), `_-x5G` the targets still in
+   contact. In order:
+   - **Only stunned.** With `OnlyStunnedTrigger` (`_-N59`), a fighter that is not in hitstun is skipped.
+   - **Already hit.** A target in `_-Io` is skipped, unless `AllowRepeatedCollision` (`_-A4s`) is set and
+     `_-Io` ≠ −1.
+   - **400 ms after the throw** (`_-O13 + 400`), a fighter is skipped in two cases: the thrower is in
+     hitstun from that fighter's last power, and that power is not a ThrownItem (TargetMethod 11); or
+     `_-I1E(candidate)` is true.
+   - **No overlap** (steps 3–4): the bit is cleared from `_-x5G`, no hit.
+   - **Catch.** If the fighter can catch (`_-J5Z(t, false, true)`), there is no hit. The bit is cleared when
+     `_-66f(_-Lu, _-33c)` is true, set otherwise.
+   - **Grace after the throw.** A fighter not in hitstun is not hit during the first 32 ms after the throw,
+     or 64 ms when the item moves more along y than x. The bit is set.
+   - **Boomerang** (PathType 1). The bit is cleared again once t − max(`_-u4B`, `_-O13`) ≥ 500 ms
+     (`_-p5k._-K3V`).
+   - **Still in contact.** A target whose bit is set is not hit again, unless `_-f4i` and an
+     `OnExplodePower` exist.
+
+   Otherwise the candidate is kept. The last candidate kept is the one that is hit.
+6. **Hit.** The last target that passes is handed to `_-Q3h(t, holder, target)` (@1792). That calls
+   `_-R58` (#15230 @242), which spawns a power of the thrower with `_-F5N._-q5` (#15209 @1829). `_-q5`
+   builds a new `_-l4X` with **`_-x4I = the hit target`** and `_-A3S = true`, adds it to `_-pX` and runs
+   `_-R63` once (#1702).
+
+So for TargetMethod 2 / 11 (Ranged, ThrownItem), §2's "list = [`_-x4I`]" means the power hits exactly the
+target the item touched. `_-A3S` makes the line of sight ignore item-ignore lines (§7.1).
+
+### 8.0 Throwing an item (`items.throw_vector`, `throw_start`; `_-F5N._-M4Q` #1689) [V]
+
+When a fighter throws its item (`_-M4Q(t, charge)`):
+1. **Spawn** (`items.throw_spawn`). A `_-p5k` is created at the thrower's (x, y − 30). When the thrower
+   is airborne (`_-wn()`), h = Height − 120. If `Entity._-P4n(h)` #3070 allows it, the item goes to feet + h:
+   that is always the case for h < 0, otherwise only when a cast (0, h) down from the feet (hard | soft)
+   hits nothing.
+2. **Speed** (`_-F5N._-Fi` #1722, from the input bits `_-x10`: 1 up, 2 down, 4 left, 8 right):
+   - a ProximityTrigger item (`_-r58`) cannot be thrown down from a hard ground line (bit 2 is dropped);
+   - with no bit, the item goes the way the thrower faces (`_-r35()`);
+   - up / down set y to −1 / 1, otherwise y = `ThrownHorizontalY` (`_-x5D`, default −0.1);
+   - the vector is normalised to `_-R1O(charge, x == 0)` = (55 straight up / down, else 75) ×
+     (1 + 0.8 × min(charge, 1000)/1000);
+   - then it gains the thrower's `_-v1D` in x and `_-P5S` × 0.25 in y.
+3. **State** (`_-p5k._-q54` #15197):
+   - `_-Lu` / `_-33c` = speed × `ThrownInitialVelocityMult` (`_-I2d`, default 1), and the launch speed
+     (`_-Wj`, `_-A5W`) is the same;
+   - `_-W6M` = **charge ≥ 2000 ms**: a charged throw corkscrews a rocket and gives a boomerang its 1800 ms
+     delay;
+   - `_-BG` = PathType ≠ 0, state `_-5T` = 1, thrower `_-r5B`, team, `_-74O` = 0;
+   - `_-M4Q` then sets `_-O13` = t.
+
+### 8.1 Motion of a thrown item ([`tools/bh/items.py`](../tools/bh/items.py), `_-p5k._-8i` #15192)
+
+Each tick, before its map sweeps, a thrown item updates its speeds `_-Lu` (x) and `_-33c` (y) [V, bytecode
+order]:
+1. **Friction.** `_-Lu` moves toward 0 by `Friction` × 0.384 on a ground line, or `AirFriction` × 0.384 in
+   the air (defaults 2.5 / 0.15). It stops at 0 instead of changing sign.
+2. **Horizontal impulse and cap.** `_-Lu` += `_-B66`, then it is capped at ±`_-Z5d`. `ItemType.<init>` sets
+   `_-Z5d` to 0 and no column writes it, so the cap is **350**. The x step is `_-Lu` × 0.384.
+3. **Ground walk** (`items.ground_walk`, @1225–1736) [V]. On a ground line with normal y < 0, the x step
+   `local10` walks along the line, with the same loop shape as the fighter's (item-ignore lines are
+   excluded). Unlike the fighter's walk, **`local10` is never reduced** by the length walked:
+   - each new non-vertical line is walked with the full step again;
+   - after the loop, the same `local10` is the x part of the free move (@4509), so on the ground an item
+     covers its x step twice;
+   - a wall calls the impact (`_-u1I`) and sets `local10` to 0 if the item stuck (`_-f4i`), else to
+     −`local10`.
+4. **Vertical impulse and cap.** `_-33c` += `_-46m`, then the same ±cap.
+5. **Lifetime.** The item is removed (`_-5k()`) once t − `_-O13` > `PathLength` (when PathLength ≠ 0).
+6. **Path behaviours.** With `_-BG` set, `PathType` chooses one: BoomerangHoming 1, Linear 2, Rocket 3,
+   RocketHoming 4, Crawl 5, otherwise 0 (lookupswitch @1901). Types 0 and 5 take the default branch, which
+   removes the item (`_-5k()`) [V].
+   - **Linear** (`items.linear_path`, @2677–2812) [V]: the speed keeps its direction and takes the length of
+     the launch speed (`_-Wj`, `_-A5W`) again: constant speed.
+   - **Rocket** (`items.rocket_path`, @2816–3115) [V]: the launch speed is multiplied by
+     1.25 × `_-22H`(ease-in, t − `_-O13`, 2000) + 0.25, i.e. from 0.25 to 1.5 over 2 s. With `_-W6M` it
+     corkscrews:
+     - the angle is the launch angle (`atan2_netsafe`) plus 8π × `_-22H`(in-out, max(0, dt − 500), 3000),
+       or minus that when `_-Wj` >= 0;
+     - the speed is k × |launch|, with the rounded cos / sin.
+
+     `_-A6B._-22H` #1132 (`items.ease_22h`) is −0.5 (cos πt − 1) in-out, 1 − cos(t π/2) in, else
+     sin(t π/2). `atan2_netsafe` #1098 rounds both unit-vector parts and the angle to 1/1000.
+   - **BoomerangHoming** (`items.boomerang_path`, @1932–2673) [V]:
+     1. **Turn.** The first time the speed points against the launch speed (dot < 0, `_-A6B._-467`),
+        `_-74O` = t, and the targets already hit move into the contact mask (`_-x5G` |= `_-Io`, `_-Io` = 0).
+     2. **No thrower.** The item is removed when its thrower is gone or in a state other than 0 and 6.
+     3. **Pull.** The target is the thrower's point (`_-M43`, `_-E3d`), else the stored origin (`_-22W`,
+        `_-S6B`). The distance uses `_-p5a()` = `_-S1I`, the x committed by the last `_-x1M`, with the
+        current y. Beyond 10 and past 180 ms (1800 with `_-W6M`), the speed gains (target − pos) ×
+        |launch| × 0.0533 / distance, then is capped at |launch|.
+     4. **Catch.** Once turned, the item is removed when it is back behind the target
+        (dot(launch, pos − target) < 0).
+   - **RocketHoming** (`items.rocket_homing`, @3119–4340) [V]. Positions use `_-p5a()` / `_-d5F()`, the x and
+     centre y (y − Height/2) committed by the last `_-x1M`.
+     - **No target** (`_-P6U` = 0). Before 1000 ms (`_-N4Q`), the speed is lerped toward 0 by
+       ((t − `_-O13`) / 1000)² (`_-A6B._-a2s` = a + (b − a) k). After that, the closest entity of `_-5r` in
+       state 0 or 6 becomes the target, by squared distance, strictly closer wins, the thrower included;
+       `_-74O` = t.
+     - **Lost target.** A target that left states 0 / 6 is dropped (`_-74O` = `_-P6U` = 0).
+     - **Steering** under the mode bit `_-d3Y._-Z2Y & 64`. The wanted angle points at the target. The
+       current angle is the speed's, or the wanted one when both parts are within 1e-4 of 0. The difference,
+       wrapped to [−π, π], is turned at most `_-83w` = π/180 × 1800/1000 (1.8°) per tick. The speed is
+       |launch| × min((t − `_-74O`)/1000, 1)/2, with the rounded cos / sin.
+     - **Otherwise**, each part is lerped 1 % per tick toward |launch| aimed at the target.
+7. **Gravity.** Without `_-BG`, gravity is added unless the item rests on a flat line (`_-Lu` = `_-33c` = 0,
+   normal y = −1). It is `ThrownGravity` while thrown (`_-r5B` ≠ 0, `_-o2O` false), else `Gravity` (both
+   3.75 by default), times 0.384. The cap is applied before gravity, not after.
+8. **Move vector.** It is (x step, `_-33c` × 0.384), plus 2 × `_-p5k._-x3M` = 2.02 on a ground line.
+
+9. **Map sweeps** (`items.sweep`, @4683–6357) [V]. In state 1 with `ForceNoGeometryCollision` (`_-p2W`)
+   there are none: the item moves freely. Otherwise there are two casts, both excluding item-ignore lines
+   (`_-z2k._-M4J` = 32):
+   - a feet cast along the move vector, with the mask below;
+   - a top cast from `Height` (`_-S2O`, uint, default 0) above, hard lines only. It wins when it is
+     shorter and its line is not a flat floor (normal y ≠ −1).
+
+   The item moves by the shortened vector, `_-96f` becomes the hit line, and the item backs off 1.01
+   (`_-x3M`). The back-off goes along −normal for a hard line and a tiny move (|x|, |y| <= 1.02,
+   `_-p5k._-u4H` = `Entity._-u4H`), otherwise along the move. The ceiling cast @5474–5544 is a
+   `callpropvoid`, so its result is dropped and `local37` stays null: **items have no ceiling re-cast**.
+10. **After the sweeps** (`items.after_sweep`, @6891–7391) [V]:
+    - In state 6, when the sweep stopped on a vertical line (`items.wall_slide`, @6362–6886), `_-Lu` = 0 and
+      the y the sweep did not use (`_-U5T`.y − `_-611`.y) is slid along the wall. Feet and Height casts run,
+      the top one wins when shorter, and the item goes 1.01 back against the wanted direction when stopped.
+    - A moving item (`_-Lu` or `_-33c` ≠ 0) in state 0 or 1, or with `AlwaysArmed`, hits its ground line
+      through `_-u1I`; a lava line always does. Otherwise a floor (normal y < 0) only zeroes `_-33c`.
+    - The impulses `_-B66` / `_-46m` are cleared.
+    - On a floor that is not steep, a thrown item (state 1) with speed² <= 2500 (`_-p5k._-Y3M`) rests
+      (state 0). State 2 rests once both speeds are 0 (event `_-K3s(t, 5)`).
+    - A bounds test `_-c5C` can remove the item (`_-J5O`).
+11. **Impact** (`items.impact`, `_-u1I` #15194 @712–1515) [V]. The special cases come first
+    (`items.impact_special`, @26–711):
+    - a `Weapon` item (`_-G3X`) that touches lava after hitting someone (`_-Io` ≠ 0) goes to state 6 for
+      267 ms (`_-45l`);
+    - an `ExpireOnGeometryCollision` item (thrown, or AlwaysArmed) makes its thrower spawn the item's
+      `OnCollisionPower` (`_-Kc._-q5`, 12 arguments, at the item's x and centre y; flag 33554432 once 400 ms
+      have passed since the throw), then it expires (`_-Jl`);
+    - an item whose `OnHit` is "Teleport" (thrown) does the same, then moves its thrower onto itself
+      (`_-2c`, `_-Z5r`, `_-x1M`, and `_-p1Y()` unless the mode bit `_-Z2Y & 64`).
+
+    Without a thrower, such an item only expires.
+    - **Stick.** The item sticks with `StickToWalls` when `_-72T` [H] and (thrown or `AlwaysArmed`).
+      `ConditionalStickToWalls` STRICT_ANGLE (1) also sticks a head-on hit (cos(velocity, normal) <
+      −0.7237379), and FLOORS_ONLY (2) cancels sticking unless −|nx| >= ny. A stuck item stops.
+    - **Bounce or stop.** Otherwise the item bounces when the line is not a flat floor or its speed is >= 5,
+      and stops otherwise.
+12. **Bounce** (`items.bounce`, `_-p5k._-048` #15245) [V]. The elasticity is `Elasticity` (`_-7c`, default
+    0.6), and (1 + e) / 2 on a bouncy line.
+    - A vertical line reverses `_-Lu` × e, a horizontal line `_-33c` × e.
+    - On a slope, the normal part is reversed × e (1.05 on a steep line when falling toward it). The
+      tangent part loses `Friction` when it is longer than 1.5 × Friction.
+    - Game-mode lines can override e (`_-h40`, not transcribed).
+
+
+**Mask.** The sweeps use hard | soft, or hard only in three cases:
+- for 64 ms after a throw by a fighter standing on a soft line (state 1);
+- for a BoomerangHoming item while `_-BG` is set;
+- in state 1 with ThrownGravity 0 and `ForceNoHitstop` (`_-T30`).
+
+Local check (aggregate): the 75 local item types parse with 0 errors; 2 use a path behaviour.
+
+## 9. Where this runs in a tick
+
+The order of one 16 ms tick is in tick-loop-11.00.md (scheduler `_-h3U._-01I` #3336). The pieces of this
+document sit in it as follows [V]:
+
+| Step in #3336 | What runs | This document |
+|---|---|---|
+| 3 (@2654) | `_-22K._-d4u(t)`, only while `_-vs == 0`: every moving platform `_-Y3I`, so its lines move | §7.3 |
+| 5 (@2751) | every `Entity._-k5H(t)`: inputs, state, movement, map collision | — |
+| 6 (@2802) | every `Entity._-10(t)` → `_-Kc._-n2B` (#2990 @98 / @124) → `_-F5N._-h1T` (#1688 @43) → `_-l4X._-R63` (#1742 @227): hit areas, line of sight, re-hit rule; `_-T5A` → `Entity.OnHit` **queues** a hit record in `_-26u._-T4G` (#3042 @179–184) | §1–§7 |
+| 7a (@2824) | `_-3z._-s4H(t)`: every item `_-p5k._-h20` | §8 |
+| 7b (@2836) | `_-32h._-d3s(t)`: the queue `_-T4G` is read (#1665 @2024) and each hit goes to `_-26u._-76s` (damage, knockback) | knockback-11.00.md |
+
+Consequences:
+- **Hits are applied after every entity has attacked.** Hits are only queued in step 6 and applied in
+  step 7b, so two fighters can hit each other in the same tick [V].
+- **Hit tests see the positions after movement.** Movement runs in step 5, hit tests in step 6, and both
+  run in `_-5r` order [V]. The platforms have already moved in step 3.
+- **Mud splash.** `Entity._-8i` #2984 also calls `Entity.OnHit` directly in step 5 (@6522–6597). The
+  power is `PowerType._-h1r`, which `PowerType.static._-B6` #6482 sets to the power named `MudSplash`
+  (@3116–3126). It fires once while `_-k2j == 0`, which then holds the time. The attacker is `_-W6D` (the last
+  attacker, when 1–15) or the fighter itself. Its X velocity is scaled by `_-I1f._-X4E` just before [V].
+  [H] The trigger is contact with mud (`MudCollision`); the gate before @5961 is not read.
+
+## 10. Fighter states (`Entity._-k5H` #2991, [`tools/bh/entity_states.py`](../tools/bh/entity_states.py))
+
+In step 5, each fighter first reads its inputs (`_-1L(t)`), then switches on `_-65w` [V]. The handlers are
+[V]. The names are [H], from the methods that set each value.
+
+| `_-65w` | Name [H] | Handler | Set by |
+|---|---|---|---|
+| 0 | in play | power update `_-Kc._-25`, then movement `_-8i` (§7.4), or `_-763` in the `_-m1t` state, or pinned to `_-aB` / `_-v1Z` in the `_-J5I` state | many |
+| 2 | not spawned yet | `_-44x` only | `Entity.<init>` |
+| 3 | knocked out / waiting | power update only | `Entity._-eR`, `_-X6R._-U6W` (respawn, PR #25) |
+| 4 | held still | as 3 | `SpawnBot`, `_-y3M` |
+| 5 | in play, timed | as 0; back to 0 after 2500 ms (`_-f5u`), on lava, or other conditions | `SpawnBot`, `_-W6p` |
+| 6 | held by a power (grab) | power update; released when the holder's power ends (`mHeldByPower`) | `Entity._-j4e` |
+| 7 / 8 | **eliminated** (`_-s3m._-a1k` #3948 exports `Eliminated = (_-65w == 7)`) [V] | once 1500 ms have passed since `_-164` (7) or `_-lV` (8), or when `_-s3D._-zv() <= 1`, the bit `Entity._-e3c` is added to `_-e3e`; power update. The state is left by other code | `Entity._-Y6o` / `_-S1D` |
+| 9 | respawning | the bit `Entity._-e3c` is cleared from `_-e3e`, then `_-W1R.Respawn(t, this)` and `_-q4u._-b3v(t, 7)` | `Entity._-220` |
+
+Value 1, and anything above 9, falls into the "Unaccounted-for entity state" message. So **movement and
+map collision only run in states 0 and 5**.
+
+**Transitions found so far** [V call edges]:
+- a KO commit sets 3 (`Entity._-eR`, ko-11.00.md);
+- the respawn reset `_-X6R._-U6W(t, f, eliminated)` #6787 (which also resets the damage `_-W22`) calls
+  `Entity._-Y6o`, which sets 7 (eliminated), **only when `eliminated` is true**; otherwise it turns 2 / 9 into 3
+  and, unless the state is 8, sets 3 again at the end (@464-494);
+- `_-X6R.Respawn` #6784 calls `Entity._-hq`, which sets 0;
+- `_-d2C._-85Y` calls `Entity._-220`, which sets 9.
+
+- `Entity._-X1J` releases a grab (6 → 0).
+- **Match start** (`_-X6R._-b3x` #6777, tick step 4). On the first tick with t ≥ `_-n4k` + 256 ms (flag
+  `_-C3h`), the eligible fighters get state 3 and are passed to `_-X6R.Respawn(t, f)` #6784 with two
+  arguments, so `eliminated` takes its declared default, false (method info optional value kind 0x0A).
+  **Correction:** Respawn therefore runs `_-U6W` without `_-Y6o`; the fighter stays in state 3 and goes to
+  the respawn drone through `_-K5c` (§10.1). A game-mode rule can instead call `_-hq`, which gives
+  state 0 at once. In the same call, the replay generator R (`_-s3D._-22`) is **drawn twice**:
+  `_-G5X[i] = R._-f4c() % n` for i = 0, 1, where n is the number of `_-I1f._-o5y` entries, or 37 when there
+  are none (@904–1002) [V].
+- **Correction: the match-start placement** ([`tools/bh/match_start.py`](../tools/bh/match_start.py)) [V]. Not
+  every fighter goes to `Respawn`. On the match-start tick only fighters in state 2 are taken; those with no
+  `Entity._-o2q` bit, no game-mode test (`_-06A._-Z3E`) and no mode point (`_-sZ._-N3`) form a **start list**,
+  the others go to `Respawn`. The start list is shuffled with R (`_-A6B._-eV`, one draw per fighter) unless
+  `_-d3Y._-a4w()` (then sorted by `_-34Y`); with two fighters outside team mode, `_-Q2Q` gives the first one
+  the first candidate of `_-x22(t, 2, 1)` and the second one the last candidate (so the leftmost and the
+  rightmost Initial points when there are two or more), each through the drone `_-P3o`. One fighter →
+  `_-X5t`; more → `_-z16` / `_-U24` (not read). So a plain 1v1 draws R **four** times at the match start:
+  two for the shuffle, then the two `_-G5X` draws.
+- **R at that tick** (match_start.py, prng-order-11.00.md §4c) [V; H: completeness]: in a STOCK / TIMED
+  replay, R is seeded at replay start and drawn once per player when its `Entity` is built (`_-F5N.<init>`:
+  `_-56C` = R % 2); nothing else draws R before the match-start tick.
+- **Time base `_-n4k`** (match_start.py: `step_times`, `time_base`, `match_start_step`) [V; H: no seek or
+  rollback first]. In a replay `_-h3U._-01I` #3336 steps from the done time `_-73m` to the target `_-94N`, both
+  rounded down to 16 ms, one step every 16 ms (t = done + 16 k). On a step where `_-n4k` is 0, `_-Y6a(t)` #3545
+  sets `_-n4k` = t. `_-91N` and replay start `_-T12` zero the clocks; the replay clock `_-L5y` #3310 copies
+  `_-94N` into `_-73m` before moving it and never rewinds below `_-n4k`. So a replay played from its start has
+  `_-n4k` = 16 and its match-start step at t = 272 ms (not 256).
+- **Fighter order `_-5r`** (match_start.py: `insert_by_id`, `fighter_order`) [V]. Replay start `_-T12` #3624
+  walks the replay's id list and builds one `Entity` per id with data (`Entity._-724`), whose constructor stores
+  the id in `_-11`; `_-h3U._-63t` #3645 then inserts it into `_-5r` before the first entity with a larger
+  `_-11` (`_-A6B._-p3g`, an insert at an index), or pushes it. So `_-5r`, the order the match start loops over
+  (and shuffles in 1v1), is the increasing order of the replay entity ids (`replay.parse` → `entities[i]["id"]`).
+- **Respawn point** (`_-X6R._-K5c` #6778, `respawn_index`). `_-G5X` holds the respawn point counters, so
+  the two draws above pick where the rotation starts [V]. Each respawn takes the candidate list from `_-x22`
+  and adds 1 to a counter:
+  - outside team mode, counter 0, and the index is the counter mod n;
+  - in team mode (`_-O3P()`), team 1 uses counter 0 and the first half of the list (counter mod (n >> 1));
+    team 2 uses counter 1 and the second half (the same plus ceil(n/2));
+  - the fighter is then placed with `_-k5S._-P3o`.
+
+- **Candidate lists** ([`tools/bh/respawn_points.py`](../tools/bh/respawn_points.py)) [V]. `_-139._-L1q` #5288
+  reads each `<Respawn>` into a point at (X + dx, Y + dy) (dx / dy: the parent's offset [H]); `Initial` and
+  `ExpandedInit` count only when their text is "TRUE" in any case. `_-a2j._-y1c` puts every point in `_-X6Q`,
+  the ones without ExpandedInit in `_-o5y`, the Initial ones in `_-d2Y`; a point in a moving platform also
+  sets `_-V5D`. Once per tick `_-W1y` sorts the three lists with `_-J5b`: by x, then y, static points before
+  platform ones, then the platform id `_-94r` [H: `Array.sort` is not stable on equal keys].
+- **Which list** (`_-X6R._-x22(t, n, flags)` #6790) [V]. n (from `_-K5c`) counts the fighters without the
+  `Entity._-o2q` bit and not in state 7 / 8. With flag 1 (`_-44x`) and at least n Initial points, the Initial
+  list; else `_-o5y`; and with flag 1, no `_-F3O` and fewer than n points, `_-X6Q`. With moving respawns
+  (`_-V5D`) the list is filtered by `_-n1u` at t + `_-Y5H(t, flags)` (not transcribed). `_-K5c` first asks the
+  game mode (`_-H1g._-sZ._-N3`) for a point, and falls back to `_-I1f._-N4x()` on an empty list.
+- So `_-o5y`, the list the match-start draws use (n = its length, or 37), is the sorted list of points
+  without ExpandedInit.
+
+### 10.1 Respawn drone: from state 3 back to 0 ([`tools/bh/spawn_bot.py`](../tools/bh/spawn_bot.py))
+
+`Respawn(t, f, eliminated=false)` → `_-U6W` (state 3) → `_-K5c` (point choice, above) → `f._-k5S._-P3o(t, point)`.
+`f._-k5S` is the fighter's `SpawnBot` (the drone; its fighter is `_-767`) [V].
+
+- **Placement `SpawnBot._-P3o` #11873** [V]: returns on a null point; sets drone phase 1 (`_-Y6i(1)`) and the
+  target (`_-36A`, `_-35U`) = the point. Only when the fighter is spawned (`_-44x`) and `_-s3D._-F3O` is false:
+  - in a standalone client, or when `_-N1k._-w35 & (32768 | 16)` is non-zero: state **0 at once**, the fighter
+    is put on the point, phase 0;
+  - otherwise the fighter is put just off camera: x = right edge of `_-I1f._-8I` if the point is right of
+    its centre, else the left edge; y = top − 200. The state stays 3.
+  - **In a replay** (spawn_bot.py `REPLAY_W35`, `Drone.standalone`) [V; H: dev flag 3 clear in the shipped
+    client]: replay start `_-T12` sets `_-w35` = 1024, and `_-01I` sets 2048 only past `_-331._-G5C` + 2500
+    (the replay's end [H]); neither has an instant bit. "Standalone" is `DevSettings.IsStandaloneClient()`
+    #2563 = dev flag 3 set and 27 clear. So in a replay the drone flies in from the camera edge.
+  - **`_-44x` at the match start** (spawn_bot.py `SPAWNED_AT_MATCH_START`) [V; H: the `_-vs` gate holds]:
+    tick phase 5 calls `Entity._-k5H` on every entity of `_-5r`, and `_-k5H` sets `_-44x` = true in state 2
+    (and 9). Players wait in state 2 from replay start, so they are "spawned" when the match start places
+    them: put off camera, first trip 2000 + 3000 + 700 ms with the defaults, let go in state 0. `_-J1Y` only
+    comes from the BRAWLBALL / TAG rules, a snapshot read and the unreferenced `_-X6R._-sW`. `_-k5H` ticks
+    the drone first (`_-i1H`), so its first tick is in phase 5 of the match-start step.
+  - **`_-44x` after the match start** (spawn_bot.py `SPAWNED_IN_PLAY`) [V; H: `_-99._-h2k` is a round reset a
+    plain stock game does not reach]: in states 0 / 5 `_-k5H` clears `_-44x` unless `_-P4K` (@495-511), and
+    `_-P4K` is set only by `Entity._-s2U` (from `_-99._-h2k`) and the BRAWLBALL / TAG / `_-y3M` rules. So the
+    respawn after a KO takes the not-spawned path: the fighter stays where it was, 1500 + 2500 + 700 = 4700 ms
+    by default, let go in state 5 with `_-P5S` = 70.
+  - **Eliminated** (`Entity._-19` #3016, `Drone.eliminated`) [V @0-81]: lives `_-V` = 0 with `_-d3Y._-81d` > 0,
+    or state 7; never with the `_-B6B` bit. Then `Respawn` gives state 7 instead of the drone.
+- **Per tick `SpawnBot._-i1H` #11858**: a lookupswitch on the phase `_-T1X`: 0 `_-q15` (idle), 1 `_-82`, 2 `_-31s`,
+  3 `_-m1O`, 4 `_-Ck`. While the phase is 2 the fighter is moved onto the drone afterwards (`_-x1M(_-J2c, _-b3h)`).
+  `_-Y6i(p)` sets the phase and clears its start time `_-A6k` [V].
+- **Phase 1 `_-82`** (come down, duration `_-X6R._-H6B`): on the first tick `_-A6k` = t and the drone's start
+  position is kept; each tick the drone eases in (power 2, `_-D2g`, §7.3) toward the fighter. When
+  t > `_-A6k` + duration: phase 2, state 3, and `_-31s` runs in the same tick [V].
+- **Phase 2 `_-31s`** (carry, duration `_-L26`): the start is the fighter's position; the drone (and the
+  fighter with it) eases out to the point, power 3, or 2 when the fighter is not spawned and `_-d3Y._-K4x` is
+  neither 1 nor 2. When t > start + duration: both are put on the point, phase 3, and `_-m1O` runs [V].
+- **Phase 3 `_-m1O`** (drop, duration `_-d3X`): on the first tick (the arrival tick) `_-A6k` = t and the
+  fighter gets **state 4** (held still). Once `_-A6k` + duration <= t: phase 0, the fighter's vertical speed
+  `_-P5S` is set to 30 (spawned, or `_-K4x` 1 / 2) or 70 with `_-F5c` set, then **state 0** when the `_-e3e`
+  bit `_-M14` is clear and (bit `_-o24` is set, or the fighter is spawned and `_-F3O` is false); otherwise
+  **state 5** (timed in play, back to 0 after 2500 ms, see the table), `_-u55` set and `_-U5l()` called [V].
+  The drop animation speed is 700 / duration [V].
+- **Durations** [V], from the flags `_-nN(t, f)` (1 = spawned, 2 = a game-mode test `_-06A._-Z3E(f._-11)`,
+  4 = `_-S3h._-w1s` >= t) and the scoring type `_-d3Y._-11X`:
+
+| Phase | `_-F3O` | long case | `_-Ac` and not flag 2 | otherwise |
+|---|---|---|---|---|
+| 1 `_-H6B` | `SpawnBot._-s1I` = 1000 (script641.<init>) | 2000 | 1500 | `_-o2N` |
+| 2 `_-L26` | 2000 | 3000 | 2500 | `_-j57` |
+| 3 `_-d3X` | — | — | 700 | `_-C18` |
+
+  The long case is: `_-S3h` exists, flag 4 is set and `_-w1s` = `_-n4k` + 6000; or else flag 1 (phase 1) or
+  flag 1 or 4 (phase 2) is set and `_-K2V` is false.
+- **Scoring-type fields** (`ScoringType.static._-6P` #7475, defaults from `<init>` #7470) [V]:
+  - `FetchDuration` → `_-o2N` (default 1500);
+  - `RespawnDuration` → `_-j57` (default 2500);
+  - `DropDuration` → `_-C18` (default 700);
+  - `RespawnTimesForRounds` → `_-K2V` and `RespawnTimesOnlyForSpecialEntities` → `_-Ac`, both false by
+    default (`spawn_bot.scoring_rules`).
+
+  For a spawned fighter (flag 1) without `_-K2V`, the drone therefore takes 2000 + 3000 + 700 = **5700 ms**
+  with the defaults.
+- **From the KO.** The KO commit `Entity._-eR` #3138 calls `_-W1R.Respawn(t, this, _-19())` in the same
+  tick (@1134–1147), so the drone starts right after a ring-out [V].
+- **Replay check** (`ko-gap-check` on `integration-11.00`, aggregate only). On the 756 local 11.00 replays,
+  no gap between two KOs of the same victim is shorter than the drone time predicted for its scoring type:
+  3,241 gaps over 4 scoring types, smallest margin 172 ms. It is a one-sided check. The replays allow the
+  predicted time, but they do not show it is exact.
+
+`Entity._-b6D` #3015 is true for 4000 ms after the elimination, from `_-164` in state 7 or `_-a2O` in state 8 (it first requires the `_-8` bit of `_-e3e`) [V]. [H] It drives the post-elimination display.
+
+**How an input starts a power** [V shape]:
+1. The input consumer `_-i4Z._-rU` / `_-I35` (input-buffer-11.00.md, PR #28) calls one of:
+   - `_-F5N._-C5S`: attack slot → power through `_-42t`, with extra checks for slot 9;
+   - `_-A3Q`;
+   - `_-V5I`: throws the held item; `_-3z._-q1S` spawns it at the feet.
+2. All three end in `_-F5N._-J5R`. It returns unless `_-O5u` allows the start. `_-O5u` refuses while the
+   running power has `_-82f`. It may swap the power for the held weapon through `_-H1V` (`_-M1g` / `_-E2S` /
+   `_-w3H` matched against `_-r1e`).
+3. `_-J5R` then ends the running power (`_-VY`) and sets `_-o3I = new _-l4X(...)`.
+4. From the next update, `_-R63` runs the new power (§1.1).
+
+Chained powers start from `_-h1T` through the same `_-J5R`.
+
+**Secondary powers** (`_-F5N._-33h` #1704, 15 callers) [V]. They are built directly as `new _-l4X(...)` (7 arguments),
+with `_-x4I` = the given target and `_-SQ` = true, then pushed to `_-pX` (the running power list). None is
+made without a power type, or when the holder `_-H6K` has the `_-e3e` bit `_-a60`. Unlike `_-J5R`, they do not
+end the running power.
+
+### 10.2 Dodge: what `Entity.Dodge` #3125 writes when it commits ([`tools/bh/dodge.py`](../tools/bh/dodge.py))
+
+`_-i4Z._-51o` #6313 @2418-2433 calls `owner.Dodge(t, keys & 15, held)` on a buffered DodgeDash (256) press.
+The one input does **four things** in the game: a dodge, a chase dodge, a dash, or (with an attack right after)
+a gravity cancel. Inside Dodge:
+
+| Step | Bytecode | Status |
+|---|---|---|
+| Flags: `_-E6P()` = the `_-y1o` flag, written by `_-w5G` #2899 (true at the commit @1080, false at the timer end): **dodging**; `_-u5E()` = the `_-l4c` flag, written by `_-E5I` #2900 through `_-51c(a, b)` #3027 (u5E = a, `_-Kc._-53P` = 0, `_-a1h` = false unless a, `_-6K` = 0 with b): **cooldown running** (set at the exit, cleared by `dodge_over`). `IsDodgeLocked(t, flag)` #3075: `IsMoveLocked(t)`, u5E without flag, E6P, a running power, a wall, the `_-I1f._-12J` area test, `_-Xb` or `_-C54(t)` lock; else `_-x2C` >= 9 | #2941, #2942, #2899, #2900, #3027, #3075 | [V] `dodge.flags_51c`, `is_dodge_locked`; [H] `_-12J`, `_-x2C` |
+| Gates: `_-C2E(t, dir)` (local 4, #3073: false once `_-532` + 192 (`Entity._-84e`) < t, against `_-M3h`, with dir 0 or Drop alone on the ground; `dodge.c2e`); hit locks local 11 = `_-46I` + 64 > t, local 12 = in the air and `_-46I` + 96 > t; local 13 = neither, with Left / Right + Drop; `IsDodgeLocked(t)` false → go | @18-170 | [V] `dodge.gates` |
+| Chained dodge: with local 4, `_-H2b` != `_-14W`, `_-H2b` != 0 and not `IsDodgeLocked(t, local 4)`, local 5 = `_-H2b` + `_-y1F` and `_-14W` = t; else `_-26R(t)` sets local 7 and local 9 = `_-O5C`; either way go | @174-303 | [V] `dodge.gates`; [H] local 7 is the **chase dodge** |
+| Dash try and refusals: local 14 = neither hit lock and not (go with local 4 or local 7); with 13 or 14 and a side / Drop: `Dash(t, dir)` when not `_-350(t)`, true → return false; else with 14 on the ground → false; not go → false | @305-477 | [V] `dodge.gates` |
+| IsFast (local 8) and direction: local 15 = dir != 0 without both Left and Right in local 9 \| dir. Chased with 15 → IsFast; else local 4 with (in the air, `_-VE` <= `_-532`, or dir not Up / Drop alone) → IsFast and `_-Kc._-53P` = `_-Kc._-e28`; else on the ground without local 11 → dir = 0 (a **spot dodge**), clearing `_-v1D` first for a chased side dodge without 15. A chase of an Up / Down type loses IsFast with `_-VE` > `_-H2b`, a side against the facing, or Drop on Up / Up on Down | @523-1022 | [V] `dodge.gates`; [H] `_-VE`, `_-e28` |
+| **Dash**: a side / down direction (4, 8 or 2) and not `_-350(t)` → `Dash(t, dir)`; when it returns true, Dodge returns false | @364-427 | [V]; when a dash wins: `dodge.dash` |
+| DodgeType `_-h3i._-26O(dir, _-wn(), local 8, team flag 64, local 10)` #2770: kind = Side 1 with Left / Right, Up 2 or else Down 4; first DodgeTypes row with Set "Test" (flag 64) / "Default", that kind, Air (2, when `_-wn()`) / Ground (1) / Both (3) covering the fighter and IsFast == local 8; else the StandardSpot row `_-Z6`. Columns from the parser `_-I6L` #2768: Duration `mDuration`, Recover `_-53o`, IsFast `_-t3v`, SpeedXMult `_-a5a`, DodgeID `_-B3q` | @1024-1074; #2770; #2768 | [V] `dodge.kind`, `dodge.pick`; [H] row order = file order |
+| DodgeTypes.xml load (`_-h3i._-i32` #2767 → `_-I6L` #2768): children in file order; unsigned columns (`_-N2e._-vD`), Mult / Exit columns as doubles (`_-U13`), IsFast TRUE / FALSE (`_-Qr`), formulas and Set as strings; Direction → kind, AirType → Ground 1 / Air 2 / Both 3; a DodgeID 0 row (the Template) is dropped; `_-Z4V[DodgeID]` = row (a duplicate is logged and overwritten), `_-w14` keeps the order, StandardSpot is `_-Z6`. Local check (aggregate): every one of the 64 (dir, air, IsFast) combinations finds a row | #2767, #2768 @0-1612 | [V] `dodge.parse_types`; [H] the `_-Qr` case rule |
+| `_-H2b` = t, `_-O5C` = dir, facing `_-n3h` (Left → true, Right → false, else `_-r35()`) | @1084-1164 | [V] `dodge.facing` |
+| `_-Uy` = mDuration × 16, `_-C1d` = `_-53o` × 16, `_-T2R` = t + `_-Uy`, `_-G6S` (with `_-t3v`), `_-y1F` = `_-Uy` + `_-Z4S` + `_-C1d`, never ending before the chained one | @1482-1705 | [V] `dodge.timers`; [H] `_-Z4S` |
+| `_-v1D` = ±`_-K64(...)` with `_-t3v` and `_-a5a`; then `_-P5S` = `_-v1D` = 0 when dir != 0 or `_-wn()` | @1290-1446, @1876-1937 | [V] `dodge.neutral_push`, `clears_velocity` |
+| Speeds: `_-T5L` = type.`_-F6w(t, this)` #2763, `_-WL` = type.`_-S6F(t, this)` #2762. Both start from the formula `_-h3i._-B15` #2771: StandardHorizontal (k = `_-K64(flag)`, flag = in the air with a jump squat `_-I5A` started within `_-M4C` = 64 ms; x = 1 - min(abs(k - vx), abs(2k)) / abs(2k); 0.6 + 0.4 x² when x >= 0.5, else 0.7 + 0.8 (x - 0.5)³), MomentumHorizontal ((1 + abs(vx) / 60) / 2), else 1. X: with a side and SpeedXMaxMult, abs(vx) / `_-z2v` in [0.33, 0.57] blends SpeedXMult to SpeedXMaxMult; else x SpeedXMult. Y: with up / down and SpeedYMaxMult, vy / -40 (up) or vy / 70 (down) in [0.5, 0.75] blends SpeedYMult to SpeedYMaxMult; else x SpeedYMult | #2763, #2762, #2771, #2774 @186-189 | [V] `dodge.formula_mult`, `speed_x`, `speed_y`, `standard_flag` |
+| `_-K64(flag)` #3093: `_-wn()` and not flag → AirRunSpeed `_-z2v` × `_-Kc._-u5j`; else RunSpeed `_-M1U` × `_-Kc._-04K` (the `_-8i` max speeds without × 1.16) | #3093 @3-61 | [V] `dodge.k64` |
+| Each tick, `Entity._-t1A(t, a)` #2992 (from `_-8i` @2659) starts with: on the ground, off a wall, not in hitstun, `_-a1h` clear, with a DodgeType (`_-Q42`) and t >= `_-46I` + 240 (`Entity._-l2o`), `_-y1F` is capped to CooldownLanded × 16 + `_-Uy` + `_-C1d`; then with `_-u5E()`, `_-H2b` + `_-y1F` <= t and not `_-3E` + 112 (`Entity._-y4m`) > t, the dodge is over: `_-Kc._-MX(PowerType._-Z32)` when `_-H2b` > 0, `_-H2b` = 0, `_-51c(false, true)`. The rest is under `_-E6P()` | #2992 @40-349, #3173 @800 / @882 | [V] `dodge.landed_cooldown`, `dodge_over`; [H] `_-a1h`, `_-u5E()`, `_-3E` (also read by Dash), `_-MX`, `_-51c` |
+| **Dodge tick** (`_-t1A` @1854-2300), while `_-H2b` + `_-Uy` + `_-C1d` > t, from t >= `_-H2b` and with the `_-e3e` bit 4096 (`Entity._-24F`) clear: unless the type is Neutral and ground-only (`_-h2L` 0, `_-6H` 1), `_-v1D` = `_-P5S` = 0 and the impulses `_-84` = ±60 × `_-T5L` × AccelXMult × ease(AccelXFormula) (− with Left in `_-O5C`, 0 without a side), `_-A4A` = 60 × `_-WL` × AccelYMult × ease(AccelYFormula); ease = `_-h3i._-I5a` #2772: EaseHorizontal, e = (t − `_-H2b`) / (`_-Uy` + `_-C1d`), 1 + 2.5 e below 0.25, else 1 − e / 3; other formulas 1. Then only Left held latches `_-l4A` = `_-g5E` = true, only Right held `_-l4A` = true, `_-g5E` = false | #2992 @367-400, @1854-2300; #2772; #2768 @149-265; #3173 @1165 | [V] `dodge.moves`, `ease`, `push`, `side_latch`; [V] `_-t1A` runs at `_-8i` @2659, before the impulse folds (x @2790-2965, y @4217-4395, `step.fold_impulse` on integration), so the push lands the same tick; [H] the meaning of the latch |
+| **Dodge exit** (`_-t1A` @402-1846), the tick `_-H2b` + `_-Uy` + `_-C1d` <= t: `_-w5G(false)`, `_-I1w` = `_-X4g` = 0, off a wall `_-f6R` = t + PostDodge × 16; then unless `_-u5E()`: a moving vx (`_-v1D` != 0) of a moving type becomes ±(a + (60 − a) × 1.5 × (a / 60)²), a = the step's max speed (`_-8i` local 7); with a side held or `_-l4A` clear, vx going right without Right held (left without Left) is × ExitBackX when the other side is held, else × ExitX, and a single held side faces that way (`_-CV`); with `_-l4A` and no side held, × ExitBackX when vx goes the latched way (right with `_-g5E`), else × ExitX, then `_-CV(_-g5E)`; × `_-T5L` (moving types); vy (`_-P5S`) going down without Drop (up without Up) is × ExitBackY with the other key held, else × ExitY; `_-51c(true, false)`, `_-T5L` = `_-WL` = 1, `_-w47` = false when `_-141()` != `_-n3h` | #2992 @402-1846; #2768 @880-1086 | [V] `dodge.exit_speed`, `exit_velocity`; [H] `_-u5E()`, `_-CV` (facing), `_-w5G`, `_-I1w`, `_-X4g` |
+| **Dash** (`Entity.Dash(t, dir)` #3132, from Dodge @416): false off the ground (`_-96f` null). The dash side is left with Left held, or facing left without Right. The side-tap times `_-VE` / `_-V22` / `_-r3L` take t (locals only) when the press turns the held side without `_-t5z`. The direction (local 16, the facing at first): `_-M3h` within 80 ms (160 with side + Drop, or after `_-K1k` + 160) of `_-532` or `_-3E`; else three taps 192 ms apart without `_-M3V` → the dash side (the other with Drop); else, without `_-t5z` / `_-M3V`, within the window of the last tap → the other side. local 18 = (`_-w4c` and vy < 0) or `_-y1U` (turn speed gate 7, else 15). A turn in kind 3 / 7 with `_-M3V` or before `_-26T` + 640 → false; no turn before `_-K1k` + 96 → false. Kind `_-L3a`: 7 (turn, \|vx\| >= gate), 6 (local 18), 7 (turn, `_-M3V`), 3 (turn), 5 (`_-M3V` after 3 / 7), 4 (`_-M3V`; `_-K1k` = t under `_-w47`), 2 (`_-y1U`, never reached), 1. Writes `_-CV` / `_-q2o`(direction), `_-v3x` = t, `_-P50`, `_-M3V` = false, `_-t5z` = true, `_-Q3q()`, `_-G6S` = 0, `_-K53._-p3c` + 1 | #3132 @78-1433 | [V] `dodge.dash`; [H] the kinds' names, `_-y1U`, `_-w4c`, `_-532`, `_-M3h`, `_-K1k`, `_-26T`; the dash.Forward / dash.Back cue and `_-O2r` record not transcribed |
+| **Gravity cancel** (input buffer #6313 @1989-2342 and `_-i4Z._-rU` #6334, PR #28 for the rest of both): in a dodge (`_-E6P()` with a DodgeType), a light, heavy or taunt press (with no running single-part move, or a taunt alone; without the `_-f2b()` + any-attack local 38, or with `_-O5C` == 0) inside `_-H2b` + 16 CancelStart (`_-M4L`) ≤ t ≤ `_-H2b` + 16 CancelLimit (`_-GX`) sets locals 32 and 33 (32 alone for local 38); a newer dodge press with `_-f2b()` and `_-26R(t)` sets local 34 instead. `_-rU(t, dir, jump, 0, 33, 32)` uses the air move slots (+3) when `_-wn()` or the jump flag, but **0 with local 33: a ground move in the air**; also 0 (local 14) in the air without the jump flag when `_-y1U(t, true, dir)`. Then `_-Kc._-C5S(t, slot, 32, false, jump, 33)`; on success with 32, `_-bC(t, 33)`, and `_-B3V` = t + 144 without 33 | #6313 @1989-2342, @2918-2922; #6334 @105-200, @653-799; #2768 @447 / @477 | [V] `dodge.cancel_flags`, `attack_air_offset`; [H] `_-f2b`, `_-26R`, `_-y1U`, `_-O5C` use @213-384 |
+| **Cancel end** (`Entity._-bC(t, gc)` #3041, from `_-rU` on a move started with local 32): cx = min(60 × `_-T5L` × AccelXMult, 60), cy = min(60 × `_-WL` × AccelYMult, 60); \|vx\| > \|cx\| → vx = ±cx by `_-O5C` (Left −, Right +, else 0); \|vy\| > \|cy\| → vy = cy (unsigned); `_-w5G(false)`, `_-T2R` = 0, `_-51c(true, true)`; with gc (local 33): `_-a1h` = true (the landed-cooldown cap no longer applies), `_-y1F` = `_-Uy` + Cooldown × 16, and in the air the running power's `_-I2g` \|= 2 | #3041 | [V] `dodge.cancel_end`; [H] `_-I2g` bit 2 |
+| Cooldown `_-Z4S(type, flag)` #3109: (flag ? Cooldown : CooldownGround) x 16, flag = in the air, on a wall or (IsFast and `_-64H`) | #3109; #3125 @1562-1636 | [V] `dodge.cooldown_ms` |
+| Counter `_-6K` (count in the high 16 bits, kind 1 / 2 in the low ones) | @499-520, @1708-1873 | [V] `dodge.counter`; [H] `_-f2b`, `_-E6P` |
+| 'dodge.' + type name event, power cancel `_-ZE(PowerType._-Z32)`, replay hook `_-t31` | @2089-2283 | [V] pinned by name only |
+
+So `_-wn()` is **in the air** (the DodgeTypes mask 2 is 'Air') [V].
+
+Still open for the dodge: the meaning of `_-u5E()` and the latch; the `_-O5C` branch of `_-rU` @213-384.
+
+### 10.3 Slot -> power: `_-F5N._-42t` #1726 ([`tools/bh/power_pick.py`](../tools/bh/power_pick.py))
+
+`_-F5N._-C5S(t, slot, a3, a4, a5, a6)` #1700 calls `_-42t(t, slot, a3 && a6)`; from `_-i4Z._-rU` a3 / a6 are
+locals 32 / 33 of the input buffer, so the third argument is the **gravity cancel** (§10.2).
+
+| Step | Bytecode | Status |
+|---|---|---|
+| Weapon = the held item's ItemType `_-O2R._-93n`, else unarmed `ItemType._-m4V`; with `_-K1V` it becomes `ItemType._-iJ`. Slots 13-20 read the fighter's emote table `_-b14` | @83-470 | [V]; emote slots not transcribed |
+| Slot 11 (neutral signature): `mSpecialPower1` when the weapon's `_-E49` is `mBaseWeapon1`, else `mSpecialPower2` for `mBaseWeapon2`, else unarmed `PowerType._-r7._-r1e`; in ZOMBIE mode a missing name takes `_-Z6M[8]`. Other slots: `_-Z6M[slot]`, then slot 7 / 8 take `mSpecialPower1/2_Forward` / `_Down` of the matching base weapon when set | @473-892 | [V] `power_pick.power_name` |
+| Loaders: itemTypes.csv `PowerType_*` columns fill `_-Z6M` (a fixed Vector of 21, #4963 @370): Combo1 1, Forward 2, Down 3, Aerial 4, Aerial_Forward 5, Aerial_Down 6, Smash_Forward 7, Smash_Down 8, Smash_Aerial_Up 9, Smash_Aerial_Down 10, Smash_Neutral 11; `_-E49` is the ItemType's name. HeroTypes.xml BaseWeapon1/2 and SpecialPower* columns. Local check (aggregate): 140 base weapons found, every slot 1-11 named; 6 base-weapon names have no item row | #4963, #4974 @2331-2736 | [V] `power_pick.item_slots`; [H] `hero_powers` (HeroType parser not read) |
+| `PowerType._-p4G(name)` #6493 reads the StringMap `_-kl` (`getReserved` for reserved keys); `power_pick.power_rows` keys powerTypes.csv by PowerName. Local check (aggregate): 3,768 powers; 161 of the 172 item slot names found, 11 not [H: key or reserved names] | #6493 | [V] read path; [H] the `_-kl` key |
+| Lookup `PowerType._-p4G(name)`; team flag 64: `name_TESTFEATURE` when it exists; then ExhaustedVersion under `_-UT`, **GCVersion under the gravity cancel**, OriginOverrideIfInMode under `_-b3A` > 1, MomentumVersion when \|vx\| >= 60 toward the facing | @894-1331 | [V] `power_pick.redirect`; [H] `_-UT`, `_-b3A` |
+
+## 11. Still open
+
+- Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
+  and curves inside a DynamicCollision block (offset of the anchor) [H].
+- The other guards at the top of `_-T5A` (`_-i4o` HoldHitEnts with `Entity._-b2C`, `_-u3H` against
+  Uninterruptable `_-C5G`, `_-hQ` / `_-72e`). The order of the list follows `_-5r` [H].
+- `_-B5B`, the meaning of `_-q24`, and the exact gate on `_-L5r` per frame (§1); the cancel path of §1.1.
+- The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
+- Items: the per-target gates of §8 step 5, the item's own motion and map collision (`_-p5k._-8i` uses
+  `_-X2e`), `_-p5k._-u1I` is the item impact (§8.1); `_-F5N._-33h` spawns secondary powers (§10).
+- Respawn drone (§10.1): the idle and phase-4 handlers (`_-q15`, `_-Ck`), the
+  scoring-type durations (`_-o2N`, `_-j57`, `_-C18`) and who calls `Respawn` after a KO [H].
+- Nothing has been checked against a running game. The next step towards the KO oracle
+  (oracle-ko.md) is one scripted exchange: a hit, its knockback, then a ring-out.
