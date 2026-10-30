@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (clears_velocity, cooldown_ms, counter, facing, formula_mult, kind,  # noqa: E402
+from bh.dodge import (clears_velocity, cooldown_ms, counter, facing, formula_mult, k64, kind,  # noqa: E402
                       neutral_push, pick, speed_x, speed_y, standard_flag, timers)
 
 
@@ -56,6 +56,11 @@ class Dodge(unittest.TestCase):
         self.assertEqual(pick(rows, 1, airborne=False, is_fast=False)["DodgeName"], "StandardSpot")
         self.assertEqual(pick(rows, 4, airborne=False, is_fast=True)["DodgeName"], "StandardSpot")
 
+
+    def test_k64(self):
+        self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)
+        self.assertEqual(k64(True, True, 10.0, 0.5, 20.0, 2.0), 40.0)
+        self.assertEqual(k64(False, False, 10.0, 0.5, 20.0, 2.0), 40.0)
 
     def test_standard_flag(self):
         self.assertTrue(standard_flag(1064, True, 1000, 0))

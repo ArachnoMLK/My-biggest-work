@@ -1066,14 +1066,15 @@ a gravity cancel. Inside Dodge:
 | `_-H2b` = t, `_-O5C` = dir, facing `_-n3h` (Left → true, Right → false, else `_-r35()`) | @1084-1164 | [V] `dodge.facing` |
 | `_-Uy` = mDuration × 16, `_-C1d` = `_-53o` × 16, `_-T2R` = t + `_-Uy`, `_-G6S` (with `_-t3v`), `_-y1F` = `_-Uy` + `_-Z4S` + `_-C1d`, never ending before the chained one | @1482-1705 | [V] `dodge.timers`; [H] `_-Z4S` |
 | `_-v1D` = ±`_-K64(...)` with `_-t3v` and `_-a5a`; then `_-P5S` = `_-v1D` = 0 when dir != 0 or `_-wn()` | @1290-1446, @1876-1937 | [V] `dodge.neutral_push`, `clears_velocity` |
-| Speeds: `_-T5L` = type.`_-F6w(t, this)` #2763, `_-WL` = type.`_-S6F(t, this)` #2762. Both start from the formula `_-h3i._-B15` #2771: StandardHorizontal (k = `_-K64(flag)`, flag = in the air with a jump squat `_-I5A` started within `_-M4C` = 64 ms; x = 1 - min(abs(k - vx), abs(2k)) / abs(2k); 0.6 + 0.4 x² when x >= 0.5, else 0.7 + 0.8 (x - 0.5)³), MomentumHorizontal ((1 + abs(vx) / 60) / 2), else 1. X: with a side and SpeedXMaxMult, abs(vx) / `_-z2v` in [0.33, 0.57] blends SpeedXMult to SpeedXMaxMult; else x SpeedXMult. Y: with up / down and SpeedYMaxMult, vy / -40 (up) or vy / 70 (down) in [0.5, 0.75] blends SpeedYMult to SpeedYMaxMult; else x SpeedYMult | #2763, #2762, #2771, #2774 @186-189 | [V] `dodge.formula_mult`, `speed_x`, `speed_y`, `standard_flag`; [H] `_-K64` reads power fields (`_-Kc._-u5j` / `_-04K`) |
+| Speeds: `_-T5L` = type.`_-F6w(t, this)` #2763, `_-WL` = type.`_-S6F(t, this)` #2762. Both start from the formula `_-h3i._-B15` #2771: StandardHorizontal (k = `_-K64(flag)`, flag = in the air with a jump squat `_-I5A` started within `_-M4C` = 64 ms; x = 1 - min(abs(k - vx), abs(2k)) / abs(2k); 0.6 + 0.4 x² when x >= 0.5, else 0.7 + 0.8 (x - 0.5)³), MomentumHorizontal ((1 + abs(vx) / 60) / 2), else 1. X: with a side and SpeedXMaxMult, abs(vx) / `_-z2v` in [0.33, 0.57] blends SpeedXMult to SpeedXMaxMult; else x SpeedXMult. Y: with up / down and SpeedYMaxMult, vy / -40 (up) or vy / 70 (down) in [0.5, 0.75] blends SpeedYMult to SpeedYMaxMult; else x SpeedYMult | #2763, #2762, #2771, #2774 @186-189 | [V] `dodge.formula_mult`, `speed_x`, `speed_y`, `standard_flag` |
+| `_-K64(flag)` #3093: `_-wn()` and not flag → AirRunSpeed `_-z2v` × `_-Kc._-u5j`; else RunSpeed `_-M1U` × `_-Kc._-04K` (the `_-8i` max speeds without × 1.16) | #3093 @3-61 | [V] `dodge.k64` |
 | Cooldown `_-Z4S(type, flag)` #3109: (flag ? Cooldown : CooldownGround) x 16, flag = in the air, on a wall or (IsFast and `_-64H`) | #3109; #3125 @1562-1636 | [V] `dodge.cooldown_ms` |
 | Counter `_-6K` (count in the high 16 bits, kind 1 / 2 in the low ones) | @499-520, @1708-1873 | [V] `dodge.counter`; [H] `_-f2b`, `_-E6P` |
 | 'dodge.' + type name event, power cancel `_-ZE(PowerType._-Z32)`, replay hook `_-t31` | @2089-2283 | [V] pinned by name only |
 
 So `_-wn()` is **in the air** (the DodgeTypes mask 2 is 'Air') [V].
 
-Still open for the dodge: `_-K64` (power fields); the motion during the dodge (dodge state of `Entity._-8i`); the **gravity cancel** (a spot air
+Still open for the dodge: the motion during the dodge (dodge state of `Entity._-8i`); the **gravity cancel** (a spot air
 dodge cancelled into an attack: attack side, `_-ZE` / power code) [H]; `Dash` itself.
 
 ## 11. Still open

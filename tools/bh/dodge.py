@@ -124,6 +124,15 @@ def standard_flag(t, airborne, i5a, p5y):
     return airborne and i5a != 0 and p5y == 0 and i5a + STANDARD_WINDOW_MS >= t
 
 
+def k64(flag, airborne, z2v, u5j, m1u, o4k):
+    """`Entity._-K64(flag)` #3093: AirRunSpeed (`_-z2v`) x `_-Kc._-u5j` when `_-wn()` and not flag, else
+    RunSpeed (`_-M1U`) x `_-Kc._-04K`: the same products as the `_-8i` max speeds (horizontal.py), without
+    the x 1.16 of `_-w47`. So the StandardHorizontal flag (a fresh jump squat) uses the ground speed."""
+    if airborne and not flag:
+        return z2v * u5j
+    return m1u * o4k
+
+
 def formula_mult(formula, vx, k64, dir):
     """`_-h3i._-B15(t, formula, fighter)` #2771: the speed multiplier of a SpeedX / SpeedY formula.
 
@@ -292,10 +301,15 @@ ANCHORS = {ABC_1100: {
         (3109, 6, "getproperty", "_-p2U"),
         (3109, 15, "getproperty", "_-S6E"),
         (3109, 22, "pushbyte", "16"),
+        (3093, 6, "callproperty", "_-wn, 0"),
+        (3093, 16, "getlocal_1", ""),
+        (3093, 17, "not", ""),
         (3093, 26, "getproperty", "_-z2v"),
+        (3093, 39, "multiply", ""),
         (3093, 35, "getproperty", "_-u5j"),
         (3093, 48, "getproperty", "_-M1U"),
         (3093, 57, "getproperty", "_-04K"),
+        (3093, 60, "multiply", ""),
     ],
     "Entity.Dodge counter _-6K: count >>> 16 cleared unless _-E6P() or chained; low half 2 / 1 under _-f2b(); count + 1": [
         (3125, 483, "callproperty", "_-E6P, 0"),
