@@ -7,6 +7,8 @@ the ground walk loop along a line (@1268-1732, the same shape as the fighter's),
 import math
 
 from .air_move import steep
+from .level_collision import as3_round
+from .platforms import PI1_2, cos_r, sin_r
 from .movement import ABC_1100
 from .raycast import ray_cast
 
@@ -302,6 +304,52 @@ def wall_slide(lines, team, x, y, wanted_y, moved_y, mask, height):
     return x, y, 0.0
 
 
+def ease_22h(ease_in, ease_out, num, den):
+    """`_-A6B.static._-22H` #1132: in-out = -0.5 (cos(pi t) - 1); in = 1 - cos(t pi/2); else sin(t pi/2), with
+    the rounded cos / sin `_-K6l` / `_-b4l` (platforms.py) and t = num / den."""
+    if ease_in and ease_out:
+        return -0.5 * (cos_r(math.pi * (num / den)) - 1)
+    if ease_in:
+        return 1 - cos_r(num / den * PI1_2)
+    return sin_r(num / den * PI1_2)
+
+
+def atan2_netsafe(y, x):
+    """`_-A6B.static.atan2_netsafe` #1098: both parts of the unit vector rounded to 1/1000, then the angle."""
+    n = math.sqrt(x * x + y * y)
+    if n <= 0:
+        return 0.0
+    a = as3_round(y / n * 1000.0) / 1000.0
+    b = as3_round(x / n * 1000.0) / 1000.0
+    return as3_round(math.atan2(a, b) * 1000.0) / 1000.0
+
+
+def linear_path(lu, vy, launch):
+    """PathType 2 (Linear), `_-p5k._-8i` @2677-2812: the speed keeps its direction and takes the length of
+    the launch speed (`_-Wj`, `_-A5W`) again (Point.normalize: x *= k / len)."""
+    k = math.sqrt(launch[0] * launch[0] + launch[1] * launch[1])
+    n = math.sqrt(lu * lu + vy * vy)
+    if n == 0:
+        return lu, vy
+    return lu * (k / n), vy * (k / n)
+
+
+def rocket_path(t, thrown_at, launch, wobble):
+    """PathType 3 (Rocket), @2816-3115: the launch speed times 1.25 x ease-in(t - `_-O13`, 2000) + 0.25. With
+    `_-W6M` it corkscrews: the launch angle (atan2_netsafe) plus (when `_-Wj` < 0) or minus 8 pi x
+    ease-in-out(max(0, dt - 500), 3000), with the rounded cos / sin."""
+    dt = t - thrown_at
+    k = 1.25 * ease_22h(True, False, dt, 2000) + 0.25
+    wj, a5w = launch
+    if not wobble:
+        return k * wj, k * a5w
+    w = math.pi * 8 * ease_22h(True, True, max(0, dt - 500), 3000)
+    base = atan2_netsafe(a5w, wj)
+    a = base + w if wj < 0 else base - w
+    sp = k * math.sqrt(wj * wj + a5w * a5w)
+    return sp * cos_r(a), sp * sin_r(a)
+
+
 def expired(t, thrown_at, path_length):
     """@1832-1882: `_-5k()` (the item is removed) once t - `_-O13` > PathLength, when PathLength != 0."""
     return path_length != 0 and t - thrown_at > path_length
@@ -515,5 +563,27 @@ ANCHORS = {ABC_1100: {
         (15192, 6750, "lessthan", ""),
         (15192, 6869, "getproperty", "_-x3M"),
         (15192, 6872, "negate", ""),
+    ],
+    "PathType Linear: speed renormalised to |launch| (_-Wj, _-A5W); Rocket: 1.25 x _-22H(in, 2000) + 0.25, corkscrew 8 pi under _-W6M": [
+        (15192, 2683, "getproperty", "_-Wj"),
+        (15192, 2697, "getproperty", "_-A5W"),
+        (15192, 2768, "callpropvoid", "normalize, 1"),
+        (15192, 2830, "pushdouble", "1.25"),
+        (15192, 2841, "pushint", "2000"),
+        (15192, 2844, "callproperty", "_-22H, 4"),
+        (15192, 2850, "pushdouble", "0.25"),
+        (15192, 2861, "getproperty", "_-W6M"),
+        (15192, 2875, "pushbyte", "8"),
+        (15192, 2892, "pushint", "500"),
+        (15192, 2901, "pushint", "3000"),
+        (15192, 2933, "callproperty", "atan2_netsafe, 2"),
+        (15192, 3041, "callproperty", "_-K6l, 1"),
+        (15192, 3063, "callproperty", "_-b4l, 1"),
+        (1132, 13, "pushdouble", "-0.5"),
+        (1132, 65, "getproperty", "PI1_2"),
+        (1132, 94, "callproperty", "_-b4l, 1"),
+        (1098, 42, "pushdouble", "1000.0"),
+        (1098, 104, "callproperty", "atan2, 2"),
+        (1098, 122, "callproperty", "round, 1"),
     ],
 }}

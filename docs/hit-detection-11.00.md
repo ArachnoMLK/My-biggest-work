@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(964 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(984 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -675,7 +675,20 @@ order]:
 4. **Vertical impulse and cap.** `_-33c` += `_-46m`, then the same ±cap.
 5. **Lifetime.** The item is removed (`_-5k()`) once t − `_-O13` > `PathLength` (when PathLength ≠ 0).
 6. **Path behaviours.** With `_-BG` set, `PathType` chooses one: BoomerangHoming 1, Linear 2, Rocket 3,
-   RocketHoming 4, Crawl 5, otherwise 0 (lookupswitch @1901). Not transcribed yet.
+   RocketHoming 4, Crawl 5, otherwise 0 (lookupswitch @1901). Types 0 and 5 take the default branch, which
+   removes the item (`_-5k()`) [V].
+   - **Linear** (`items.linear_path`, @2677–2812) [V]: the speed keeps its direction and takes the length of
+     the launch speed (`_-Wj`, `_-A5W`) again: constant speed.
+   - **Rocket** (`items.rocket_path`, @2816–3115) [V]: the launch speed is multiplied by
+     1.25 × `_-22H`(ease-in, t − `_-O13`, 2000) + 0.25, i.e. from 0.25 to 1.5 over 2 s. With `_-W6M` it
+     corkscrews:
+     - the angle is the launch angle (`atan2_netsafe`) plus 8π × `_-22H`(in-out, max(0, dt − 500), 3000),
+       or minus that when `_-Wj` >= 0;
+     - the speed is k × |launch|, with the rounded cos / sin.
+
+     `_-A6B._-22H` #1132 (`items.ease_22h`) is −0.5 (cos πt − 1) in-out, 1 − cos(t π/2) in, else
+     sin(t π/2). `atan2_netsafe` #1098 rounds both unit-vector parts and the angle to 1/1000.
+   - BoomerangHoming and RocketHoming are not transcribed yet.
 7. **Gravity.** Without `_-BG`, gravity is added unless the item rests on a flat line (`_-Lu` = `_-33c` = 0,
    normal y = −1). It is `ThrownGravity` while thrown (`_-r5B` ≠ 0, `_-o2O` false), else `Gravity` (both
    3.75 by default), times 0.384. The cap is applied before gravity, not after.
