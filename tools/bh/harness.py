@@ -322,6 +322,8 @@ def fire_impulse(f, power, step):
         if not power.get(col):
             continue
         v = vals[step] if step < len(vals) else vals[0]
+        if attr == "v1d" and f.power is not None:
+            f.power["fx_set"] = v != UNSET                      # `_-759` (#47 @451-460)
         if v == UNSET:
             continue
         if attr == "v1d" and f.facing_left:
@@ -390,7 +392,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         fr = friction_value(t, airborne, f.stats["Friction"], f.stats["AirFriction"], f.dash_timer, power=pw,
                             hitstun=t < f.stun_until, vx=f.v1d)
         f.v1d = apply_friction(f.v1d, fr)
-    if left != right:
+    j4z = f.power is not None and f.power.get("fx_set") and not f.power["tl"].running   # `_-Kc._-J4Z` (#1745 @231-266)
+    if left != right and not j4z:                               # @2054-2066: no acceleration under `_-J4Z`
         a, vm = acceleration(airborne, f.stats["Acceleration"], f.stats["AirAcceleration"], vmax=vmax)
         if f.power is not None:                                 # @2070-2109: x `_-o3I._-x1E(t)`
             a *= power_accel(f, left)

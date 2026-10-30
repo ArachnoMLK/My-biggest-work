@@ -238,6 +238,12 @@ class Harness(unittest.TestCase):
         self.assertEqual(harness.power_accel(f, True), 0.25)  # facing right, left held
         self.assertEqual(harness.power_accel(f, False), 1.0)
 
+    def test_fire_impulse_cuts_acceleration(self):
+        f = harness.Fighter(0.0, -400.0)
+        f.power = {"row": {}, "tl": harness.Timeline([100, 5], 0), "name": "F", "fx_set": True}
+        harness.tick(f, 1000, smoke.map_grid(FLAT), right=True)
+        self.assertEqual(f.v1d, 0.0)                          # `_-J4Z`: the held side does not accelerate
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)
