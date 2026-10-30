@@ -30,9 +30,10 @@ bytecode arithmetic and a `*-verify` command pins it.
    (state 3, then `Respawn` with `eliminated` = false, two R draws), the respawn point rotation, state 7 =
    "Eliminated", and the respawn drone `SpawnBot` (`spawn_bot.py`): instant 0 in some modes, otherwise come
    down / carry / drop phases, state 4 while held, then 0 (or 5). Left as data: the scoring-type durations.
-2. **Animation frame table `_-cA`** (`_-l4X._-54L` #86). It maps ticks since cast to animation frames, from
-   CastAnim (`_-HT` / `_-6b`) and the animation's frame data (`_-y1v`: `_-T6`, `_-W1n`, `_-012`). It
-   selects the target's hurtbox row (§4 of hit-detection-11.00.md). Needs the `.anm` parser of PR #19.
+2. **Animation frame table `_-cA`.** Done (#30, `anim_frames.py`, doc §1.3): `_-l4X._-54L` from the CastTime
+   key frames (`D@F`, `D:R@F-G`), the recovery ticks and 0.384 frames per tick, with the CastAnim "L" loop
+   between the `.anm` animation's `_-T6` / `_-W1n` (header u32 2 and 3, PR #19). Left: check on real data
+   that the table's frame − 1 matches the 1-based rows of `_-P6e`.
 3. **Flags passed in today**: decoded (#30). `_-wn()` is "airborne after the previous move", `_-5q()` "in
    hitstun" [H], `_-e36()` "on lava"; `_-t46()` / `_-81n()` come from the power and the input handler. A
    simulator keeps them as plain booleans (the camouflage draws from the global generator, not the replay
