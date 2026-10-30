@@ -35,6 +35,9 @@ BOUNCY = 64             # `_-z2k._-B6P`
 BOOMERANG_DELAY_MS = 180        # `_-p5k._-L1Y` (script822.<init> #15249)
 BOOMERANG_DELAY_WOBBLE_MS = 1800   # `_-p5k._-i4S`, when `_-W6M`
 BOOMERANG_PULL = 0.05333333333333334   # `_-p5k._-o1V`
+HOMING_ARM_MS = 1000            # `_-p5k._-N4Q` (script822.<init> #15249)
+HOMING_TURN = math.pi / 180.0 * 1800 / 1000   # `_-p5k._-83w` = `_-A6B._-661` (pi / 180) x 1800 / 1000 (_-y2E.init)
+STILL = 0.0001                  # @3683 / @3727: a speed part within this of 0 counts as 0
 BOOMERANG_REARM_MS = 500    # `_-p5k._-K3V` (script822.<init> #15249)
 THROW_GUARD_MS = 400        # `_-h20` @866-880
 PATH_TYPES = {"BoomerangHoming": 1, "Linear": 2, "Rocket": 3, "RocketHoming": 4, "Crawl": 5}   # else 0
@@ -370,6 +373,70 @@ def boomerang_path(t, thrown_at, turned_at, launch, lu, vy, x_committed, y, targ
     return lu, vy, turned_at, io, x5g, removed
 
 
+def lerp(a, b, k):
+    """`_-A6B.static._-a2s` #1061: a + (b - a) x k."""
+    return a + (b - a) * k
+
+
+def rocket_homing(t, thrown_at, lu, vy, launch, x_c, y_c, target_id, turned_at, fighters, steer=False):
+    """PathType 4 (RocketHoming), `_-p5k._-8i` @3119-4340. Returns (lu, vy, target_id `_-P6U`, `_-74O`).
+
+    `x_c` / `y_c` are `_-p5a()` / `_-d5F()`: the x and the centre y (y - Height / 2) committed by the last
+    `_-x1M`. `fighters` lists every entity of `_-N1k._-5r` as (id `_-11`, state `_-65w`, x `_-M43`, y `_-E3d`),
+    in order; the thrower is not excluded [V]. `steer` is the mode bit `_-d3Y._-Z2Y & 64`.
+    - No target: before 1000 ms the speed is lerped toward 0 by ((t - `_-O13`) / 1000)^2; after that the
+      closest entity in state 0 or 6 (strictly closer wins, by squared distance) becomes the target and
+      `_-74O` = t.
+    - A target that left states 0 / 6 is dropped (`_-74O` = `_-P6U` = 0), the speed unchanged.
+    - With `steer`: the wanted angle points at the target (atan2_netsafe); the current one is the speed's
+      (or the wanted one when both parts are within 1e-4 of 0); the difference, wrapped to [-pi, pi], is
+      turned at most 1.8 degrees per tick; the speed is |launch| x min((t - `_-74O`) / 1000, 1) / 2 along the
+      new angle (rounded cos / sin).
+    - Without it: each part is lerped 1 % toward |launch| aimed at the target.
+    """
+    by_id = {f[0]: f for f in fighters}
+    if target_id == 0:
+        dt = t - thrown_at
+        if dt > HOMING_ARM_MS:
+            best = math.inf
+            for fid, state, fx, fy in fighters:
+                if state not in (0, 6):
+                    continue
+                dx, dy = fx - x_c, fy - y_c
+                d2 = dx * dx + dy * dy
+                if d2 < best:
+                    target_id, best, turned_at = fid, d2, t
+            return lu, vy, target_id, turned_at
+        k = math.pow(dt / HOMING_ARM_MS, 2)
+        return lerp(lu, 0, k), lerp(vy, 0, k), target_id, turned_at
+    tgt = by_id.get(target_id)
+    if tgt is None or tgt[1] not in (0, 6):
+        return lu, vy, 0, 0
+    _, _, tx, ty = tgt
+    sp = math.sqrt(launch[0] * launch[0] + launch[1] * launch[1])
+    if steer:
+        want = atan2_netsafe(ty - y_c, tx - x_c)
+        still = -STILL < lu < STILL and -STILL < vy < STILL
+        cur = want if still else atan2_netsafe(vy, lu)
+        diff = want - cur
+        if diff > math.pi:
+            diff -= 2 * math.pi
+        elif diff < -math.pi:
+            diff += 2 * math.pi
+        if abs(diff) < HOMING_TURN:
+            new = want
+        else:
+            new = cur + HOMING_TURN if diff > 0 else cur - HOMING_TURN
+        if turned_at == 0:
+            turned_at = t
+        k = min((t - turned_at) / HOMING_ARM_MS, 1) / 2
+        return cos_r(new) * k * sp, sin_r(new) * k * sp, target_id, turned_at
+    if turned_at == 0:
+        turned_at = t
+    ang = atan2_netsafe(ty - y_c, tx - x_c)
+    return lerp(lu, cos_r(ang) * sp, 0.01), lerp(vy, sin_r(ang) * sp, 0.01), target_id, turned_at
+
+
 def linear_path(lu, vy, launch):
     """PathType 2 (Linear), `_-p5k._-8i` @2677-2812: the speed keeps its direction and takes the length of
     the launch speed (`_-Wj`, `_-A5W`) again (Point.normalize: x *= k / len)."""
@@ -656,5 +723,35 @@ ANCHORS = {ABC_1100: {
         (15249, 503, "pushuint", "180"),
         (15249, 512, "pushuint", "1800"),
         (15249, 523, "pushdouble", "0.05333333333333334"),
+    ],
+    "PathType RocketHoming: slow down (dt / _-N4Q)^2, nearest entity in state 0 / 6, lose target, steer 1.8 deg (_-83w) under Z2Y & 64, else lerp 0.01": [
+        (15192, 3122, "getproperty", "_-P6U"),
+        (15192, 3152, "getproperty", "_-N4Q"),
+        (15192, 3165, "getproperty", "POSITIVE_INFINITY"),
+        (15192, 3183, "getproperty", "_-5r"),
+        (15192, 3265, "pushbyte", "6"),
+        (15192, 3297, "callproperty", "_-d5F, 0"),
+        (15192, 3369, "ifnlt", "24"),
+        (15192, 3382, "initproperty", "_-P6U"),
+        (15192, 3424, "pushbyte", "2"),
+        (15192, 3426, "callproperty", "pow, 2"),
+        (15192, 3455, "callproperty", "_-a2s, 3"),
+        (15192, 3574, "initproperty", "_-P6U"),
+        (15192, 3594, "pushbyte", "64"),
+        (15192, 3664, "callproperty", "atan2_netsafe, 2"),
+        (15192, 3683, "pushdouble", "0.0001"),
+        (15192, 3842, "getproperty", "PI2"),
+        (15192, 3898, "getproperty", "_-83w"),
+        (15192, 4053, "callproperty", "min, 2"),
+        (15192, 4059, "pushbyte", "2"),
+        (15192, 4288, "pushdouble", "0.01"),
+        (1061, 3, "subtract", ""),
+        (15185, 6, "getproperty", "_-f66"),
+        (15249, 543, "pushuint", "1000"),
+        (15249, 546, "initproperty", "_-N4Q"),
+        (15351, 80405, "pushint", "1800"),
+        (15351, 80413, "initproperty", "_-83w"),
+        (15351, 11972, "pushdouble", "180.0"),
+        (15351, 11976, "initproperty", "_-661"),
     ],
 }}

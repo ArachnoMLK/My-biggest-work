@@ -8,7 +8,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.items import (ITEM_DEFAULTS, after_sweep, bounce, expired, ground_walk, impact, item_type, sweep,  # noqa: E402
-                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path,
+                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path, rocket_homing, lerp,
                       target_gate, velocity)
 from bh.raycast import Line  # noqa: E402
 
@@ -234,6 +234,29 @@ class Boomerang(unittest.TestCase):
                                        0, 0)[5])
         self.assertTrue(boomerang_path(1100, 1000, 0, (10.0, 0.0), 10.0, 0.0, 5.0, 0.0, (0.0, 0.0), False, 0, 0,
                                        thrower_gone=True)[5])
+
+class RocketHoming(unittest.TestCase):
+    FIGHTERS = [(1, 0, 100.0, 0.0), (2, 0, 30.0, 0.0), (3, 3, 1.0, 0.0)]     # id 3 is knocked out (state 3)
+
+    def test_slows_then_locks_nearest(self):
+        lu, vy, tid, turned = rocket_homing(1500, 1000, 10.0, 0.0, (10.0, 0.0), 0.0, 0.0, 0, 0, self.FIGHTERS)
+        self.assertEqual((lu, tid), (lerp(10.0, 0, 0.25), 0))
+        lu, vy, tid, turned = rocket_homing(2001, 1000, 10.0, 0.0, (10.0, 0.0), 0.0, 0.0, 0, 0, self.FIGHTERS)
+        self.assertEqual((lu, tid, turned), (10.0, 2, 2001))
+
+    def test_lerp_toward_target(self):
+        lu, vy, tid, turned = rocket_homing(3000, 1000, 0.0, 0.0, (0.0, 10.0), 0.0, 0.0, 2, 2001, self.FIGHTERS)
+        self.assertAlmostEqual(lu, 0.1)                                      # 1 % of 10 toward +x
+        self.assertEqual(tid, 2)
+        self.assertEqual(rocket_homing(3000, 1000, 1.0, 2.0, (0.0, 10.0), 0.0, 0.0, 3, 5, self.FIGHTERS),
+                         (1.0, 2.0, 0, 0))                                   # target knocked out: dropped
+
+    def test_steer_turns_at_most_1_8_degrees(self):
+        lu, vy, tid, turned = rocket_homing(2500, 1000, 0.0, -10.0, (10.0, 0.0), 0.0, 0.0, 2, 2000,
+                                            self.FIGHTERS, steer=True)
+        ang = math.atan2(vy, lu)
+        self.assertAlmostEqual(ang, -math.pi / 2 + math.pi / 100, places=2)   # -90 deg turned 1.8 deg toward 0
+        self.assertAlmostEqual(math.hypot(lu, vy), 10.0 * 0.25, places=2)      # min(500 / 1000, 1) / 2
 
 if __name__ == "__main__":
     unittest.main()
