@@ -57,6 +57,7 @@ DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFrict
                  "Acceleration": 3.0, "AirAcceleration": 2.0}   # synthetic defaults; real ones from stats.py
 AIR_JUMPS = 2       # [H] `_-56T()`: not read yet
 MOVE_LEFT, MOVE_RIGHT, JUMP = 4, 8, 16   # replay.INPUT_BITS: bit i = 1 << i
+FALL_CAP_DROP = 85.0                      # movement-11.00.md: `Entity._-8i` @5127-5170 with the Drop bit
 DODGE_DASH, DIR_MASK = 256, 15            # the dodge key; Dodge's dir = keys & 15 (#6313 @2427)
 LIGHT, HEAVY = 128, 64                    # LightAttack, HeavyAttack (input-buffer-11.00.md)
 
@@ -343,7 +344,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     f.p5s, _ = fold_impulse(f.p5s, f.a4a)
     f.p5s = clamp(f.p5s, cap)
     g_term = 0.0
-    if gravity_applies(f.e6p, f.ground, f.y1l, t, False, GRAVITY) and f.p5s < FALL_CAP:
+    fall_cap = FALL_CAP_DROP if keys & 2 else FALL_CAP           # @5097-5170: 85 with Drop held [H: `_-61h`, lock]
+    if gravity_applies(f.e6p, f.ground, f.y1l, t, False, GRAVITY) and f.p5s < fall_cap:
         g_term = GRAVITY * STEP
         f.p5s += g_term
     m = air_move(grid, team, f.x, f.y, x_step, f.p5s, f.ground is not None)

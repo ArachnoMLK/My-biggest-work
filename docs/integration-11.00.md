@@ -330,3 +330,8 @@ were in a power, 88 had been hit. So the simulated fighters run out of air optio
 recover. Caveat on the method: a replay holds only the inputs, so the check is open loop. Once the simulated
 position drifts from the real one, the replayed inputs no longer fit, and the drift grows. A KO can match only
 when the movement is exact up to it, so this check measures exactness, not "closeness".
+
+Two more [V] rules added after that: a hit with a knockback gives the victim one air jump back (#1677
+@1171-1226), and the fall cap is 85 with Drop held (movement-11.00.md, @5097-5170). Neither moves the
+aggregate (224 early, 13 late, harness life 13.8 s): the drift is broad, and the first-KO time is too coarse to
+judge one piece at a time. A finer check needs a per-tick reference (positions), which a replay does not hold.
