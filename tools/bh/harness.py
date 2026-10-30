@@ -100,6 +100,7 @@ class Fighter:
     i46: int = 0              # `_-46I`, last hit (no hits here)
     e3: int = 0               # `_-3E`
     f6r: int = 0              # `_-f6R`, end of PostDodge
+    t322: int = 0             # `_-322`, last landing (`_-8i` @13446)
     moves: dict = None        # {"hero": hero_powers row, "weapon": item_slots row, "powers": power_rows}
     power: dict = None        # the running power: {"name", "steps": power_steps, "tl": Timeline}
     w22: float = 0.0          # `_-W22`, damage taken
@@ -379,6 +380,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     f.wn = f.ground is None                                     # @13169
     landed = was_airborne and f.ground is not None
     if landed:
+        f.t322 = t
         f.i5a = squat_on_landing(f.xb, f.i5a, True)
         f.air_used = 0                                          # [H] where `_-k1j(0)` runs is not read
         events.append(("land", f.y))
@@ -553,8 +555,9 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 records = inputs_by_id.get(p["e"]["id"], [])
                 keys = state_at(records, t)
                 f = p["f"]                                      # #6313 @122-209: window 9 while dodging,
-                wide = f.e6p or t <= f.i5a + 32 or t <= f.f6r   # in a jump squat or before `_-f6R`, else 5
-                bp = buffered_presses(records, t, 9 if wide else 5) or {}   # [H] `_-322`, `_-P50` / `_-M3V` cases
+                wide = (f.e6p or t <= f.t322 + 64 or t <= f.i5a + 32   # 64 ms after landing, in a squat,
+                        or t <= f.f6r)                          # before `_-f6R`; else 5
+                bp = buffered_presses(records, t, 9 if wide else 5) or {}   # [H] the `_-P50` / `_-M3V` cases
                 done = p.setdefault("handled", {})
                 fresh = {a: bp[a] for a in ("Jump", "DodgeDash", "LightAttack", "HeavyAttack")
                          if a in bp and bp[a] > done.get(a, -1)}
