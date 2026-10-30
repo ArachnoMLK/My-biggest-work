@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 333 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 339 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
