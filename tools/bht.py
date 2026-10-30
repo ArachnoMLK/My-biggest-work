@@ -24,6 +24,7 @@ from bh import powertypes as powertypesmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
+from bh import smoke as smokemod  # noqa: E402
 from bh import step as stepmod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
 from bh import stats as statsmod  # noqa: E402
@@ -432,6 +433,21 @@ def cmd_knockback_verify(a):
     print("static bytecode evidence only: no execution, no runtime oracle (docs/knockback-11.00.md)")
 
 
+def cmd_smoke_fall(a):
+    """One fighter, no input, falls from every respawn point of the local LevelDescs (aggregate counts only)."""
+    import glob
+    folder = os.path.join(a.swz or os.path.join(WORK, "swz"), "Dynamic.swz")
+    files = sorted(glob.glob(os.path.join(folder, "LevelDesc_*.xml")))
+    if not files:
+        sys.exit("no LevelDesc files; run swz-dump first (or pass --swz)")
+    counts = smokemod.run([rendermod.read_text(f) for f in files])
+    for k, v in counts.items():
+        print(f"  {k:<24} {v}")
+    print("static bytecode evidence only: not compared with the running game (tools/bh/smoke.py)")
+    if counts["contact"] != counts["within_1e-6"]:
+        sys.exit(1)
+
+
 def cmd_power_columns(a):
     """Print the powerTypes column -> PowerType field map rebuilt from the ABC (#6483); no game data is read."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
@@ -700,6 +716,7 @@ def main():
     add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
     add("input-buffer-verify", cmd_input_buffer_verify, abc)
     add("knockback-verify", cmd_knockback_verify, abc)
+    add("smoke-fall", cmd_smoke_fall, (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
     add("power-columns", cmd_power_columns, abc, (["--markdown"], {"action": "store_true"}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
