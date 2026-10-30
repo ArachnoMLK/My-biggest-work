@@ -319,6 +319,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                                    "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
                                    "row": power}
                         cast_impulse(f, power)
+                        f.lock_start = t                        # `_-532` = t: `Entity._-c1r` at the move start
             events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None

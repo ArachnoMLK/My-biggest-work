@@ -344,3 +344,5 @@ action ran (`_-C51` for the dodge; [H] for the others), so a refused press is re
 With the window widenings of #6313 §2 (9 ticks while dodging, within 32 ms of `_-I5A`, before `_-f6R`; the dodge
 exit now writes `_-f6R` = t + PostDodge × 16 off a wall) and [H] the `_-322` / `_-P50` / `_-M3V` cases left out:
 225 early, 11 late, 1 off by one tick, 5 within 1 s, harness life 13.2 s (median; p90 26.6 s).
+Then `_-532` = t at each power start (`Entity._-c1r`, input-buffer-11.00.md §6), which feeds the jump lock and
+`_-C2E`: 226 early, 11 late, 5 within 1 s (the near-exact case turns early), life 13.3 s; kept since the rule is [V].
