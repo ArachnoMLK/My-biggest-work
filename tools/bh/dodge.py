@@ -7,8 +7,8 @@ dodge `_-26R`, `Dash`, the ground `_-96f`) are only pinned, not transcribed. The
 in the dodge state of `Entity._-8i` and is not transcribed yet.
 
 Names: `dir` is Dodge's second argument (`keys & 15`: Up 1, Drop 2, Left 4, Right 8). `_-wn()` is called
-`grounded` here [H: the name; it gates the ground cases of Jump too]. The DodgeType is
-`_-h3i._-26O(dir, grounded, local 8, team flag 64, local 10)`, a row of DodgeTypes.xml (`_-h3i._-i32`).
+`airborne` here: `_-26O` maps it to the DodgeTypes mask 2, the value of 'Air' (#2768 @312-323) [V]. The DodgeType is
+`_-h3i._-26O(dir, airborne, local 8, team flag 64, local 10)`, a row of DodgeTypes.xml (`_-h3i._-i32`).
 [V] unless marked [H].
 """
 from .movement import ABC_1100
@@ -46,10 +46,10 @@ def timers(t, duration_frames, recover_frames, has_t3v, z4s, chain_end=0):
             "_-G6S": t + uy + c1d if has_t3v else None, "_-y1F": y1f}
 
 
-def clears_velocity(dir, grounded):
-    """@1876-1937: with a direction or on the ground, `_-P5S` and `_-v1D` are set to 0. A neutral air dodge
+def clears_velocity(dir, airborne):
+    """@1876-1937: with a direction or in the air (`_-wn()`), `_-P5S` and `_-v1D` are set to 0. A neutral ground dodge
     keeps them (after the `_-v1D` = ±`_-K64` write of @1290-1446 when the type has `_-t3v` and `_-a5a`)."""
-    return dir != 0 or grounded
+    return dir != 0 or airborne
 
 
 def neutral_push(k64, dir):
@@ -58,12 +58,12 @@ def neutral_push(k64, dir):
     return -k64 if dir & LEFT else k64
 
 
-def counter(k6, chained, has_dir_bits, grounded, f2b, e6p=False):
+def counter(k6, chained, has_dir_bits, airborne, f2b, e6p=False):
     """`_-6K` after the dodge (@499-520, @1708-1873). The count is `_-6K` >>> 16.
 
     @499: without `_-E6P()` and not chained (local 7), the count is cleared first. Then the low half is
-    reset: when `_-f2b()`, a chained dodge with a direction (local 15) sets it to 2 on the ground, else 1; a
-    fresh air dodge with a direction sets it to 1. If the low half is then non-zero or the dodge is chained,
+    reset: when `_-f2b()`, a chained dodge with a direction (local 15) sets it to 2 in the air, else 1; a
+    fresh dodge on the ground (not `_-wn()`) with a direction sets it to 1. If the low half is then non-zero or the dodge is chained,
     the count is the old count + 1; otherwise `_-6K` stays 0 (count lost). [H] `_-f2b`, `_-E6P` meanings.
     """
     if not e6p and not chained:
@@ -73,12 +73,46 @@ def counter(k6, chained, has_dir_bits, grounded, f2b, e6p=False):
     if f2b:
         if chained:
             if has_dir_bits:
-                k6 = 2 if grounded else 1
-        elif not grounded and has_dir_bits:
+                k6 = 2 if airborne else 1
+        elif not airborne and has_dir_bits:
             k6 = 1
     if k6 != 0 or chained:
         k6 = ((count + 1) << COUNT_SHIFT) | (k6 & LOW_MASK)
     return k6
+
+
+# DodgeTypes.xml columns (`_-h3i._-I6L` #2768) -> fields used here.
+COLUMNS = {"DodgeName": "_-86E", "DodgeID": "_-B3q", "Set": "_-p1r", "Air/Ground/Both": "_-6H",
+           "direction (Neutral, Side, Up, Down, SideUp, SideDown)": "_-h2L", "IsFast": "_-t3v",
+           "Duration": "mDuration", "Recover": "_-53o", "SpeedXMult": "_-a5a", "Cooldown": "_-p2U",
+           "CooldownGround": "_-S6E", "CooldownLanded": "_-T2A"}
+KIND_SIDE, KIND_UP, KIND_DOWN = 1, 2, 4           # @660-742: Neutral 0, Side 1, Up 2, Down 4, SideUp 3, SideDown 5
+WHERE_GROUND, WHERE_AIR, WHERE_BOTH = 1, 2, 3     # @357-369 / @312-323; Both = `_-h3i._-I6u` = 1 | 2 (#15351 @27965-27972)
+FALLBACK = "StandardSpot"                         # @1526-1539: the row named StandardSpot is `_-h3i._-Z6`
+
+
+def kind(dir):
+    """`_-26O` #2770 @11-89: Side when Left or Right, then Up (1) wins over Drop (2)."""
+    k = KIND_SIDE if dir & (LEFT | RIGHT) else 0
+    if dir & 1:
+        k |= KIND_UP
+    elif dir & 2:
+        k |= KIND_DOWN
+    return k
+
+
+def pick(rows, dir, airborne, is_fast, test_set=False):
+    """`_-h3i._-26O` #2770: the first row of `_-w14` (file order [H]) with Set == "Test" / "Default",
+    direction == kind(dir), Air/Ground/Both covering the fighter (2 when `_-wn()`, i.e. in the air, else 1) and IsFast ==
+    is_fast; else the StandardSpot row. Rows are dicts with the keys "Set", "kind", "where", "IsFast", "DodgeName".
+    In Dodge, `test_set` is the team flag 64 (`_-N1k._-d3Y._-Z2Y` & 64) and `is_fast` is its local 8."""
+    want_set = "Test" if test_set else "Default"
+    k = kind(dir)
+    mask = WHERE_AIR if airborne else WHERE_GROUND
+    for r in rows:
+        if r["Set"] == want_set and r["kind"] == k and r["where"] & mask and bool(r["IsFast"]) == bool(is_fast):
+            return r
+    return next((r for r in rows if r.get("DodgeName") == FALLBACK), None)
 
 
 ANCHORS = {ABC_1100: {
@@ -123,6 +157,40 @@ ANCHORS = {ABC_1100: {
         (3125, 1919, "callpropvoid", "_-N5C::_-E1t, 2"),
         (3125, 1932, "getproperty", "_-v1D"),
         (3125, 1937, "callpropvoid", "_-N5C::_-E1t, 2"),
+    ],
+    "DodgeType pick _-h3i._-26O: kind Side 1 | Up 2 / Down 4; mask 2 (Air) when _-wn() else 1 (Ground); Set 'Test' : 'Default'; first row of _-w14 matching _-p1r, _-h2L, _-6H, _-t3v; else _-Z6": [
+        (2770, 18, "pushbyte", "4"),
+        (2770, 44, "pushbyte", "1"),
+        (2770, 70, "pushbyte", "2"),
+        (2770, 96, "pushbyte", "2"),
+        (2770, 103, "pushbyte", "1"),
+        (2770, 115, "pushstring", "'Test'"),
+        (2770, 123, "pushstring", "'Default'"),
+        (2770, 142, "getproperty", "_-w14"),
+        (2770, 192, "getproperty", "_-p1r"),
+        (2770, 208, "getproperty", "_-h2L"),
+        (2770, 226, "getproperty", "_-6H"),
+        (2770, 245, "getproperty", "_-t3v"),
+        (2770, 273, "getproperty", "_-Z6"),
+    ],
+    "DodgeTypes.xml parser _-h3i._-I6L: Air 2, Ground 1, Both _-I6u; Neutral 0, Side 1, Up 2, Down 4; IsFast, Set, Duration, Recover, SpeedXMult; StandardSpot -> _-Z6": [
+        (2768, 312, "pushstring", "'Air'"),
+        (2768, 320, "pushbyte", "2"),
+        (2768, 345, "getproperty", "_-I6u"),
+        (2768, 357, "pushstring", "'Ground'"),
+        (2768, 366, "pushbyte", "1"),
+        (2768, 618, "pushstring", "'Down'"),
+        (2768, 627, "pushbyte", "4"),
+        (2768, 648, "pushbyte", "0"),
+        (2768, 668, "pushbyte", "1"),
+        (2768, 739, "pushbyte", "2"),
+        (2768, 1055, "initproperty", "_-t3v"),
+        (2768, 1148, "initproperty", "_-p1r"),
+        (2768, 1526, "pushstring", "'StandardSpot'"),
+        (2768, 1539, "initproperty", "_-Z6"),
+        (15351, 27965, "pushbyte", "1"),
+        (15351, 27968, "pushbyte", "2"),
+        (15351, 27972, "initproperty", "_-I6u"),
     ],
     "Entity.Dodge counter _-6K: count >>> 16 cleared unless _-E6P() or chained; low half 2 / 1 under _-f2b(); count + 1": [
         (3125, 483, "callproperty", "_-E6P, 0"),

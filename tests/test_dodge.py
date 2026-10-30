@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import clears_velocity, counter, facing, neutral_push, timers  # noqa: E402
+from bh.dodge import clears_velocity, counter, facing, kind, neutral_push, pick, timers  # noqa: E402
 
 
 class Dodge(unittest.TestCase):
@@ -34,12 +34,26 @@ class Dodge(unittest.TestCase):
         self.assertEqual(neutral_push(7.5, 0), 7.5)
 
     def test_counter(self):
-        self.assertEqual(counter(3 << 16 | 1, chained=False, has_dir_bits=True, grounded=False, f2b=True), 1 << 16 | 1)
-        self.assertEqual(counter(3 << 16, chained=False, has_dir_bits=False, grounded=False, f2b=True), 0)
-        self.assertEqual(counter(3 << 16, chained=True, has_dir_bits=True, grounded=True, f2b=True), 4 << 16 | 2)
-        self.assertEqual(counter(3 << 16, chained=True, has_dir_bits=False, grounded=False, f2b=False), 4 << 16)
-        self.assertEqual(counter(3 << 16, chained=False, has_dir_bits=True, grounded=False, f2b=True, e6p=True),
+        self.assertEqual(counter(3 << 16 | 1, chained=False, has_dir_bits=True, airborne=False, f2b=True), 1 << 16 | 1)
+        self.assertEqual(counter(3 << 16, chained=False, has_dir_bits=False, airborne=False, f2b=True), 0)
+        self.assertEqual(counter(3 << 16, chained=True, has_dir_bits=True, airborne=True, f2b=True), 4 << 16 | 2)
+        self.assertEqual(counter(3 << 16, chained=True, has_dir_bits=False, airborne=False, f2b=False), 4 << 16)
+        self.assertEqual(counter(3 << 16, chained=False, has_dir_bits=True, airborne=False, f2b=True, e6p=True),
                          4 << 16 | 1)
+
+    def test_kind(self):
+        self.assertEqual([kind(d) for d in (0, 4, 8, 1, 2, 4 | 1, 8 | 2, 1 | 2)], [0, 1, 1, 2, 4, 3, 5, 2])
+
+    def test_pick(self):
+        rows = [{"DodgeName": "a", "Set": "Default", "kind": 1, "where": 1, "IsFast": False},
+                {"DodgeName": "b", "Set": "Default", "kind": 1, "where": 3, "IsFast": False},
+                {"DodgeName": "c", "Set": "Test", "kind": 1, "where": 3, "IsFast": False},
+                {"DodgeName": "StandardSpot", "Set": "Default", "kind": 0, "where": 3, "IsFast": False}]
+        self.assertEqual(pick(rows, 4, airborne=False, is_fast=False)["DodgeName"], "a")   # ground: mask 1
+        self.assertEqual(pick(rows, 4, airborne=True, is_fast=False)["DodgeName"], "b")    # _-wn() (air): mask 2
+        self.assertEqual(pick(rows, 8, airborne=True, is_fast=False, test_set=True)["DodgeName"], "c")
+        self.assertEqual(pick(rows, 1, airborne=False, is_fast=False)["DodgeName"], "StandardSpot")
+        self.assertEqual(pick(rows, 4, airborne=False, is_fast=True)["DodgeName"], "StandardSpot")
 
 
 if __name__ == "__main__":
