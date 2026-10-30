@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(776 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(825 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -627,6 +627,32 @@ Thrown weapons and projectiles are `_-p5k` objects (148 instance traits), not po
 
 So for TargetMethod 2 / 11 (Ranged, ThrownItem), §2's "list = [`_-x4I`]" means the power hits exactly the
 target the item touched. `_-A3S` makes the line of sight ignore item-ignore lines (§7.1).
+
+### 8.1 Motion of a thrown item ([`tools/bh/items.py`](../tools/bh/items.py), `_-p5k._-8i` #15192)
+
+Each tick, before its map sweeps, a thrown item updates its speeds `_-Lu` (x) and `_-33c` (y) [V, bytecode
+order]:
+1. **Friction.** `_-Lu` moves toward 0 by `Friction` × 0.384 on a ground line, or `AirFriction` × 0.384 in
+   the air (defaults 2.5 / 0.15). It stops at 0 instead of changing sign.
+2. **Horizontal impulse and cap.** `_-Lu` += `_-B66`, then it is capped at ±`_-Z5d`. `ItemType.<init>` sets
+   `_-Z5d` to 0 and no column writes it, so the cap is **350**. The x step is `_-Lu` × 0.384.
+3. **Ground walk.** On a ground line with normal y < 0, the x step walks along the line (@1268–1732, the
+   same loop shape as the fighter's). Not transcribed yet.
+4. **Vertical impulse and cap.** `_-33c` += `_-46m`, then the same ±cap.
+5. **Lifetime.** The item is removed (`_-5k()`) once t − `_-O13` > `PathLength` (when PathLength ≠ 0).
+6. **Path behaviours.** With `_-BG` set, `PathType` chooses one: BoomerangHoming 1, Linear 2, Rocket 3,
+   RocketHoming 4, Crawl 5, otherwise 0 (lookupswitch @1901). Not transcribed yet.
+7. **Gravity.** Without `_-BG`, gravity is added unless the item rests on a flat line (`_-Lu` = `_-33c` = 0,
+   normal y = −1). It is `ThrownGravity` while thrown (`_-r5B` ≠ 0, `_-o2O` false), else `Gravity` (both
+   3.75 by default), times 0.384. The cap is applied before gravity, not after.
+8. **Move vector.** It is (x step, `_-33c` × 0.384), plus 2 × `_-p5k._-x3M` = 2.02 on a ground line.
+
+**Mask.** The sweeps use hard | soft, or hard only in three cases:
+- for 64 ms after a throw by a fighter standing on a soft line (state 1);
+- for a BoomerangHoming item while `_-BG` is set;
+- in state 1 with ThrownGravity 0 and `ForceNoHitstop` (`_-T30`).
+
+Local check (aggregate): the 75 local item types parse with 0 errors; 2 use a path behaviour.
 
 ## 9. Where this runs in a tick
 
