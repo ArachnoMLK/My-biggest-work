@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 385 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 386 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -366,3 +366,6 @@ its last step, with the move lock cleared there under AllowRecoverMove (#46 @467
 not read.
 Then CancelGravity (`_-q1G`, the `_-8i` gravity gate @5252) while a power runs: 220 early, 17 late, harness life
 14.4 s (median).
+Then the power's acceleration factor `_-l4X._-x1E(t)` #68 (AccelMult[step] while a step is pending, else
+BackwardAccelMult against the facing; [H] the air-power and `_-H6I` rules left out), applied at `_-8i` @2070-2109:
+220 early, 17 late, harness life **14.9 s** (median).

@@ -248,6 +248,28 @@ def end_tick(power, k4b):
     return int(k4b + num("FixedRecoverTime") + num("RecoverTime"))
 
 
+def power_accel(f, left_held):
+    """`_-l4X._-x1E(t)` #68: AccelMult (`_-T1b`)[step] (entry 0 past the end) while the step is not running
+    (`_-d38`), else BackwardAccelMult (`_-x21`) when the facing `_-L0` differs from `_-141()` (left held), else 1.
+    [H] glue: the IsAirPower x 0.5 rule (@148-261) and the `_-H6I(t)` 0.4 rule (@262-292) are left out; a
+    missing BackwardAccelMult reads as 1."""
+    row, tl = f.power.get("row", {}), f.power["tl"]
+    vals = []
+    for x in str(row.get("AccelMult") or "").split(","):
+        try:
+            vals.append(float(x))
+        except ValueError:
+            pass
+    if vals and not tl.running:
+        return vals[tl.step] if tl.step < len(vals) else vals[0]
+    if f.facing_left != left_held:
+        try:
+            return float(row.get("BackwardAccelMult") or 1.0)
+        except ValueError:
+            return 1.0
+    return 1.0
+
+
 def _true(v):
     return str(v or "").upper() == "TRUE"
 
@@ -370,6 +392,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         f.v1d = apply_friction(f.v1d, fr)
     if left != right:
         a, vm = acceleration(airborne, f.stats["Acceleration"], f.stats["AirAcceleration"], vmax=vmax)
+        if f.power is not None:                                 # @2070-2109: x `_-o3I._-x1E(t)`
+            a *= power_accel(f, left)
         if airborne and (f.v1d > 0) == left and f.v1d != 0:
             a *= reversal_factor(f.v1d)
         f.v1d = apply_acceleration(f.v1d, left, a, vm)

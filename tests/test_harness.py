@@ -228,6 +228,16 @@ class Harness(unittest.TestCase):
         harness.tick(f, 1000, smoke.map_grid(FLAT))
         self.assertEqual(f.p5s, 0.0)
 
+    def test_power_accel(self):
+        f = harness.Fighter(0.0, 0.0)
+        f.power = {"row": {"AccelMult": "0.5,2", "BackwardAccelMult": "0.25"}, "tl": harness.Timeline([3, 3], 0)}
+        self.assertEqual(harness.power_accel(f, False), 0.5)
+        f.power["tl"].update(3)                               # step 0 fires, step 1 pending
+        self.assertEqual(harness.power_accel(f, False), 2.0)
+        f.power["row"] = {"BackwardAccelMult": "0.25"}
+        self.assertEqual(harness.power_accel(f, True), 0.25)  # facing right, left held
+        self.assertEqual(harness.power_accel(f, False), 1.0)
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)
