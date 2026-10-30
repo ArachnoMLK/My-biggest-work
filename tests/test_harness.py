@@ -103,6 +103,20 @@ class Harness(unittest.TestCase):
         self.assertTrue(f.u5e)
         self.assertEqual((f.t5l, f.wl), (1.0, 1.0))
 
+    def test_attack_slot_and_gravity_cancel(self):
+        row = {"DodgeName": "spot", "DodgeID": 1, "Set": "Default", "kind": 0, "where": 3, "IsFast": False,
+               "Duration": 20, "Recover": 0, "CancelStart": 2, "CancelLimit": 10}
+        f, grid = harness.Fighter(0.0, -400.0), smoke.map_grid(FLAT)
+        ev = harness.tick(f, 1000, grid, light_press=True)
+        self.assertEqual(ev[0][0], "attack")
+        self.assertEqual(ev[0][2], False)
+        air_slot = ev[0][1]
+        harness.tick(f, 1016, grid, dodge_press=True, dodge_rows=[row])
+        self.assertTrue(f.e6p)
+        ev = harness.tick(f, 1016 + 48, grid, light_press=True)
+        self.assertEqual(ev[0][2], True)                      # inside 1016 + 32 .. 1016 + 160
+        self.assertNotEqual(ev[0][1], air_slot)               # a ground move in the air
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)

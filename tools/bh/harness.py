@@ -31,12 +31,12 @@ fighters are independent.
 from dataclasses import dataclass, field
 
 from .air_move import WallState, air_move, gravity_applies, ground_reset, ground_walk, respond, steep, wall_contact
-from .dodge import (c2e, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
+from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
                     gates, is_dodge_locked, k64, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x,
                     speed_y, standard_flag, timers)
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
-from .input_buffer import state_at
+from .input_buffer import attack_slot, state_at
 from .ko import ko_mask
 from .respawn_points import candidates
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
@@ -52,6 +52,7 @@ DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFrict
 AIR_JUMPS = 2       # [H] `_-56T()`: not read yet
 MOVE_LEFT, MOVE_RIGHT, JUMP = 4, 8, 16   # replay.INPUT_BITS: bit i = 1 << i
 DODGE_DASH, DIR_MASK = 256, 15            # the dodge key; Dodge's dir = keys & 15 (#6313 @2427)
+LIGHT, HEAVY = 128, 64                    # LightAttack, HeavyAttack (input-buffer-11.00.md)
 
 
 @dataclass
@@ -200,8 +201,23 @@ def dodge_tick(f, t, a, held):
         f.l4a, f.g5e = side_latch(f.l4a, f.g5e, held)
 
 
+def attack(f, t, keys, heavy):
+    """The move slot a fresh light / heavy press asks for (`_-i4Z._-rU` #6334): `dodge.cancel_flags` (in the
+    cancel window of a dodge, local 33) then `dodge.attack_air_offset` (0 under the cancel: the gravity cancel)
+    and `input_buffer.attack_slot`. Returns (slot, gravity cancel). [H] glue: no move runs (no `_-I35` chain),
+    `_-f2b()` false, no jump flag, `_-y1U` false; the power itself is not started yet (plan step b2-b5)."""
+    row = f.dodge if f.e6p else None
+    gc = False
+    if row is not None:
+        press = t
+        _, gc, _ = cancel_flags(t, True, False, 0 if heavy else press, press if heavy else 0, 0, 0, 0, f.h2b, False,
+                                False, f.o5c, row.get("CancelStart", 0), row.get("CancelLimit", 0))
+    off, _ = attack_air_offset(f.ground is None, False, gc, False)
+    return attack_slot(keys, heavy, off != 0), gc
+
+
 def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None, dodge_press=False, keys=0,
-         dodge_rows=None):
+         dodge_rows=None, light_press=False, heavy_press=False):
     """One 16 ms tick at time t. `bounds` is (camera rectangle, kill dict) for the ring-out test, or None.
     `dodge_press` with `dodge_rows` (dodge.parse_types) tries `Entity.Dodge(t, keys & 15)` first (#6313 tries the
     dodge before the jump). Returns the list of events of this tick."""
@@ -212,6 +228,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             events.append(("dodge", name))
     if jump_press:
         events.append(("press", jump(f, t, left, right)))
+    for press, heavy in ((light_press, False), (heavy_press, True)):
+        if press:
+            events.append(("attack",) + attack(f, t, keys, heavy))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
     vmax = _vmax(f)
@@ -378,7 +397,8 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 keys, before = state_at(records, t), state_at(records, t - STEP_MS)
                 tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT),
                      bool(keys & JUMP and not before & JUMP), 0, bounds,
-                     bool(keys & DODGE_DASH and not before & DODGE_DASH), keys, dodge_rows)
+                     bool(keys & DODGE_DASH and not before & DODGE_DASH), keys, dodge_rows,
+                     bool(keys & LIGHT and not before & LIGHT), bool(keys & HEAVY and not before & HEAVY))
         for p in players:                                   # phase 6
             f, body = p["f"], p["body"]
             if f is None or body["state"] not in (0, 5) or not f.a3d:

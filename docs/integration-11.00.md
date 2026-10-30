@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 370 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 371 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -281,4 +281,9 @@ cooldown, cooldown end, the push of each dodge tick, the exit speed); friction a
 `_-M3h` false, power multipliers 1, Set "Default". Rerun (aggregate only, format 271): 68 without a KO, 460 not
 1v1, 236 skipped (opponent attacked first), and the **1 candidate is now predicted late** instead of early: the
 dodge moves its victim, but the KO is not reproduced yet (its dash and chase dodge are still missing). Next:
-(b), the hit detection in `harness.play`.
+(b), the hit detection in `harness.play` (plan in the evening note: b1 slot, b2 power name, b3 timeline and
+frames, b4 capsules, b5 knockback and hitstun, b6 rerun).
+
+**(b1)** `harness.attack`: a fresh LightAttack (128) / HeavyAttack (64) press records `("attack", slot, gravity
+cancel)`: `dodge.cancel_flags` in a dodge, `dodge.attack_air_offset`, `input_buffer.attack_slot`. Nothing moves
+yet: the power is not started (b2-b5). [H] glue: no running move, `_-f2b()` false, no jump flag, `_-y1U` false.
