@@ -6,9 +6,9 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (clears_velocity, cooldown_ms, counter, dash, dodge_over, ease, exit_speed,  # noqa: E402
-                      exit_velocity, facing, formula_mult, k64, kind, landed_cooldown, moves, neutral_push, pick,
-                      push, side_latch, speed_x, speed_y, standard_flag, timers)
+from bh.dodge import (attack_air_offset, cancel_flags, clears_velocity, cooldown_ms, counter, dash,  # noqa: E402
+                      dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, k64, kind, landed_cooldown,
+                      moves, neutral_push, pick, push, side_latch, speed_x, speed_y, standard_flag, timers)
 
 
 class Dodge(unittest.TestCase):
@@ -137,6 +137,24 @@ class Dodge(unittest.TestCase):
         self.assertEqual(dash(**dict(base, m3v=True, l3a=7))["_-L3a"], 5)
         w = dash(**dict(base, dir=4, held=4, w4c=True, vy=-1.0, ve=950))
         self.assertEqual((w["_-L3a"], w["dir_left"]), (6, True))
+
+    def test_cancel_flags(self):
+        k = dict(t=1100, in_dodge=True, f2b=False, light=1090, heavy=0, taunt=0, pickup=0, dodge_press=0, h2b=1000,
+                 chase_ok=False, move_no_chain=False, o5c=0, cancel_start=4, cancel_limit=8)
+        self.assertEqual(cancel_flags(**k), (True, True, False))
+        self.assertEqual(cancel_flags(**dict(k, t=1063)), (False, False, False))
+        self.assertEqual(cancel_flags(**dict(k, t=1129)), (False, False, False))
+        self.assertEqual(cancel_flags(**dict(k, in_dodge=False)), (False, False, False))
+        self.assertEqual(cancel_flags(**dict(k, move_no_chain=True)), (False, False, False))
+        self.assertEqual(cancel_flags(**dict(k, f2b=True, o5c=4)), (True, False, False))
+        self.assertEqual(cancel_flags(**dict(k, f2b=True, dodge_press=1050, chase_ok=True)), (False, False, True))
+
+    def test_attack_air_offset(self):
+        self.assertEqual(attack_air_offset(True, False, False, False), (3, False))
+        self.assertEqual(attack_air_offset(True, False, True, False), (0, False))
+        self.assertEqual(attack_air_offset(False, True, False, True), (3, False))
+        self.assertEqual(attack_air_offset(True, False, False, True), (0, True))
+        self.assertEqual(attack_air_offset(False, False, False, True), (0, False))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)

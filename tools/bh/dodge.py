@@ -87,7 +87,8 @@ COLUMNS = {"DodgeName": "_-86E", "DodgeID": "_-B3q", "Set": "_-p1r", "Air/Ground
            "Duration": "mDuration", "Recover": "_-53o", "SpeedXMult": "_-a5a", "Cooldown": "_-p2U",
            "CooldownGround": "_-S6E", "CooldownLanded": "_-T2A",
            "AccelXFormula": "_-K35", "AccelXMult": "_-r4O", "AccelYFormula": "_-F5s", "AccelYMult": "_-k4q",
-           "ExitBackX": "_-i16", "ExitBackY": "_-73o", "ExitX": "_-05s", "ExitY": "_-LX", "PostDodge": "_-f6R"}
+           "ExitBackX": "_-i16", "ExitBackY": "_-73o", "ExitX": "_-05s", "ExitY": "_-LX", "PostDodge": "_-f6R",
+           "CancelLimit": "_-GX", "CancelStart": "_-M4L", "StartInvuln": "_-553"}
 KIND_SIDE, KIND_UP, KIND_DOWN = 1, 2, 4           # @660-742: Neutral 0, Side 1, Up 2, Down 4, SideUp 3, SideDown 5
 WHERE_GROUND, WHERE_AIR, WHERE_BOTH = 1, 2, 3     # @357-369 / @312-323; Both = `_-h3i._-I6u` = 1 | 2 (#15351 @27965-27972)
 FALLBACK = "StandardSpot"                         # @1526-1539: the row named StandardSpot is `_-h3i._-Z6`
@@ -333,6 +334,46 @@ def dash(t, dir, y1u, w4c, grounded, held, held_left, facing_left, ve, v22, r3l,
     w.update({"_-L3a": kind, "dir_left": out, "_-v3x": t, "_-P50": True, "_-M3V": False, "_-t5z": True,
               "_-G6S": 0})
     return w
+
+
+def cancel_flags(t, in_dodge, f2b, light, heavy, taunt, pickup, dodge_press, h2b, chase_ok, move_no_chain, o5c,
+                 cancel_start, cancel_limit):
+    """`_-i4Z._-51o` #6313 @1989-2342 (input buffer, PR #28): the dodge-cancel flags (local 32, 33, 34).
+
+    in_dodge = local 36 = `_-E6P()` with a DodgeType (`_-Q42`); nothing is set otherwise. light / heavy / taunt
+    / pickup / dodge_press are the buffered press times (locals 18, 20, 22, 26, 23; 0 = none); f2b = `_-f2b()`
+    (local 37); chase_ok = `_-26R(t)`, called only when f2b and a dodge press newer than `_-H2b`: then local 34
+    (chase dodge) and nothing else. Else local 38 = f2b with light, heavy, taunt or pick-up; local 39 = light,
+    heavy or taunt, with no running single-part move (move_no_chain = local 10) or a taunt alone, and without
+    local 38 or with `_-O5C` == 0. With 38 or 39, inside `_-H2b` + 16 CancelStart <= t <= `_-H2b` + 16
+    CancelLimit: local 32, and local 33 with 39. Returns (32, 33, 34). [H] `_-f2b`, `_-26R`."""
+    if not in_dodge:
+        return False, False, False
+    if f2b and dodge_press != 0 and dodge_press > h2b and chase_ok:
+        return False, False, True
+    l38 = f2b and (light | heavy | taunt | pickup) != 0
+    l39 = ((light | heavy | taunt) != 0 and (not move_no_chain or (taunt != 0 and (light | heavy) == 0))
+           and (not l38 or o5c == 0))
+    if (l39 or l38) and h2b + cancel_start * FRAME_MS <= t <= h2b + cancel_limit * FRAME_MS:
+        return True, l39, False
+    return False, False, False
+
+
+AIR_OFFSET = 3             # `_-i4Z._-rU` #6334 @128: the air moves are 3 slots after the ground ones
+
+
+def attack_air_offset(airborne, jump_flag, cancel, y1u):
+    """`_-i4Z._-rU(t, dir, jump, 0, cancel, window)` #6334 @105-200: the slot offset (local 15) is 3 when
+    `_-wn()` or the jump flag, then 0 with `cancel` (local 33 of #6313): **the gravity cancel**, an attack in the
+    cancel window of a dodge takes a ground move even in the air. Else, in the air without the jump flag, when
+    y1u = `_-y1U(t, true, dir)`, the offset is 0 too and local 14 is set (`_-P5S`, `_-75K` and `_-96f` are put
+    back if `_-C5S` fails, @729-799). Returns (offset, local 14). [H] `_-y1U` (a ground probe)."""
+    off = AIR_OFFSET if airborne or jump_flag else 0
+    if cancel:
+        off = 0
+    if off != 0 and not jump_flag and y1u:
+        return 0, True
+    return off, False
 
 
 def formula_mult(formula, vx, k64, dir):
@@ -671,5 +712,37 @@ ANCHORS = {ABC_1100: {
         (3132, 1142, "initproperty", "_-p3c"),
         (3132, 1433, "returnvalue", ""),
         (3132, 1435, "returnvalue", ""),
+    ],
+    "Gravity cancel: #6313 cancel flags 32 / 33 / 34 in _-H2b + 16 CancelStart .. 16 CancelLimit; #6334 _-rU air offset 3, 0 with the cancel flag; _-C5S / _-bC": [
+        (6313, 2018, "callproperty", "_-E6P, 0"),
+        (6313, 2054, "callproperty", "_-f2b, 0"),
+        (6313, 2092, "getproperty", "_-H2b"),
+        (6313, 2110, "callproperty", "_-26R, 1"),
+        (6313, 2122, "setlocal", "34"),
+        (6313, 2153, "setlocal", "38"),
+        (6313, 2235, "getproperty", "_-O5C"),
+        (6313, 2244, "setlocal", "39"),
+        (6313, 2263, "getproperty", "_-M4L"),
+        (6313, 2267, "pushbyte", "16"),
+        (6313, 2276, "getproperty", "_-GX"),
+        (6313, 2303, "greaterequals", ""),
+        (6313, 2324, "lessequals", ""),
+        (6313, 2332, "setlocal", "32"),
+        (6313, 2342, "setlocal", "33"),
+        (6313, 2918, "getlocal", "33"),
+        (6313, 2920, "getlocal", "32"),
+        (6313, 2922, "callproperty", "_-rU, 6"),
+        (6334, 112, "callproperty", "_-wn, 0"),
+        (6334, 128, "pushbyte", "3"),
+        (6334, 141, "getlocal", "5"),
+        (6334, 147, "pushbyte", "0"),
+        (6334, 183, "callproperty", "_-y1U, 3"),
+        (6334, 671, "callproperty", "_-C5S, 6"),
+        (6334, 700, "callpropvoid", "_-bC, 2"),
+        (6334, 718, "pushuint", "144"),
+        (6334, 722, "initproperty", "_-B3V"),
+        (6334, 799, "initproperty", "_-96f"),
+        (2768, 447, "initproperty", "_-GX"),
+        (2768, 477, "initproperty", "_-M4L"),
     ],
 }}
