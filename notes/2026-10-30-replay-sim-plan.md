@@ -34,9 +34,10 @@ one-sided; this one can fail.
 1. ~~Horizontal movement as code~~ — done: `tools/bh/horizontal.py` in #30 (max speed, friction choice and
    application, acceleration and its clamp; 47 anchors). Still open: where `_-141()` (facing) and `_-81n()`
    (a horizontal input held) are set from MoveLeft / MoveRight.
-2. **Jump.** movement-11.00.md (#16) has the impulses (Entity.Jump: dash window, grounded and dash
-   impulses, `vy -= impulse`). The input → `owner.Jump(t)` path is `_-i4Z._-51o` (bit 16). Air jumps and
-   the 192 ms lock are in #28. Wire them into one per-tick function.
+2. **Jump** — ground and dash jumps done in #30 (`tools/bh/jump.py`: 57 × (0.86 | 1), 170 in the 160 ms
+   window, `_-P5S` = 0, `_-96f` = null, `_-A4A` −= impulse). Left: the air jumps of `Entity.Jump` @1545–
+   (third / fourth branches: 57 / 65 × k, `_-S4O` × k and 48), and wiring the press of bit 16 (#28: 192 ms
+   lock, air-jump count) into the harness.
 3. ~~KO bounds data~~ — done in #31 (`tools/bh/level_bounds.py`: CameraBounds + LevelType kills; 989 of 995
    respawn points inside, 160 of 166 falls into the void end in a bottom KO). Open [H]: one map has 6 respawn
    points outside its static kill box.
