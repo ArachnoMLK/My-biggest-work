@@ -6,6 +6,7 @@ the ground walk loop along a line (@1268-1732, the same shape as the fighter's),
 """
 import math
 
+from .air_move import steep
 from .movement import ABC_1100
 from .raycast import ray_cast
 
@@ -19,9 +20,16 @@ SOFT_THROW_MS = 64      # @818-834: soft lines are ignored this long after a thr
 # `ItemType.static._-z2u` #4974 column -> field; defaults from `ItemType.<init>` #4963
 ITEM_COLUMNS = {"Friction": "T2P", "AirFriction": "h5M", "Gravity": "84Q", "ThrownGravity": "OY",
                 "PathLength": "G6o", "PathType": "z4P", "ForceNoHitstop": "T30", "OnlyStunnedTrigger": "N59",
-                "AllowRepeatedCollision": "A4s", "Height": "S2O", "ForceNoGeometryCollision": "p2W"}
+                "AllowRepeatedCollision": "A4s", "Height": "S2O", "ForceNoGeometryCollision": "p2W",
+                "Elasticity": "7c", "StickToWalls": "o1G", "AlwaysArmed": "XJ", "ConditionalStickToWalls": "o1l"}
 ITEM_DEFAULTS = {"T2P": 2.5, "h5M": 0.15, "84Q": 3.75, "OY": 3.75, "G6o": 0, "z4P": 0, "T30": False,
-                 "N59": False, "A4s": False, "S2O": 0, "p2W": False}
+                 "N59": False, "A4s": False, "S2O": 0, "p2W": False, "7c": 0.6, "o1G": False, "XJ": False,
+                 "o1l": 0}
+STICK_FLAGS = {"STRICT_ANGLE": 1, "FLOORS_ONLY": 2}           # ConditionalStickToWalls, split on "|"
+REST_SPEED2 = 2500      # `_-p5k._-Y3M` (script822.<init> #15249): a thrown item at or below this speed^2 rests
+STOP_SPEED = 5          # `_-u1I` @1366: on a flat floor, slower impacts stop instead of bouncing
+STRICT_COS = -0.7237379   # `_-u1I` @1187: STRICT_ANGLE sticks when cos(velocity, normal) is below this
+BOUNCY = 64             # `_-z2k._-B6P`
 BOOMERANG_REARM_MS = 500    # `_-p5k._-K3V` (script822.<init> #15249)
 THROW_GUARD_MS = 400        # `_-h20` @866-880
 PATH_TYPES = {"BoomerangHoming": 1, "Linear": 2, "Rocket": 3, "RocketHoming": 4, "Crawl": 5}   # else 0
@@ -149,6 +157,82 @@ def sweep(lines, team, x, y, move, mask, height, no_geometry=False):
     return x, y, line, head_stop
 
 
+def bounce(line, lu, vy, elasticity, friction):
+    """`_-p5k._-048` #15245 (the game-mode lines' `_-h40` override is left out): the speeds after a bounce.
+
+    The elasticity is `_-7c` (the item's Elasticity), averaged with 1 on a bouncy line (64). A vertical line
+    reverses `_-Lu`, a horizontal one `_-33c`, both times e. On a slope the normal part is reversed times e
+    (1.05 on a steep line `_-S1A` while falling toward it), and the tangent part loses `Friction` when it is
+    longer than 1.5 x Friction.
+    """
+    e = (1 + elasticity) * 0.5 if line.type & BOUNCY else elasticity
+    if line.sx == line.ex:
+        return lu * -e, vy
+    if line.sy == line.ey:
+        return lu, vy * -e
+    nx, ny = line.normal
+    if steep(line) and vy > 0 and (lu > 0) == (nx > 0):
+        e = 1.05
+    d = lu * nx + vy * ny
+    ux, uy = d * nx, d * ny
+    wx, wy = lu - ux, vy - uy
+    wl = math.sqrt(wx * wx + wy * wy)
+    if wl > friction * 1.5:
+        k = (wl - friction) / wl
+        wx, wy = wx * k, wy * k
+    ux, uy = ux * e, uy * e
+    return wx - ux, wy - uy
+
+
+def impact(lu, vy, line, item, can_stick=False):
+    """`_-p5k._-u1I` #15194 @712-1515, without the special cases before it (ExpireOnGeometryCollision powers,
+    Teleport, lava with Weapon) and the path behaviours. Returns (lu, vy, kind): "stick", "bounce" or "stop".
+
+    `can_stick` is StickToWalls with `_-72T` and (thrown or AlwaysArmed) [H: `_-72T`]. STRICT_ANGLE also
+    sticks a head-on hit (cos < -0.7237379); FLOORS_ONLY cancels sticking when -|nx| < ny. A stuck item
+    stops (`_-f4i`). Otherwise it bounces when the line is not a flat floor or the speed is >= 5, else stops.
+    """
+    speed = math.sqrt(lu * lu + vy * vy)
+    stick = can_stick
+    nx, ny = line.normal
+    if item["o1l"] & 1:
+        c = (lu * nx + vy * ny) / speed if speed != 0 else 0
+        if c < STRICT_COS:
+            stick = True
+    if item["o1l"] & 2 and -abs(nx) < ny:
+        stick = False
+    if stick:
+        return 0.0, 0.0, "stick"
+    if ny != -1 or speed >= STOP_SPEED:
+        lu, vy = bounce(line, lu, vy, item["7c"], item["T2P"])
+        return lu, vy, "bounce"
+    return 0.0, 0.0, "stop"
+
+
+def after_sweep(lu, vy, ground, item, state, can_stick=False):
+    """`_-p5k._-8i` @6891-7391 with a ground line: (lu, vy, state, impact kind or None).
+
+    A moving item (`_-Lu` or `_-33c` != 0) in state 0 or 1, or AlwaysArmed, calls the impact; so does a
+    lava line; otherwise a floor (normal y < 0) zeroes `_-33c`. Then, on a floor that is not steep, a thrown
+    item (state 1) at or below speed^2 2500 rests (state 0), and state 2 rests once both speeds are 0.
+    """
+    kind = None
+    if ground is None:
+        return lu, vy, state, kind
+    if (lu != 0 or vy != 0) and (state in (0, 1) or item["XJ"]):
+        lu, vy, kind = impact(lu, vy, ground, item, can_stick)
+    elif ground.type & 512:
+        lu, vy, kind = impact(lu, vy, ground, item, can_stick)
+    elif ground.normal[1] < 0:
+        vy = 0.0
+    if ground.normal[1] < 0 and not steep(ground):
+        if state == 1 and lu * lu + vy * vy <= REST_SPEED2:
+            state = 0
+        elif state == 2 and lu == 0 and vy == 0:
+            state = 0
+    return lu, vy, state, kind
+
+
 def expired(t, thrown_at, path_length):
     """@1832-1882: `_-5k()` (the item is removed) once t - `_-O13` > PathLength, when PathLength != 0."""
     return path_length != 0 and t - thrown_at > path_length
@@ -163,7 +247,9 @@ def item_type(cells):
             continue
         if field == "z4P":
             r[field] = PATH_TYPES.get(v, 0)
-        elif field in ("T30", "N59", "A4s", "p2W"):
+        elif field == "o1l":
+            r[field] = sum(STICK_FLAGS.get(p, 0) for p in set(v.split("|")))   # OR of distinct bits
+        elif field in ("T30", "N59", "A4s", "p2W", "o1G", "XJ"):
             r[field] = v.strip().lower() == "true"
         elif field in ("G6o", "S2O"):            # uint slots
             r[field] = int(v)
@@ -281,5 +367,57 @@ ANCHORS = {ABC_1100: {
         (4974, 1411, "initproperty", "_-S2O"),
         (15351, 80334, "getproperty", "_-u4H"),
         (15351, 80338, "initproperty", "_-u4H"),
+    ],
+    "_-p5k._-8i after the sweeps: impact _-u1I when moving (state 0/1 or AlwaysArmed) or on lava, else floor vy = 0; rest at speed^2 <= _-Y3M": [
+        (15192, 6912, "getproperty", "_-Lu"),
+        (15192, 6964, "pushbyte", "1"),
+        (15192, 6980, "getproperty", "_-XJ"),
+        (15192, 7000, "callpropvoid", "_-u1I, 2"),
+        (15192, 7072, "getproperty", "_-s2O"),
+        (15192, 7130, "initproperty", "_-33c"),
+        (15192, 7166, "initproperty", "_-B66"),
+        (15192, 7176, "initproperty", "_-46m"),
+        (15192, 7227, "getproperty", "_-S1A"),
+        (15192, 7298, "getproperty", "_-Y3M"),
+        (15192, 7314, "initproperty", "_-5T"),
+        (15192, 7387, "pushbyte", "5"),
+        (15249, 141, "pushint", "2500"),
+        (15249, 144, "initproperty", "_-Y3M"),
+    ],
+    "_-p5k._-u1I impact: stick (StickToWalls, STRICT_ANGLE -0.7237379, FLOORS_ONLY), bounce unless a flat floor and speed < 5": [
+        (15194, 720, "getproperty", "_-o1G"),
+        (15194, 765, "getproperty", "_-XJ"),
+        (15194, 813, "callproperty", "sqrt, 1"),
+        (15194, 1106, "getproperty", "_-o1l"),
+        (15194, 1187, "pushdouble", "-0.7237379"),
+        (15194, 1208, "pushbyte", "2"),
+        (15194, 1234, "callproperty", "abs, 1"),
+        (15194, 1277, "initproperty", "_-f4i"),
+        (15194, 1359, "pushbyte", "-1"),
+        (15194, 1368, "pushbyte", "5"),
+        (15194, 1415, "callpropvoid", "_-048, 1"),
+        (15194, 1501, "initproperty", "_-33c"),
+        (15194, 1511, "initproperty", "_-Lu"),
+    ],
+    "_-p5k._-048 bounce: _-7c (bouncy: (1 + e) / 2), vertical -> Lu, horizontal -> 33c, slope normal x e (1.05 steep) and tangent friction": [
+        (15245, 23, "getproperty", "_-B6P"),
+        (15245, 46, "pushdouble", "0.5"),
+        (15245, 70, "getproperty", "_-J6w"),
+        (15245, 157, "initproperty", "_-Lu"),
+        (15245, 192, "initproperty", "_-33c"),
+        (15245, 203, "getproperty", "_-S1A"),
+        (15245, 258, "pushdouble", "1.05"),
+        (15245, 433, "getproperty", "_-T2P"),
+        (15245, 436, "pushdouble", "1.5"),
+        (15245, 474, "callpropvoid", "normalize, 1"),
+        (4974, 880, "pushstring", "'Elasticity'"),
+        (4974, 897, "initproperty", "_-7c"),
+        (4963, 298, "pushdouble", "0.6"),
+        (4974, 618, "pushstring", "'STRICT_ANGLE'"),
+        (4974, 645, "pushstring", "'FLOORS_ONLY'"),
+        (4974, 259, "pushstring", "'AlwaysArmed'"),
+        (4974, 276, "initproperty", "_-XJ"),
+        (4974, 2997, "pushstring", "'StickToWalls'"),
+        (4974, 3014, "initproperty", "_-o1G"),
     ],
 }}

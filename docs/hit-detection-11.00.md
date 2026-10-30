@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(871 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(917 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -671,7 +671,28 @@ order]:
    (`_-x3M`). The back-off goes along −normal for a hard line and a tiny move (|x|, |y| <= 1.02,
    `_-p5k._-u4H` = `Entity._-u4H`), otherwise along the move. The ceiling cast @5474–5544 is a
    `callpropvoid`, so its result is dropped and `local37` stays null: **items have no ceiling re-cast**.
-   What follows the sweeps (@6362–, state 6, bounce `_-048`) is not transcribed.
+10. **After the sweeps** (`items.after_sweep`, @6891–7391) [V]:
+    - In state 6 against a wall, the item slides down it instead (@6362–6886, not transcribed).
+    - A moving item (`_-Lu` or `_-33c` ≠ 0) in state 0 or 1, or with `AlwaysArmed`, hits its ground line
+      through `_-u1I`; a lava line always does. Otherwise a floor (normal y < 0) only zeroes `_-33c`.
+    - The impulses `_-B66` / `_-46m` are cleared.
+    - On a floor that is not steep, a thrown item (state 1) with speed² <= 2500 (`_-p5k._-Y3M`) rests
+      (state 0). State 2 rests once both speeds are 0 (event `_-K3s(t, 5)`).
+    - A bounds test `_-c5C` can remove the item (`_-J5O`).
+11. **Impact** (`items.impact`, `_-u1I` #15194 @712–1515) [V]. The special cases before @712 are not
+    transcribed: `ExpireOnGeometryCollision` spawns a power through `_-q5`; Teleport; and a Weapon item on lava.
+    - **Stick.** The item sticks with `StickToWalls` when `_-72T` [H] and (thrown or `AlwaysArmed`).
+      `ConditionalStickToWalls` STRICT_ANGLE (1) also sticks a head-on hit (cos(velocity, normal) <
+      −0.7237379), and FLOORS_ONLY (2) cancels sticking unless −|nx| >= ny. A stuck item stops.
+    - **Bounce or stop.** Otherwise the item bounces when the line is not a flat floor or its speed is >= 5,
+      and stops otherwise.
+12. **Bounce** (`items.bounce`, `_-p5k._-048` #15245) [V]. The elasticity is `Elasticity` (`_-7c`, default
+    0.6), and (1 + e) / 2 on a bouncy line.
+    - A vertical line reverses `_-Lu` × e, a horizontal line `_-33c` × e.
+    - On a slope, the normal part is reversed × e (1.05 on a steep line when falling toward it). The
+      tangent part loses `Friction` when it is longer than 1.5 × Friction.
+    - Game-mode lines can override e (`_-h40`, not transcribed).
+
 
 **Mask.** The sweeps use hard | soft, or hard only in three cases:
 - for 64 ms after a throw by a fighter standing on a soft line (state 1);
