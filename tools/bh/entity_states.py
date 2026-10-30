@@ -38,7 +38,7 @@ UNHANDLED = (1,)   # the switch sends 1 (and anything above 9) to the "Unaccount
 # which sets 7 (eliminated: `_-s3m._-a1k` #3948 @225-241 exports 'Eliminated' = (`_-65w` == 7)); `_-X6R.Respawn` (#6784) calls `Entity._-hq` (#2996), which sets 0; `_-d2C._-85Y`
 # calls `Entity._-220` (#3000), which sets 9. State 7 is final for the match; a normal respawn places the fighter through `_-k5S._-P3o` (SpawnBot._-P3o sets 0).
 # Match start, `_-X6R._-b3x` #6777 (tick step 4, `_-W1R._-b3x(t)`): on the first tick with t >= `_-n4k` + 256 ms
-# (flag `_-C3h`), eligible fighters get state 3 and are passed to `Respawn` (-> `_-U6W` -> 7), and the replay
+# (flag `_-C3h`), eligible fighters get state 3 and are passed to `Respawn` (eliminated = false: -> `_-U6W` -> 3 -> drone, spawn_bot.py), and the replay
 # generator R (`_-s3D._-22`) is drawn twice: `_-G5X[i] = R._-f4c() % n` for i = 0, 1, with n = the number of
 # `_-I1f._-o5y` entries, or 37 when there are none (@904-1002). These two draws are not in prng-order-11.00.md.
 MATCH_START_MS = 256
@@ -61,7 +61,8 @@ def respawn_index(counters, team, n_points, team_mode):
     return k % n_points
 
 
-TRANSITIONS = {(None, 3): "Entity._-eR (KO commit)", (None, 7): "_-X6R._-U6W -> Entity._-Y6o",
+TRANSITIONS = {(None, 3): "Entity._-eR (KO commit)", (None, 7): "_-X6R._-U6W(eliminated) -> Entity._-Y6o", (3, 4): "SpawnBot._-m1O (drop starts)",
+               (4, 0): "SpawnBot._-m1O (let go)", (4, 5): "SpawnBot._-m1O (let go, other case)", (3, 0): "SpawnBot._-P3o (instant)",
                (None, 0): "_-X6R.Respawn -> Entity._-hq", (None, 9): "_-d2C._-85Y -> Entity._-220"}
 
 POWER_START = ("_-i4Z._-rU / _-I35", "_-F5N._-C5S / _-A3Q / _-V5I", "_-F5N._-J5R", "_-O5u", "new _-l4X")

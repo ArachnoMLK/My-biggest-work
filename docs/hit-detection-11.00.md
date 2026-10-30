@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(588 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(644 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -575,16 +575,19 @@ map collision only run in states 0 and 5**.
 
 **Transitions found so far** [V call edges]:
 - a KO commit sets 3 (`Entity._-eR`, ko-11.00.md);
-- the respawn reset `_-X6R._-U6W` #6787 (which also resets the damage `_-W22`) calls `Entity._-Y6o`, which sets
-  7 (eliminated);
+- the respawn reset `_-X6R._-U6W(t, f, eliminated)` #6787 (which also resets the damage `_-W22`) calls
+  `Entity._-Y6o`, which sets 7 (eliminated), **only when `eliminated` is true**; otherwise it turns 2 / 9 into 3
+  and, unless the state is 8, sets 3 again at the end (@464-494);
 - `_-X6R.Respawn` #6784 calls `Entity._-hq`, which sets 0;
 - `_-d2C._-85Y` calls `Entity._-220`, which sets 9.
 
 - `Entity._-X1J` releases a grab (6 → 0).
 - **Match start** (`_-X6R._-b3x` #6777, tick step 4). On the first tick with t ≥ `_-n4k` + 256 ms (flag
-  `_-C3h`), the eligible fighters get state 3 and are passed to `_-X6R.Respawn` #6784. Respawn runs
-  `_-U6W`, which calls `_-Y6o` and gives state 7. A game-mode rule can instead call `_-hq`, which gives
-  state 0. In the same call, the replay generator R (`_-s3D._-22`) is **drawn twice**:
+  `_-C3h`), the eligible fighters get state 3 and are passed to `_-X6R.Respawn(t, f)` #6784 with two
+  arguments, so `eliminated` takes its declared default, false (method info optional value kind 0x0A).
+  **Correction:** Respawn therefore runs `_-U6W` without `_-Y6o`; the fighter stays in state 3 and goes to
+  the respawn drone through `_-K5c` (§10.1). A game-mode rule can instead call `_-hq`, which gives
+  state 0 at once. In the same call, the replay generator R (`_-s3D._-22`) is **drawn twice**:
   `_-G5X[i] = R._-f4c() % n` for i = 0, 1, where n is the number of `_-I1f._-o5y` entries, or 37 when there
   are none (@904–1002) [V].
 - **Respawn point** (`_-X6R._-K5c` #6778, `respawn_index`). `_-G5X` holds the respawn point counters, so
@@ -594,6 +597,46 @@ map collision only run in states 0 and 5**.
   - in team mode (`_-O3P()`), team 1 uses counter 0 and the first half of the list (counter mod (n >> 1));
     team 2 uses counter 1 and the second half (the same plus ceil(n/2));
   - the fighter is then placed with `_-k5S._-P3o`.
+
+### 10.1 Respawn drone: from state 3 back to 0 ([`tools/bh/spawn_bot.py`](../tools/bh/spawn_bot.py))
+
+`Respawn(t, f, eliminated=false)` → `_-U6W` (state 3) → `_-K5c` (point choice, above) → `f._-k5S._-P3o(t, point)`.
+`f._-k5S` is the fighter's `SpawnBot` (the drone; its fighter is `_-767`) [V].
+
+- **Placement `SpawnBot._-P3o` #11873** [V]: returns on a null point; sets drone phase 1 (`_-Y6i(1)`) and the
+  target (`_-36A`, `_-35U`) = the point. Only when the fighter is spawned (`_-44x`) and `_-s3D._-F3O` is false:
+  - in a standalone client, or when `_-N1k._-w35 & (32768 | 16)` is non-zero: state **0 at once**, the fighter
+    is put on the point, phase 0;
+  - otherwise the fighter is put just off camera: x = right edge of `_-I1f._-8I` if the point is right of
+    its centre, else the left edge; y = top − 200. The state stays 3.
+- **Per tick `SpawnBot._-i1H` #11858**: a lookupswitch on the phase `_-T1X`: 0 `_-q15` (idle), 1 `_-82`, 2 `_-31s`,
+  3 `_-m1O`, 4 `_-Ck`. While the phase is 2 the fighter is moved onto the drone afterwards (`_-x1M(_-J2c, _-b3h)`).
+  `_-Y6i(p)` sets the phase and clears its start time `_-A6k` [V].
+- **Phase 1 `_-82`** (come down, duration `_-X6R._-H6B`): on the first tick `_-A6k` = t and the drone's start
+  position is kept; each tick the drone eases in (power 2, `_-D2g`, §7.3) toward the fighter. When
+  t > `_-A6k` + duration: phase 2, state 3, and `_-31s` runs in the same tick [V].
+- **Phase 2 `_-31s`** (carry, duration `_-L26`): the start is the fighter's position; the drone (and the
+  fighter with it) eases out to the point, power 3, or 2 when the fighter is not spawned and `_-d3Y._-K4x` is
+  neither 1 nor 2. When t > start + duration: both are put on the point, phase 3, and `_-m1O` runs [V].
+- **Phase 3 `_-m1O`** (drop, duration `_-d3X`): on the first tick (the arrival tick) `_-A6k` = t and the
+  fighter gets **state 4** (held still). Once `_-A6k` + duration <= t: phase 0, the fighter's vertical speed
+  `_-P5S` is set to 30 (spawned, or `_-K4x` 1 / 2) or 70 with `_-F5c` set, then **state 0** when the `_-e3e`
+  bit `_-M14` is clear and (bit `_-o24` is set, or the fighter is spawned and `_-F3O` is false); otherwise
+  **state 5** (timed in play, back to 0 after 2500 ms, see the table), `_-u55` set and `_-U5l()` called [V].
+  The drop animation speed is 700 / duration [V].
+- **Durations** [V], from the flags `_-nN(t, f)` (1 = spawned, 2 = a game-mode test `_-06A._-Z3E(f._-11)`,
+  4 = `_-S3h._-w1s` >= t) and the scoring type `_-d3Y._-11X`:
+
+| Phase | `_-F3O` | long case | `_-Ac` and not flag 2 | otherwise |
+|---|---|---|---|---|
+| 1 `_-H6B` | static `SpawnBot._-s1I` [value not read] | 2000 | 1500 | `_-o2N` |
+| 2 `_-L26` | 2000 | 3000 | 2500 | `_-j57` |
+| 3 `_-d3X` | — | — | 700 | `_-C18` |
+
+  The long case is: `_-S3h` exists, flag 4 is set and `_-w1s` = `_-n4k` + 6000; or else flag 1 (phase 1) or
+  flag 1 or 4 (phase 2) is set and `_-K2V` is false.
+- [H] The scoring-type fields (`_-o2N`, `_-j57`, `_-C18`, `_-K2V`, `_-Ac`) come from game data and are not
+  read here; with them, a normal respawn takes phase 1 + phase 2 + phase 3 ms before the fighter moves.
 
 `Entity._-b6D` #3015 is true for 4000 ms after the elimination, from `_-164` in state 7 or `_-a2O` in state 8 (it first requires the `_-8` bit of `_-e3e`) [V]. [H] It drives the post-elimination display.
 
@@ -620,5 +663,7 @@ Chained powers start from `_-h1T` through the same `_-J5R`.
 - The other filters of §3 (`_-55E`, `_-E2I`, `_-AP`, `_-r1o`).
 - Items: the per-target gates of §8 step 5, the item's own motion and map collision (`_-p5k._-8i` uses
   `_-X2e`), and the other spawners `_-F5N._-33h` (15 callers) and `_-p5k._-u1I`.
+- Respawn drone (§10.1): the idle and phase-4 handlers (`_-q15`, `_-Ck`), the value of `SpawnBot._-s1I`, the
+  scoring-type durations (`_-o2N`, `_-j57`, `_-C18`) and who calls `Respawn` after a KO [H].
 - Nothing has been checked against a running game. The next step towards the KO oracle
   (oracle-ko.md) is one scripted exchange: a hit, its knockback, then a ring-out.
