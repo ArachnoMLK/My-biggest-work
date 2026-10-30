@@ -7,7 +7,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms,  # noqa: E402
-                      counter, dash, dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, k64, kind,
+                      counter, dash, dodge_over, ease, exit_speed, exit_velocity, facing, formula_mult, gates, k64, kind,
                       landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x, speed_y, standard_flag,
                       timers)
 
@@ -164,6 +164,30 @@ class Dodge(unittest.TestCase):
         self.assertEqual(cancel_end(80.0, 0.0, **dict(k, ax_mult=2.0, o5c=8))["_-v1D"], 60.0)
         w = cancel_end(0.0, 0.0, **dict(k, gc=True))
         self.assertEqual((w["_-a1h"], w["_-y1F"], w["power_I2g_or_2"]), (True, 256, True))
+
+    def test_gates(self):
+        k = dict(t=1000, dir=8, c2e=True, i46=0, airborne=True, locked=False, locked_chain=False, h2b=0, w14=0,
+                 y1f=0, r26=False, o5c=0, d350=False, dash_ok=False, grounded=False, ve=0, d532=0, n3h=False,
+                 chase_h2l=None)
+        g = gates(**k)
+        self.assertEqual((g["dir"], g["is_fast"], g["e28"], g["chained"]), (8, True, True, False))
+        self.assertIsNotNone(gates(**dict(k, dash_ok=True)))
+        self.assertIsNone(gates(**dict(k, dash_ok=True, c2e=False)))
+        self.assertIsNotNone(gates(**dict(k, dash_ok=True, d350=True, c2e=False)))
+        self.assertIsNone(gates(**dict(k, c2e=False, grounded=True)))
+        self.assertIsNone(gates(**dict(k, locked=True)))
+        g = gates(**dict(k, locked=True, h2b=900, w14=800, y1f=400))
+        self.assertEqual((g["chain_end"], g["w14"]), (1300, 1000))
+        g = gates(**dict(k, locked=True, r26=True, o5c=4, c2e=False))
+        self.assertEqual((g["chained"], g["chase_dir"], g["is_fast"]), (True, 4, False))
+        g = gates(**dict(k, locked=True, r26=True, o5c=8, c2e=False))
+        self.assertTrue(g["is_fast"])
+        g = gates(**dict(k, c2e=False, airborne=False, grounded=True, dir=1, i46=0))
+        self.assertEqual((g["dir"], g["is_fast"]), (0, False))       # a ground up dodge becomes a spot dodge
+        g = gates(**dict(k, c2e=False, airborne=False, grounded=True, dir=1, i46=950))
+        self.assertEqual((g["dir"], g["is_fast"]), (1, False))
+        g = gates(**dict(k, locked=True, r26=True, o5c=8, c2e=False, chase_h2l=2, n3h=True))
+        self.assertFalse(g["is_fast"])
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)
