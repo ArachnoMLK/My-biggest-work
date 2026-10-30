@@ -195,6 +195,12 @@ class Harness(unittest.TestCase):
         f.facing_left = True
         harness.cast_impulse(f, {"CastImpulseX": "12", "CastImpulseY": "-30"})
         self.assertEqual((f.v1d, f.p5s), (-12.0, -30.0))
+        g = harness.Fighter(0.0, 0.0, v1d=20.0)
+        harness.cast_impulse(g, {"SpeedLimit": "8"})
+        self.assertEqual(g.v1d, 8.0)
+        g = harness.Fighter(0.0, 0.0, v1d=-20.0)              # facing right, moving left: backward
+        harness.cast_impulse(g, {"SpeedLimitBackward": "5", "SpeedLimit": "8"})
+        self.assertEqual(g.v1d, -5.0)
 
     def test_fire_impulse(self):
         f = harness.Fighter(0.0, 0.0, v1d=3.0, p5s=4.0)

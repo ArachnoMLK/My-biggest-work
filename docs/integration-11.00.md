@@ -371,3 +371,5 @@ BackwardAccelMult against the facing; [H] the air-power and `_-H6I` rules left o
 220 early, 17 late, harness life **14.9 s** (median).
 Then `_-Kc._-J4Z` = `_-759` (the last fired step set a FireImpulseX) and not `_-d38` (#1745 @231-266), which turns
 the acceleration off (`_-8i` @2054-2066): identical aggregate.
+Then the speed limits of `_-O1K` #91 @714-1083 at a power start without CastImpulseX (SpeedLimitBackward `_-M2J`
+for a backward speed, else SpeedLimit `_-u1G` toward the facing): identical aggregate.

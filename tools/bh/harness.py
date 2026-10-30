@@ -285,7 +285,9 @@ def move_locked(f):
 
 def cast_impulse(f, power):
     """`_-l4X._-O1K` #91 @385-471 / @1087-1144 (entity-step-11.00.md): CastImpulseX (`_-C6Z`) **sets** `_-v1D`,
-    negated when `_-L0` (facing left), and CastImpulseY (`_-8S`) sets `_-P5S`, each unless unset. [H] glue: run at
+    negated when `_-L0` (facing left), and CastImpulseY (`_-8S`) sets `_-P5S`, each unless unset. Without a
+    CastImpulseX, a backward |vx| above SpeedLimitBackward becomes it, else a |vx| above SpeedLimit becomes it
+    toward the facing (@714-1083). [H] glue: run at
     the power start (the first `_-f14` update), `_-L0` = the facing, the other branches of #91 (@475-1083,
     @1148-1491: `_-I2g & 2`, combo fields) are not read."""
     def num(k):
@@ -298,6 +300,14 @@ def cast_impulse(f, power):
     cx, cy = num("CastImpulseX"), num("CastImpulseY")
     if cx is not None:
         f.v1d = float(-cx if f.facing_left else cx)
+    else:                                                       # @714-1083 (the @475-710 branches left out [H])
+        back, lim = num("SpeedLimitBackward") or 0, num("SpeedLimit") or 0
+        backward = (f.v1d < 0) != f.facing_left
+        if back != 0 and backward:
+            if abs(f.v1d) > back:                               # SpeedLimitBackward `_-M2J`
+                f.v1d = float(back if f.facing_left else -back)
+        elif lim != 0 and abs(f.v1d) > lim:                     # SpeedLimit `_-u1G`, toward the facing
+            f.v1d = float(-lim if f.facing_left else lim)
     if cy is not None:
         f.p5s = float(cy)
 
