@@ -275,3 +275,50 @@ def run_walk(level_xmls, x_step=6.0, max_ticks=1000):
                 c[outcome] += 1
                 c["height_kept_1e-6"] += gap <= 1e-6
     return c
+
+
+def item_slide(grid, x, y, ground, item, lu0=10.0, max_ticks=600):
+    """A resting item on `ground` gets `_-Lu` = lu0 and slides: velocity (ground friction), the item ground
+    walk (`items.ground_walk`, which uses the full x step and leaves it for the free move too), the sweep and
+    the landing. While it moves, the free move has an x part, so the 1.01 back-off goes along the move and
+    the height above the floor is not constant. Returns (outcome, ticks): "stopped", "ledge" (lost the ground
+    past the end of its line), "through" (lost it inside the line's x range) or "moving"."""
+    lu, vy, state = lu0, 0.0, 0
+    for tick in range(1, max_ticks + 1):
+        prev = ground
+        lu, vy, mv = items.velocity(lu, vy, 0.0, 0.0, ground, item, thrown=False, o2o=False)
+        x, y, ground, step, lu, vy, _ = items.ground_walk(grid, 0, x, y, ground, mv[0], 3, lu, vy, item)
+        x, y, g2, _ = items.sweep(grid, 0, x, y, (step, mv[1]), 3, item["S2O"])
+        if g2 is None:
+            inside = min(prev.sx, prev.ex) <= x <= max(prev.sx, prev.ex)
+            return ("through" if inside else "ledge"), tick
+        ground = g2
+        lu, vy, state, _ = items.after_sweep(lu, vy, ground, item, state)
+        if lu == 0 and vy == 0:
+            return "stopped", tick
+    return "moving", max_ticks
+
+
+def run_item_slide(level_xmls, item, lu0=10.0):
+    """Aggregate counts of `item_slide` both ways for every item that stopped after its fall."""
+    c = {"slides": 0, "stopped": 0, "ledge": 0, "through": 0, "moving": 0, "ticks_max": 0}
+    for xml in level_xmls:
+        grid = map_grid(xml)
+        for x, y in item_spawns(xml):
+            lu = vy = 0.0
+            ground, state = None, 0
+            for _ in range(1000):
+                lu, vy, mv = items.velocity(lu, vy, 0.0, 0.0, ground, item, thrown=False, o2o=False)
+                x, y, ground, _ = items.sweep(grid, 0, x, y, mv, 3, item["S2O"])
+                lu, vy, state, _ = items.after_sweep(lu, vy, ground, item, state)
+                if ground is not None and lu == 0 and vy == 0:
+                    break
+            else:
+                continue
+            for sign in (1.0, -1.0):
+                c["slides"] += 1
+                outcome, ticks = item_slide(grid, x, y, ground, item, sign * lu0)
+                c[outcome] += 1
+                if outcome == "stopped":
+                    c["ticks_max"] = max(c["ticks_max"], ticks)
+    return c

@@ -91,6 +91,12 @@ class Fall(unittest.TestCase):
         c = smoke.run_walk([ledge])
         self.assertEqual((c["walks"], c["left"], c["height_kept_1e-6"]), (2, 2, 2))
 
+    def test_item_slide(self):
+        from bh import items
+        xml = FLAT.replace('<Respawn X="0" Y="0" />', '<ItemInitSpawn X="0" Y="0" />')
+        c = smoke.run_item_slide([xml], items.ITEM_DEFAULTS)
+        self.assertEqual((c["slides"], c["stopped"], c["through"]), (2, 2, 0))
+
     def test_run_counts(self):
         c = smoke.run([FLAT, EMPTY, MOVING], max_ticks=200)
         self.assertEqual((c["maps"], c["respawns"], c["contact"], c["within_1e-6"]), (3, 4, 2, 2))

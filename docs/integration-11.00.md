@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 941 | 0 |
+| `hit-detection-verify` | 964 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 266 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 271 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -105,6 +105,20 @@ rests 60 more ticks.
 | Stopped (both speeds 0) | 623, after up to 349 ticks of bounces; all 623 stay still for 60 ticks |
 | Never stopped | 59: they micro-bounce on flat floors whose normal y is −0.9999999999999999, not −1; 58 of them still stay in place |
 | No contact | 141: 129 on maps with moving platforms (left out here), 12 with no line below them at all |
+
+**Sliding.** Each item that stopped is then pushed both ways (`_-Lu` = ±10) and slides. Each tick runs the
+item ground walk (`items.ground_walk`), whose full x step is used again by the free move, then the sweep and
+the landing:
+
+| | |
+|---|---|
+| Slides | 1,246 |
+| Stopped | 1,244, within 6 ticks: under speed 5, the impact stops the item dead on a flat floor |
+| Off a ledge | 2 |
+| **Fell through a floor** | **0** |
+
+While it moves, the free move has an x part, so the 1.01 back-off goes along the move. The height above the
+floor is then not constant (about 0.05 instead of 1.01) [V].
 
 **Rounding finding [V].** A flat line's normal is (0, w) scaled by `Point.normalize(1)`, i.e. times
 1 / length. For some widths (e.g. 1700) this gives −0.9999999999999999 instead of −1. The impact test
