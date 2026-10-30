@@ -44,8 +44,9 @@ bytecode arithmetic and a `*-verify` command pins it.
    respawn point of the 122 local maps; 829 of 829 ground contacts end on the line within 1e-6; the 166 falls
    without contact are all on maps with moving platforms (dynamic lines left out). With the moving platforms'
    lines: 965 of 965 contacts on the line; then 60 standing ticks (step-start landing `_-P5S` = 0, no gravity on
-   a ground line, both in #30): all 794 flat fixed-ground cases stay still. Next: slope slide and platform
-   carry while standing, then the KO oracle of #27.
+   a ground line, both in #30): all 794 flat fixed-ground cases stay still. Then lava as hits and the platform
+   carry (#30): 954 of 954 keep the ground, 146 of 146 keep their height on moving lines; the 14 gentle hard
+   slopes creep [H]. Next: the KO oracle of #27.
 
 ## Rules that stay in force
 
