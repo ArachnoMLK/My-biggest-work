@@ -45,6 +45,21 @@ def item_slots(csv_text):
     return out
 
 
+def power_rows(csv_text):
+    """powerTypes.csv (row 0 the table name, row 1 the header) -> {PowerName: row of strings}, the map `_-kl` that
+    `PowerType._-p4G(name)` #6493 reads (a haxe StringMap, `getReserved` for reserved keys). Empty cells are
+    dropped so `redirect` sees a missing version as absent. [H] the key is PowerName (the `_-kl` writer is not
+    read)."""
+    rows = list(csv.reader(io.StringIO(csv_text)))
+    head = rows[1]
+    out = {}
+    for r in rows[2:]:
+        cells = {k: v for k, v in zip(head, r) if v != ""}
+        if cells.get("PowerName"):
+            out[cells["PowerName"]] = cells
+    return out
+
+
 def hero_powers(herotypes_xml):
     """HeroTypes.xml -> {HeroID: {"mBaseWeapon1": ..., "mSpecialPower1_Forward": ...}} for `power_name`.
     [H] the HeroType parser is not read: the columns are taken to fill the fields of the same name with "m"."""
@@ -164,5 +179,8 @@ ANCHORS = {ABC_1100: {
         (1726, 1232, "lessthan", ""),
         (1726, 1241, "callproperty", "_-r35, 0"),
         (1726, 1302, "pushdouble", "60.0"),
+        (6493, 3, "getproperty", "_-kl"),
+        (6493, 27, "callproperty", "getReserved, 1"),
+        (6493, 41, "getproperty", "h"),
     ],
 }}
