@@ -150,7 +150,7 @@ def dodge(f, t, dir, rows):
     c = c2e(t, dir, f.lock_start, False, not airborne)
 
     def locked(flag):
-        return is_dodge_locked(False, f.u5e, flag, f.e6p, False, f.r51, False, f.xb, False, 0)
+        return is_dodge_locked(move_locked(f), f.u5e, flag, f.e6p, False, f.r51, False, f.xb, False, 0)
 
     g = gates(t, dir, c, f.i46, airborne, locked(False), locked(c), f.h2b, f.w14, f.y1f, False, f.o5c, False,
               False, not airborne, 0, f.lock_start, f.facing_left, None)
@@ -236,6 +236,19 @@ def attack(f, t, keys, heavy):
 UNSET = 2147483647        # an empty CastImpulse cell (`_-l4X._-O1K` #91 @396)
 
 
+def _true(v):
+    return str(v or "").upper() == "TRUE"
+
+
+def move_locked(f):
+    """`IsMoveLocked` from a running power: `_-l4X._-f14` #59 @682-725 calls the owner's `_-a6l(true)` (the flag
+    `_-23G`, read by `_-65i()`, which `IsMoveLocked` #3061 tests) when the power has neither AllowMove (`_-Y5V`)
+    nor AllowMoveForward (`_-T20`); `_-R63` #46 @4677-4719 clears it with AllowRecoverMove (`_-r4W`). While locked,
+    `Entity._-1L` #2986 @50-348 does not take the move inputs. [H] glue: cleared when the harness drops the power,
+    `_-Kc._-H6I(t)` not tested, AllowRecoverMove not modelled."""
+    return f.power is not None and f.power.get("move_lock", False)
+
+
 def cast_impulse(f, power):
     """`_-l4X._-O1K` #91 @385-471 / @1087-1144 (entity-step-11.00.md): CastImpulseX (`_-C6Z`) **sets** `_-v1D`,
     negated when `_-L0` (facing left), and CastImpulseY (`_-8S`) sets `_-P5S`, each unless unset. [H] glue: run at
@@ -291,6 +304,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     if t < f.stun_until:                                        # `_-5q()`: no input acts in hitstun [H]
         left = right = jump_press = dodge_press = light_press = heavy_press = False
         keys = 0
+    if move_locked(f):                                          # `_-1L`: no move input while move-locked
+        left = right = False
     if f.power is not None:                                     # `_-Kc._-25` before `_-8i` (state 0)
         step = f.power["tl"].update(tick_index(t))
         if step is not None:
@@ -320,6 +335,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                                    "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
                                    "row": power}
                         cast_impulse(f, power)
+                        f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
                         f.lock_start = t                        # `_-532` = t: `Entity._-c1r` at the move start
             events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)

@@ -195,6 +195,18 @@ class Harness(unittest.TestCase):
         harness.tick(f, 1000, smoke.map_grid(FLAT))
         self.assertAlmostEqual(f.v1d, 60.0 - 10.0 * 0.384)      # no friction, the decay instead
 
+    def test_move_lock_of_a_power(self):
+        powers = {"J": {"PowerName": "J", "CastTime": "5"}, "M": {"PowerName": "M", "CastTime": "5", "AllowMove": "TRUE"}}
+        grid = smoke.map_grid(FLAT)
+        for name, moves in (("J", False), ("M", True)):
+            f = harness.Fighter(0.0, -400.0, moves={"hero": {}, "weapon": {"id": "U", "slots": [name] * 21},
+                                                     "powers": powers})
+            harness.tick(f, 1600, grid, light_press=True)
+            self.assertEqual(harness.move_locked(f), not moves)
+            v = f.v1d
+            harness.tick(f, 1616, grid, right=True)
+            self.assertEqual(f.v1d > v, moves)                # right is ignored while move-locked
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)

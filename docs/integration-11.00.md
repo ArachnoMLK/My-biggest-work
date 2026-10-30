@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 382 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 383 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -354,3 +354,9 @@ More diagnosis (aggregate, local): harness life is the same on maps with and wit
 13.9 s over 60 victims vs 13.1 s over 177), so the left-out platforms are not the main gap. Of 879 harness KOs,
 **118 never landed** after the let-go (a placement / drop question to check against the drone and the spawn
 points), 525 landed 1-3 times, 236 four times or more.
+
+**Move lock of a power** (`harness.move_locked`): a power with neither AllowMove nor AllowMoveForward makes its
+owner move-locked (`_-l4X._-f14` #59 @682-725 → `Entity._-a6l(true)` → `_-23G` → `_-65i()` → `IsMoveLocked`
+#3061), and `Entity._-1L` then takes no left / right; the lock also feeds `IsDodgeLocked`. [H] cleared when the
+harness drops the power (AllowRecoverMove and `_-Kc._-H6I` not modelled). Rerun: **222 early, 15 late**, 4 within
+1 s, 85 victims hit, harness life 14.2 s (median, was 13.3 s).
