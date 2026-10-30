@@ -20,7 +20,6 @@ from bh import anm as anmmod, collision as collisionmod, commands as commandsmod
 from bh import movement as movementmod  # noqa: E402
 from bh import oracle as oraclemod  # noqa: E402
 from bh import knockback as knockbackmod  # noqa: E402
-from bh import movement as movementmod  # noqa: E402
 from bh import powertypes as powertypesmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
@@ -345,18 +344,6 @@ def cmd_prng_order_verify(a):
 
 def cmd_step_verify(a):
     """Check the pinned order of operations of Entity._-8i; exit 1 on mismatch, 2 on unknown ABC."""
-
-
-def cmd_ko_verify(a):
-    """Check the pinned static evidence of the KO bounds test; exit 1 on mismatch, 2 on unknown ABC."""
-
-
-def cmd_input_buffer_verify(a):
-    """Check the pinned shape of the input buffer (#6313, #6323); exit 1 on mismatch, 2 on unknown ABC."""
-
-
-def cmd_knockback_verify(a):
-    """Check the pinned shape of the damage / knockback formula (#1674, #1675); exit 1 on mismatch, 2 on unknown ABC."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
     if not os.path.exists(p):
         sys.exit("run `abc-extract` first (or pass --abc)")
@@ -376,6 +363,16 @@ def cmd_knockback_verify(a):
     for group in stepmod.ANCHORS[sha]:
         print(f"  ok  {group}")
     print("static bytecode evidence only: no execution, no runtime oracle (docs/entity-step-11.00.md)")
+
+
+def cmd_ko_verify(a):
+    """Check the pinned static evidence of the KO bounds test; exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
     if sha not in komod.ANCHORS:
         print(f"no KO anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in komod.ANCHORS)})")
         sys.exit(2)
@@ -389,6 +386,16 @@ def cmd_knockback_verify(a):
     for group in komod.ANCHORS[sha]:
         print(f"  ok  {group}")
     print("static bytecode evidence only: no execution, no runtime oracle (docs/ko-11.00.md)")
+
+
+def cmd_input_buffer_verify(a):
+    """Check the pinned shape of the input buffer (#6313, #6323); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
     if sha not in inputbufmod.ANCHORS:
         print(f"no input-buffer anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in inputbufmod.ANCHORS)})")
         sys.exit(2)
@@ -401,6 +408,16 @@ def cmd_knockback_verify(a):
     for group in inputbufmod.ANCHORS[sha]:
         print(f"  ok  {group}")
     print("static bytecode evidence only: no execution, no runtime oracle (docs/input-buffer-11.00.md)")
+
+
+def cmd_knockback_verify(a):
+    """Check the pinned shape of the damage / knockback formula (#1674, #1675); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
     if sha not in knockbackmod.ANCHORS:
         print(f"no knockback anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in knockbackmod.ANCHORS)})")
         sys.exit(2)
