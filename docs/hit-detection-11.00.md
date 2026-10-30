@@ -577,7 +577,29 @@ in movement-11.00.md, PR #16) [V]. The grounded branch is taken when `_-96f` is 
 - in the dash window (`_-26T` + 160 > t, with a ground line or `_-Xb` == 1), it is 170 instead;
 - then `_-P5S` = 0, `_-96f` = null and `_-A4A` −= impulse, which the next fold adds to `_-P5S`.
 
-The air jumps (@1545–) are not transcribed.
+- **After a ground jump** (@1066–1537), when a side is held (`_-81n()`) or local 6 (the dash window with the
+  `_-R5q._-66U` bits 4 / 8 matching the side), with M = `_-K64()`. Held left (`_-141()`): with `_-M3V` and
+  vx > 4, vx −= 4; else a positive vx becomes 0; else at vx ≤ −M, `_-84` −= `_-13G` × 0.5 (`_-13G` = 30, so
+  15). Held right is the mirror. [H] `_-84` is the horizontal impulse, folded like `_-A4A`.
+
+**Wall jump** (@1545–2014) [V], when the grounded branch is not taken and `_-r51` ≠ 0 or `_-Xb` == 2:
+- `_-31A()`, `_-96f` = null, `_-A4A` −= `Entity._-S4O` × k (53 × k), `_-v1D` = 0;
+- `_-P5S` takes the value returned by the `_-v1D` write [H: 0; `_-N5C` is an interface, #3199 has no body];
+- with no side held, `_-CV(_-r35())` [H: turn away from the wall];
+- `_-84` += 48 on a wall `_-r51` == 1 (× 0.9 when held left), else −= 48 (× 0.9 when held right): the push
+  is weaker when the held side points back at the wall [H on the side meaning];
+- event `'jump.Wall'`.
+
+**Air jump** (@2018–2423) [V], when `_-P5Y()` < `_-56T()` [H: air jumps used < allowed]:
+- `_-31A()`, impulse 57 × k, or 65 × k with the second argument; `_-P5S` = 0; `_-A4A` −= impulse;
+  `_-k1j(_-P5Y() + 1)`; a stat counter `_-K53._-G5O`++ under `_-i2H._-A1S`;
+- with a side held and M = `_-K64(false)`: held left, vx > M becomes M; held right, vx < −M becomes −M;
+- event `'jump.Air'`.
+- With no air jump left (@2427): local 12 = `_-e3e` & `Entity._-8` ≠ 0, `_-I5A` = 0.
+
+Not yet read: the pre-jump path @223–506 (when neither the second nor the third argument is set and no
+power runs: `_-w4c`, `_-n5b`, then `_-Xb` = 1 / 2 / 3 for ground / wall / air and `_-I5A` = t, return) — it
+looks like the jump squat that stores the pending kind before the real jump [H].
 
 **Horizontal speed** ([`tools/bh/horizontal.py`](../tools/bh/horizontal.py), `_-8i` @519–2659; first read in
 horizontal-11.00.md, PR #23) [V]. Before the walk, `_-v1D` goes through friction, then acceleration:
