@@ -322,3 +322,74 @@ def run_item_slide(level_xmls, item, lu0=10.0):
                 if outcome == "stopped":
                     c["ticks_max"] = max(c["ticks_max"], ticks)
     return c
+
+
+def _hit_point_on_line(line, x, y, wanted):
+    """The sweep backs off 1.01 along the *actual* move, or along -normal when that move is tiny on a hard
+    line (`items._back_off`). The actual move is parallel to the wanted one, so the hit point is either
+    P - normal x 1.01 or P + unit(wanted) x 1.01; accept the contact when one of them is on the line."""
+    nx, ny = line.normal
+    cands = [(x - nx * items.GROUND_PUSH, y - ny * items.GROUND_PUSH)]
+    n = (wanted[0] ** 2 + wanted[1] ** 2) ** 0.5
+    if n:
+        cands.append((x + wanted[0] / n * items.GROUND_PUSH, y + wanted[1] / n * items.GROUND_PUSH))
+    return any(abs(cy - line_y(line, cx)) <= 1e-6 for cx, cy in cands)
+
+
+THROW_BITS = (0, 1, 2, 4, 8, 4 | 1)      # facing, up, down, left, right, up-left
+
+
+def throw_flight(grid, x, y, ground_type, bits, charge, item, max_ticks=900):
+    """A standing fighter (facing right, at rest) throws `item`: `items.throw_vector` / `throw_start`, spawn
+    30 above the feet, then velocity (thrown gravity), sweep and landing every tick. Returns (outcome,
+    ticks, on_line): outcome "stopped" (both speeds 0 on a line), "moving" (still bouncing at the end) or
+    "gone" (no line touched for the last 300 ticks: it left the map); on_line tells whether the first
+    contact point (feet + back-off) is on its line within 1e-6."""
+    d = items.throw_vector(charge, bits, False, item, ground_type, 0.0, 0.0)
+    st = items.throw_start(d, item, 1, 1, charge, 0)
+    lu, vy, state = st["Lu"], st["33c"], st["state"]
+    x, y, ground = x, y - items.SPAWN_RISE, None
+    on_line, last_contact = None, 0
+    for tick in range(1, max_ticks + 1):
+        mask = items.sweep_mask(ground_type is not None and ground_type & 2, state, 0, tick * TICK_MS, 0,
+                                False, item["OY"], item["T30"])
+        thrown = state == 1
+        lu, vy, mv = items.velocity(lu, vy, 0.0, 0.0, ground, item, thrown=thrown, o2o=False)
+        x, y, step, lu, vy, kinds = (x, y, mv[0], lu, vy, [])
+        if ground is not None:
+            x, y, ground, step, lu, vy, kinds = items.ground_walk(grid, 0, x, y, ground, mv[0], mask, lu, vy, item)
+        x, y, ground, _ = items.sweep(grid, 0, x, y, (step, mv[1]), mask, item["S2O"])
+        if ground is not None:
+            last_contact = tick
+            if on_line is None:
+                on_line = ground.sx == ground.ex or _hit_point_on_line(ground, x, y, (step, mv[1]))
+        lu, vy, state, _ = items.after_sweep(lu, vy, ground, item, state)
+        if ground is not None and lu == 0 and vy == 0:
+            return "stopped", tick, on_line
+        if tick - last_contact > 300:
+            return "gone", tick, on_line
+    return "moving", max_ticks, on_line
+
+
+def run_throws(level_xmls, item, max_ticks=900):
+    """Aggregate counts of `throw_flight` from every respawn landing on a fixed, non-lava line."""
+    c = {"throws": 0, "stopped": 0, "moving": 0, "gone": 0, "touched_a_line": 0, "first_contact_on_line": 0,
+         "ticks_max_stopped": 0}
+    for xml in level_xmls:
+        grid = map_grid(xml)
+        for x, y in respawns(xml):
+            ticks, r = fall(grid, x, y)
+            if r is None or r.ground.type & LAVA:
+                continue
+            for bits in THROW_BITS:
+                for charge in (0, 2500):
+                    c["throws"] += 1
+                    outcome, t, on_line = throw_flight(grid, r.x, r.y, r.ground.type, bits, charge, item,
+                                                       max_ticks)
+                    c[outcome] += 1
+                    if on_line is not None:
+                        c["touched_a_line"] += 1
+                        c["first_contact_on_line"] += on_line
+                    if outcome == "stopped":
+                        c["ticks_max_stopped"] = max(c["ticks_max_stopped"], t)
+    return c

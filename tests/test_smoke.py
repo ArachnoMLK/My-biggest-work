@@ -97,6 +97,13 @@ class Fall(unittest.TestCase):
         c = smoke.run_item_slide([xml], items.ITEM_DEFAULTS)
         self.assertEqual((c["slides"], c["stopped"], c["through"]), (2, 2, 0))
 
+    def test_throws(self):
+        from bh import items
+        c = smoke.run_throws([FLAT], items.ITEM_DEFAULTS)
+        self.assertEqual(c["throws"], 2 * len(smoke.THROW_BITS) * 2)
+        self.assertEqual(c["touched_a_line"], c["first_contact_on_line"])
+        self.assertGreater(c["stopped"], 0)
+
     def test_run_counts(self):
         c = smoke.run([FLAT, EMPTY, MOVING], max_ticks=200)
         self.assertEqual((c["maps"], c["respawns"], c["contact"], c["within_1e-6"]), (3, 4, 2, 2))

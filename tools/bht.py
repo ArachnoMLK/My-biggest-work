@@ -471,6 +471,9 @@ def cmd_smoke_fall(a):
     print("items (default ItemType, static lines):")
     for k, v in smokemod.run_items(xmls, smokemod.items.ITEM_DEFAULTS).items():
         print(f"  {k:<24} {v}")
+    print("item thrown from every landing, 6 directions x (no charge, 2.5 s) (static lines):")
+    for k, v in smokemod.run_throws(xmls, smokemod.items.ITEM_DEFAULTS).items():
+        print(f"  {k:<24} {v}")
     print("item pushed both ways (_-Lu = 10) after it stopped (static lines):")
     for k, v in smokemod.run_item_slide(xmls, smokemod.items.ITEM_DEFAULTS).items():
         print(f"  {k:<24} {v}")

@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 1035 | 0 |
+| `hit-detection-verify` | 1069 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 280 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 284 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -119,6 +119,19 @@ the landing:
 
 While it moves, the free move has an x part, so the 1.01 back-off goes along the move. The height above the
 floor is then not constant (about 0.05 instead of 1.01) [V].
+
+**Throws.** From every respawn landing on a fixed, non-lava line, the fighter (at rest, facing right)
+throws a default item in 6 directions (facing, up, down, left, right, up-left), uncharged and charged
+2.5 s. The throw uses `items.throw_vector` / `throw_start` (PR #30), with the spawn 30 above the feet. Each
+tick then runs the velocity (thrown gravity), item ground walk, sweep and landing:
+
+| | |
+|---|---|
+| Throws | 9,900 |
+| First contact on its line within 1e-6 | **6,910 of 6,910** |
+| Stopped on a line | 3,738 (within 863 ticks) |
+| Left the map (no line touched for 300 ticks) | 5,688: a 75- to 135-unit throw often leaves the stage |
+| Still bouncing after 900 ticks | 474 |
 
 **Rounding finding [V].** A flat line's normal is (0, w) scaled by `Point.normalize(1)`, i.e. times
 1 / length. For some widths (e.g. 1700) this gives −0.9999999999999999 instead of −1. The impact test
