@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 387 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 388 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -373,3 +373,5 @@ Then `_-Kc._-J4Z` = `_-759` (the last fired step set a FireImpulseX) and not `_-
 the acceleration off (`_-8i` @2054-2066): identical aggregate.
 Then the speed limits of `_-O1K` #91 @714-1083 at a power start without CastImpulseX (SpeedLimitBackward `_-M2J`
 for a backward speed, else SpeedLimit `_-u1G` toward the facing): identical aggregate.
+Then the power's gravity cancel as `_-o4b` #45 sets it (while the step is held: tick < start + AntigravTime, from
+#59 @515-592; else CancelGravity): identical aggregate.

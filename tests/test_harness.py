@@ -250,6 +250,14 @@ class Harness(unittest.TestCase):
         harness.tick(f, 1000, smoke.map_grid(FLAT), right=True)
         self.assertEqual(f.v1d, 0.0)                          # `_-J4Z`: the held side does not accelerate
 
+    def test_antigrav_time(self):
+        f = harness.Fighter(0.0, 0.0)
+        f.power = {"row": {"AntigravTime": "10", "CancelGravity": "TRUE"}, "tl": harness.Timeline([1], 100)}
+        self.assertTrue(harness.power_cancels_gravity(f, 1600))      # step pending: CancelGravity
+        f.power["tl"].update(101)                                     # the only step fires and is held
+        self.assertTrue(harness.power_cancels_gravity(f, 16 * 109))
+        self.assertFalse(harness.power_cancels_gravity(f, 16 * 110))  # antigrav over at start + 10
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)

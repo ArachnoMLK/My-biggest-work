@@ -270,6 +270,22 @@ def power_accel(f, left_held):
     return 1.0
 
 
+def power_cancels_gravity(f, t):
+    """The running power's `_-q1G` as `_-l4X._-o4b` #45 @1082-1176 sets it each update: while its step is held
+    (`_-d38`), tick < start + AntigravTime (`_-q12`, #59 @515-592); else the CancelGravity column. [H] the
+    GCancelTime (`_-aO`) case under `_-I2g & 2` is left out."""
+    if f.power is None:
+        return False
+    row, tl = f.power.get("row", {}), f.power["tl"]
+    if tl.running:
+        try:
+            antigrav = int(float(row.get("AntigravTime") or 0))
+        except ValueError:
+            antigrav = 0
+        return antigrav != 0 and tick_index(t) < tl.start + antigrav
+    return _true(row.get("CancelGravity"))
+
+
 def _true(v):
     return str(v or "").upper() == "TRUE"
 
@@ -433,7 +449,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     f.p5s = clamp(f.p5s, cap)
     g_term = 0.0
     fall_cap = FALL_CAP_DROP if keys & 2 else FALL_CAP           # @5097-5170: 85 with Drop held [H: `_-61h`, lock]
-    cancel = f.power is not None and _true(f.power.get("row", {}).get("CancelGravity"))   # `_-q1G` @5252
+    cancel = power_cancels_gravity(f, t)                        # `_-q1G` @5252
     if gravity_applies(f.e6p, f.ground, f.y1l, t, cancel, GRAVITY) and f.p5s < fall_cap:
         g_term = GRAVITY * STEP
         f.p5s += g_term
