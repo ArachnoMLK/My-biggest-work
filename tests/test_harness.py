@@ -117,6 +117,13 @@ class Harness(unittest.TestCase):
         self.assertEqual(ev[0][2], True)                      # inside 1016 + 32 .. 1016 + 160
         self.assertNotEqual(ev[0][1], air_slot)               # a ground move in the air
 
+    def test_attack_names_the_power(self):
+        f = harness.Fighter(0.0, -400.0, moves={"hero": {"mBaseWeapon1": "Sword"},
+                                                 "weapon": {"id": "Unarmed", "slots": [None, "UJab"] + [None] * 19}})
+        ev = harness.tick(f, 1000, smoke.map_grid(FLAT), light_press=True, keys=0)
+        self.assertEqual(ev[0][0], "attack")
+        self.assertEqual(len(ev[0]), 4)
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)

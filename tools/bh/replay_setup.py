@@ -15,11 +15,12 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
-from . import dodge, harness, stats
+from . import dodge, harness, power_pick, stats
 from .level_bounds import camera_bounds, level_kills
 from .respawn_points import parse_respawns
 from .smoke import map_grid
 
+UNARMED = "Unarmed"        # `ItemType._-m4V` (ItemType._-R2Z #4965 @313-330); fighters start unarmed [H]
 HARNESS_STATS = ("RunSpeed", "AirRunSpeed", "Friction", "AirFriction", "Acceleration", "AirAcceleration")
 
 
@@ -71,6 +72,9 @@ class Swz:
         self.stat_types = stats.parse_stat_types(_read(os.path.join(game, "StatTypes.xml")))
         path = os.path.join(game, "DodgeTypes.xml")
         self.dodge_rows = dodge.parse_types(_read(path))[0] if os.path.exists(path) else None
+        self.heroes = power_pick.hero_powers(_read(os.path.join(game, "HeroTypes.xml")))
+        path = os.path.join(game, "itemTypes.csv")
+        self.items = power_pick.item_slots(_read(path)) if os.path.exists(path) else {}
         self.scoring = {}
         for t in ET.fromstring(_read(os.path.join(game, "ScoringTypes.xml"))):
             cells = {c.tag: (c.text or "") for c in t}
@@ -104,7 +108,9 @@ def setup(rep, swz):
         fighter_stats[e["id"]] = st
     return {"grid": map_grid(desc), "points": parse_respawns(desc), "cam": cam, "kill": swz.kills[name],
             "drone_camera": (cam[0], cam[1], cam[2] - cam[0]), "stats": fighter_stats,
-            "cells": swz.scoring.get(rep["settings"]["scoring_type_id"], {})}
+            "cells": swz.scoring.get(rep["settings"]["scoring_type_id"], {}),
+            "moves": {e["id"]: {"hero": swz.heroes.get(e["heroes"][0]["hero_id"]), "weapon": swz.items.get(UNARMED)}
+                      for e in rep["entities"] if swz.heroes.get(e["heroes"][0]["hero_id"]) and swz.items.get(UNARMED)}}
 
 
 def run(rep, swz, ticks=6000):
@@ -114,4 +120,4 @@ def run(rep, swz, ticks=6000):
     lives = rep["settings"].get("starting_lives", 0)
     return harness.play(rep["entities"], rep["random_seed"], s["points"], s["drone_camera"], s["grid"],
                         (s["cam"], s["kill"]), s["stats"], rep["inputs"], s["cells"], lives=lives,
-                        lives_mode=lives > 0, ticks=ticks, dodge_rows=swz.dodge_rows)
+                        lives_mode=lives > 0, ticks=ticks, dodge_rows=swz.dodge_rows, moves_by_id=s["moves"])

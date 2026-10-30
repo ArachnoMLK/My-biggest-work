@@ -37,6 +37,7 @@ from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, coold
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, state_at
+from .power_pick import power_name
 from .ko import ko_mask
 from .respawn_points import candidates
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
@@ -92,6 +93,7 @@ class Fighter:
     facing_left: bool = False  # `_-n3h`
     i46: int = 0              # `_-46I`, last hit (no hits here)
     e3: int = 0               # `_-3E`
+    moves: dict = None        # {"hero": power_pick.hero_powers row, "weapon": power_pick.item_slots row}
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -230,7 +232,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         events.append(("press", jump(f, t, left, right)))
     for press, heavy in ((light_press, False), (heavy_press, True)):
         if press:
-            events.append(("attack",) + attack(f, t, keys, heavy))
+            slot, gc = attack(f, t, keys, heavy)
+            name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
+            events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
     vmax = _vmax(f)
@@ -361,7 +365,7 @@ def ko_reset(f):
 
 
 def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id, cells=None, lives=3,
-         lives_mode=True, team_type=0, standalone=False, ticks=6000, dodge_rows=None):
+         lives_mode=True, team_type=0, standalone=False, ticks=6000, dodge_rows=None, moves_by_id=None):
     """Both fighters of a plain 1v1 replay in lockstep from the match-start step. Per tick, in `_-5r` order:
     phase 5 (`_-k5H`: the drone first, then movement in states 0 / 5, which clears `_-44x`), then phase 6
     (`_-eR`: a ring-out mask -> KO commit at t, lives - 1, then `Respawn`: state 7 when eliminated, else the
@@ -389,7 +393,8 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 d.tick(t, timing_flags(body["spawned"], False, None, t), rules, team_type, False)
                 if d.phase == IDLE and body["state"] in (0, 5):
                     st = stats_by_id.get(p["e"]["id"])
-                    p["f"] = Fighter(body["x"], body["y"], p5s=body["vy"], stats=dict(st) if st else dict(DEFAULT_STATS))
+                    p["f"] = Fighter(body["x"], body["y"], p5s=body["vy"], stats=dict(st) if st else dict(DEFAULT_STATS),
+                                     moves=(moves_by_id or {}).get(p["e"]["id"]))
                     p["let_go"].append(t)
             if body["state"] in (0, 5) and p["f"] is not None:
                 body["spawned"] = SPAWNED_IN_PLAY

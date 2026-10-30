@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 1868 | 0 |
+| `hit-detection-verify` | 1917 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 371 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 374 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -287,3 +287,7 @@ frames, b4 capsules, b5 knockback and hitstun, b6 rerun).
 **(b1)** `harness.attack`: a fresh LightAttack (128) / HeavyAttack (64) press records `("attack", slot, gravity
 cancel)`: `dodge.cancel_flags` in a dodge, `dodge.attack_air_offset`, `input_buffer.attack_slot`. Nothing moves
 yet: the power is not started (b2-b5). [H] glue: no running move, `_-f2b()` false, no jump flag, `_-y1U` false.
+
+**(b2)** the event also names the power (`power_pick.power_name`): `replay_setup` loads HeroTypes.xml
+(signatures) and itemTypes.csv (`_-Z6M`), and each fighter starts with the Unarmed item (`ItemType._-m4V`)
+[H: no pick-up yet]. The `power_pick.redirect` versions and the PowerType lookup come with b3.
