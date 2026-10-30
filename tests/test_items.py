@@ -1,12 +1,14 @@
 """Tests of the thrown item motion (tools/bh/items.py). Synthetic values only.
 Run: python -I -m unittest discover -s tests"""
+import math
 import os
 import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.items import ITEM_DEFAULTS, expired, item_type, sweep, sweep_mask, target_gate, velocity  # noqa: E402
+from bh.items import (ITEM_DEFAULTS, after_sweep, bounce, expired, impact, item_type, sweep, sweep_mask,  # noqa: E402
+                      target_gate, velocity)
 from bh.raycast import Line  # noqa: E402
 
 
@@ -114,6 +116,51 @@ class Sweep(unittest.TestCase):
         self.assertIs(g, wall)
         self.assertTrue(head)
         self.assertAlmostEqual(x, 10.0 - 1.01)
+
+class Impact(unittest.TestCase):
+    FLOOR = Line(-100.0, 50.0, 100.0, 50.0, 1, (0.0, -1.0))
+    WALL = Line(10.0, 0.0, 10.0, 50.0, 1, (-1.0, 0.0))
+
+    def test_bounce_on_floor_and_wall(self):
+        self.assertEqual(bounce(self.FLOOR, 3.0, 20.0, 0.6, 2.5), (3.0, -12.0))
+        self.assertEqual(bounce(self.WALL, 20.0, 3.0, 0.6, 2.5), (-12.0, 3.0))
+        bouncy = Line(-100.0, 50.0, 100.0, 50.0, 65, (0.0, -1.0))
+        self.assertEqual(bounce(bouncy, 0.0, 20.0, 0.6, 2.5), (0.0, -16.0))      # (1 + 0.6) / 2
+
+    def test_bounce_on_slope(self):
+        n = (0.6, -0.8)
+        slope = Line(0.0, 100.0, 80.0, 40.0, 1, n)
+        lu, vy = bounce(slope, 0.0, 10.0, 0.5, 2.5)
+        d = 10.0 * -0.8
+        ux, uy = d * 0.6, d * -0.8
+        wx, wy = -ux, 10.0 - uy
+        k = (math.hypot(wx, wy) - 2.5) / math.hypot(wx, wy)
+        self.assertAlmostEqual(lu, wx * k - ux * 0.5)
+        self.assertAlmostEqual(vy, wy * k - uy * 0.5)
+
+    def test_impact_kinds(self):
+        self.assertEqual(impact(0.0, 4.0, self.FLOOR, ITEM_DEFAULTS)[2], "stop")
+        self.assertEqual(impact(0.0, 5.0, self.FLOOR, ITEM_DEFAULTS), (0.0, -3.0, "bounce"))
+        self.assertEqual(impact(1.0, 1.0, self.WALL, ITEM_DEFAULTS)[2], "bounce")
+        strict = dict(ITEM_DEFAULTS, o1l=1)
+        self.assertEqual(impact(20.0, 0.0, self.WALL, strict)[2], "stick")      # head-on: cos = -1
+        self.assertEqual(impact(20.0, 20.0, self.WALL, strict)[2], "bounce")    # glancing: cos = -0.707
+        self.assertEqual(impact(-20.0, 0.0, Line(10.0, 0.0, 10.0, 50.0, 1, (1.0, 0.0)), strict)[2], "stick")
+        floors = dict(ITEM_DEFAULTS, o1l=2)
+        self.assertEqual(impact(20.0, 0.0, self.WALL, floors, can_stick=True)[2], "bounce")
+        self.assertEqual(impact(0.0, 20.0, self.FLOOR, floors, can_stick=True)[2], "stick")
+
+    def test_after_sweep(self):
+        self.assertEqual(after_sweep(0.0, 20.0, self.FLOOR, ITEM_DEFAULTS, 0), (0.0, -12.0, 0, "bounce"))
+        self.assertEqual(after_sweep(0.0, 0.0, self.FLOOR, ITEM_DEFAULTS, 2), (0.0, 0.0, 0, None))
+        self.assertEqual(after_sweep(0.0, 20.0, self.FLOOR, ITEM_DEFAULTS, 1)[2], 0)     # 144 <= 2500: rests
+        self.assertEqual(after_sweep(60.0, 0.0, self.FLOOR, ITEM_DEFAULTS, 1)[2], 1)     # 3600 > 2500
+        self.assertEqual(after_sweep(0.0, 3.0, self.FLOOR, ITEM_DEFAULTS, 3), (0.0, 0.0, 3, None))
+        self.assertEqual(after_sweep(1.0, 1.0, None, ITEM_DEFAULTS, 0), (1.0, 1.0, 0, None))
+
+    def test_stick_flags_cell(self):
+        self.assertEqual(item_type({"ConditionalStickToWalls": "STRICT_ANGLE|FLOORS_ONLY"})["o1l"], 3)
+        self.assertEqual(item_type({"Elasticity": "0.25", "AlwaysArmed": "true"})["7c"], 0.25)
 
 if __name__ == "__main__":
     unittest.main()
