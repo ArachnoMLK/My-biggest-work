@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 383 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 384 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -360,3 +360,7 @@ owner move-locked (`_-l4X._-f14` #59 @682-725 → `Entity._-a6l(true)` → `_-23
 #3061), and `Entity._-1L` then takes no left / right; the lock also feeds `IsDodgeLocked`. [H] cleared when the
 harness drops the power (AllowRecoverMove and `_-Kc._-H6I` not modelled). Rerun: **222 early, 15 late**, 4 within
 1 s, 85 victims hit, harness life 14.2 s (median, was 13.3 s).
+Then the power stays until its end tick `_-E5S` = `_-k4b` + FixedRecoverTime + RecoverTime (#59 @214-289) after
+its last step, with the move lock cleared there under AllowRecoverMove (#46 @4677-4719): identical aggregate. [H]
+`_-E5S` counts from the start, so it often falls before the last step; what else ends or extends a power is
+not read.

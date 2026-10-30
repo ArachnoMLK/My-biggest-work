@@ -139,6 +139,21 @@ class Harness(unittest.TestCase):
             ev = harness.tick(f, t, grid, light_press=(i == 0))
             fired += [(i, e[2]) for e in ev if e[0] == "step"]
         self.assertEqual(fired, [(2, 0), (5, 1)])             # step 0 after 2 ticks, step 1 three ticks later
+        self.assertIsNone(f.power)                            # no recover time: dropped after its last step
+
+    def test_power_stays_until_its_end_tick(self):
+        powers = {"J": {"PowerName": "J", "CastTime": "1", "FixedRecoverTime": "4", "RecoverTime": "2",
+                        "AllowRecoverMove": "TRUE"}}
+        f = harness.Fighter(0.0, -400.0, moves={"hero": {}, "weapon": {"id": "U", "slots": ["J"] * 21},
+                                                 "powers": powers})
+        grid = smoke.map_grid(FLAT)
+        harness.tick(f, 1600, grid, light_press=True)         # tick 100, end tick 106
+        self.assertTrue(harness.move_locked(f))
+        for i in range(1, 6):
+            harness.tick(f, 1600 + 16 * i, grid)
+        self.assertIsNotNone(f.power)                         # recovering until tick 106
+        self.assertFalse(harness.move_locked(f))              # AllowRecoverMove
+        harness.tick(f, 1600 + 16 * 6, grid)
         self.assertIsNone(f.power)
 
     def test_step_hits(self):

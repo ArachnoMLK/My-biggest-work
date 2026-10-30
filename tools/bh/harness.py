@@ -236,6 +236,18 @@ def attack(f, t, keys, heavy):
 UNSET = 2147483647        # an empty CastImpulse cell (`_-l4X._-O1K` #91 @396)
 
 
+def end_tick(power, k4b):
+    """`_-E5S` = floor(`_-k4b` + FixedRecoverTime (`_-f5c`) + RecoverTime (`_-Sp`)) (`_-l4X._-f14` #59 @214-289,
+    entity-step-11.00.md). [H] glue: the RecoverMod / AirRecoverMod / SigRecoverMod factor `_-01d` = 1, no charge
+    share, no AntigravTime."""
+    def num(k):
+        try:
+            return float(power.get(k) or 0)
+        except ValueError:
+            return 0.0
+    return int(k4b + num("FixedRecoverTime") + num("RecoverTime"))
+
+
 def _true(v):
     return str(v or "").upper() == "TRUE"
 
@@ -313,7 +325,10 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             f.power["fired"] = step
             fire_impulse(f, f.power.get("row", {}), step)
         if f.power["tl"].done:
-            f.power = None                                      # [H] the end rules (`ends_now`) are not chained
+            if f.power.get("recover_move"):                     # `_-R63` #46 @4677-4719: AllowRecoverMove
+                f.power["move_lock"] = False
+            if tick_index(t) >= f.power.get("end_tick", 0):     # `_-E5S` (#59 @253-289) [H: other end rules]
+                f.power = None
     if dodge_press and dodge_rows:
         name = dodge(f, t, keys & DIR_MASK, dodge_rows)
         if name is not None:
@@ -336,6 +351,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                                    "row": power}
                         cast_impulse(f, power)
                         f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
+                        f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
+                        f.power["end_tick"] = end_tick(power, tick_index(t))
                         f.lock_start = t                        # `_-532` = t: `Entity._-c1r` at the move start
             events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
