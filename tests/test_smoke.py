@@ -64,6 +64,18 @@ class Fall(unittest.TestCase):
         self.assertEqual((c["contact"], c["within_1e-6"]), (1, 1))
         self.assertEqual((c["stand_moving"], c["stand_moving_same_height"], c["stand_60_on_ground"]), (1, 1, 1))
 
+    def test_item_falls_and_rests(self):
+        from bh import items
+        xml = FLAT.replace('<Respawn X="0" Y="0" />', '<ItemSpawn X="-10" Y="0" W="20" H="10" /><ItemInitSpawn X="5" Y="2" />')
+        self.assertEqual(smoke.item_spawns(xml), [(0.0, 5.0), (5.0, 2.0)])
+        ticks, err, still, slope = smoke.item_fall(smoke.map_grid(xml), 0.0, 5.0, items.ITEM_DEFAULTS)
+        self.assertGreater(ticks, 1)
+        self.assertAlmostEqual(err, 0.0)
+        self.assertTrue(still)
+        self.assertFalse(slope)
+        c = smoke.run_items([xml], items.ITEM_DEFAULTS)
+        self.assertEqual((c["spawn_points"], c["contact"], c["on_line_1e-6"], c["still_60"]), (2, 2, 2, 2))
+
     def test_run_counts(self):
         c = smoke.run([FLAT, EMPTY, MOVING], max_ticks=200)
         self.assertEqual((c["maps"], c["respawns"], c["contact"], c["within_1e-6"]), (3, 4, 2, 2))

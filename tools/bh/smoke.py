@@ -12,6 +12,7 @@ import re
 
 from .air_move import LAVA, _back_off, air_move, gravity_applies, ground_reset
 from .level_collision import Grid, compute_normals, static_lines
+from . import items
 from .platforms import bind, carry, carry_offset, dynamic_lines, move, parse_platforms
 
 GRAVITY = 3.75        # `Entity._-84Q` (Entity.<init> #2887 @133)
@@ -157,4 +158,60 @@ def run(level_xmls, max_ticks=1000, with_platforms=False):
             if on_static:
                 c[f"stand_static_{kind}"] += 1
                 c[f"stand_static_{kind}_still"] += drift <= 1e-6
+    return c
+
+def item_spawns(xml):
+    """Centre of every `<ItemSpawn>` box and every `<ItemInitSpawn>` point of a LevelDesc."""
+    out = []
+    for tag, attrs in re.findall(r"<(ItemSpawn|ItemInitSpawn)\b([^>]*)/?>", xml):
+        v = {k: float(n) for k, n in re.findall(r'\b(X|Y|W|H)="([^"]+)"', attrs)}
+        if "X" in v and "Y" in v:
+            out.append((v["X"] + v.get("W", 0.0) / 2, v["Y"] + v.get("H", 0.0) / 2))
+    return out
+
+
+def item_fall(grid, x, y, item, max_ticks=1000, stand_ticks=60):
+    """An item at rest, not thrown, falls (items.velocity + items.sweep, mask hard | soft) until it touches
+    a line, then rests `stand_ticks` more ticks. Returns (contact ticks or None, error on the line, still,
+    landed on a slope). On a slope gravity keeps acting (`items.velocity`: no rest unless normal y = -1)."""
+    lu = vy = 0.0
+    ground = None
+    for tick in range(1, max_ticks + 1):
+        lu, vy, mv = items.velocity(lu, vy, 0.0, 0.0, ground, item, thrown=False, o2o=False)
+        x, y, ground, _ = items.sweep(grid, 0, x, y, mv, 3, item["S2O"])
+        if ground is not None:
+            break
+    else:
+        return None, None, False, False
+    b = items._back_off(ground, mv)
+    err = 0.0 if ground.sx == ground.ex else (y + b[1]) - line_y(ground, x + b[0])
+    slope = ground.sy != ground.ey
+    y0, still = y, True
+    vy = 0.0                                                    # [H] what the item does with _-33c on landing
+    for _ in range(stand_ticks):
+        lu, vy, mv = items.velocity(lu, vy, 0.0, 0.0, ground, item, thrown=False, o2o=False)
+        x, y, g2, _ = items.sweep(grid, 0, x, y, mv, 3, item["S2O"])
+        ground = g2 if g2 is not None else ground
+        still = still and abs(y - y0) <= 1e-6
+    return tick, err, still, slope
+
+
+def run_items(level_xmls, item, max_ticks=1000):
+    """Aggregate counts of `item_fall` over the static lines of many maps."""
+    c = {"spawn_points": 0, "contact": 0, "on_line_1e-6": 0, "still_60": 0, "moving_on_slope": 0,
+         "no_contact": 0, "no_contact_dynamic_map": 0, "max_ticks": 0}
+    for xml in level_xmls:
+        grid = map_grid(xml)
+        for x, y in item_spawns(xml):
+            c["spawn_points"] += 1
+            ticks, err, still, slope = item_fall(grid, x, y, item, max_ticks)
+            if ticks is None:
+                c["no_contact"] += 1
+                c["no_contact_dynamic_map"] += bool(DYNAMIC.search(xml))
+                continue
+            c["contact"] += 1
+            c["max_ticks"] = max(c["max_ticks"], ticks)
+            c["on_line_1e-6"] += abs(err) <= 1e-6
+            c["still_60"] += still
+            c["moving_on_slope"] += not still and slope
     return c

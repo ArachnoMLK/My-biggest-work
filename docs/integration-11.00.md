@@ -24,14 +24,14 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `commands-verify` | 31 | 0 |
 | `stats-verify` | 29 | 0 |
 | `collision-verify` | 89 | 0 |
-| `hit-detection-verify` | 851 | 0 |
+| `hit-detection-verify` | 871 | 0 |
 | `prng-order-verify` | 87 | 0 |
 | `step-verify` | 159 | 0 |
 | `ko-verify` | 290 | 0 |
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 252 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 257 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -76,6 +76,22 @@ So the gravity, sweep, grid and ray cast pieces fit together, and the fall stops
 the running game. [H] On a gentle hard slope, the ground push stops after a tiny move, so the 1.01 back-off goes along −normal
 and the fighter creeps. Either the game does the same, or a part not read yet compensates; a real game is
 needed to tell. Next: the KO oracle of #27.
+
+### Items
+
+`smoke-fall` also drops an item of the default ItemType, at rest and not thrown, from the centre of every
+`ItemSpawn` box and every `ItemInitSpawn` point. It uses `items.velocity` + `items.sweep` (PR #30) on the
+static lines. After the contact, the item rests 60 more ticks.
+
+| | |
+|---|---|
+| Item spawn points | 823 |
+| Contact | 682, **all on the line within 1e-6** |
+| Still for 60 ticks | 680; the 2 others are on slopes, where gravity keeps acting (no rest unless normal y = −1) |
+| No contact | 141: 129 on maps with moving platforms (left out here), 12 with no line below them at all |
+
+[H] What an item does with its vertical speed when it lands (the part after the sweeps, @6362–) is not
+transcribed; the test sets it to 0 on contact.
 
 ## First check against real replays: KO gaps (`ko-gap-check`, [`tools/bh/ko_gaps.py`](../tools/bh/ko_gaps.py))
 

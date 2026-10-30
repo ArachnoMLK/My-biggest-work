@@ -461,8 +461,12 @@ def cmd_smoke_fall(a):
     files = sorted(glob.glob(os.path.join(folder, "LevelDesc_*.xml")))
     if not files:
         sys.exit("no LevelDesc files; run swz-dump first (or pass --swz)")
-    counts = smokemod.run([rendermod.read_text(f) for f in files], with_platforms=not a.static_only)
+    xmls = [rendermod.read_text(f) for f in files]
+    counts = smokemod.run(xmls, with_platforms=not a.static_only)
     for k, v in counts.items():
+        print(f"  {k:<24} {v}")
+    print("items (default ItemType, static lines):")
+    for k, v in smokemod.run_items(xmls, smokemod.items.ITEM_DEFAULTS).items():
         print(f"  {k:<24} {v}")
     print("static bytecode evidence only: not compared with the running game (tools/bh/smoke.py)")
     if counts["contact"] != counts["within_1e-6"]:
