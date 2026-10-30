@@ -8,7 +8,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.items import (ITEM_DEFAULTS, after_sweep, bounce, expired, ground_walk, impact, item_type, sweep,  # noqa: E402
-                      sweep_mask,
+                      sweep_mask, wall_slide,
                       target_gate, velocity)
 from bh.raycast import Line  # noqa: E402
 
@@ -182,6 +182,14 @@ class ItemWalk(unittest.TestCase):
 
     def test_not_on_a_floor(self):
         self.assertEqual(ground_walk([], 0, 1.0, 2.0, None, 5.0, 3, 0.0, 0.0, ITEM_DEFAULTS)[:4], (1.0, 2.0, None, 5.0))
+
+class WallSlide(unittest.TestCase):
+    def test_slides_down_to_the_floor(self):
+        floor = Line(0.0, 100.0, 300.0, 100.0, 1, (0.0, -1.0))
+        x, y, lu = wall_slide([floor], 0, 10.0, 90.0, 30.0, 0.0, 3, 0)
+        self.assertEqual((x, lu), (10.0, 0.0))
+        self.assertAlmostEqual(y, 100.0 - 1.01)
+        self.assertEqual(wall_slide([], 0, 10.0, 0.0, 5.0, 2.0, 3, 0), (10.0, 3.0, 0.0))
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(954 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(964 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -693,7 +693,9 @@ order]:
    `_-p5k._-u4H` = `Entity._-u4H`), otherwise along the move. The ceiling cast @5474–5544 is a
    `callpropvoid`, so its result is dropped and `local37` stays null: **items have no ceiling re-cast**.
 10. **After the sweeps** (`items.after_sweep`, @6891–7391) [V]:
-    - In state 6 against a wall, the item slides down it instead (@6362–6886, not transcribed).
+    - In state 6, when the sweep stopped on a vertical line (`items.wall_slide`, @6362–6886), `_-Lu` = 0 and
+      the y the sweep did not use (`_-U5T`.y − `_-611`.y) is slid along the wall. Feet and Height casts run,
+      the top one wins when shorter, and the item goes 1.01 back against the wanted direction when stopped.
     - A moving item (`_-Lu` or `_-33c` ≠ 0) in state 0 or 1, or with `AlwaysArmed`, hits its ground line
       through `_-u1I`; a lava line always does. Otherwise a floor (normal y < 0) only zeroes `_-33c`.
     - The impulses `_-B66` / `_-46m` are cleared.

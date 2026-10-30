@@ -277,6 +277,31 @@ def ground_walk(lines, team, x, y, ground, x_step, mask, lu, vy, item, max_passe
     return x, y, ground, x_step, lu, vy, kinds
 
 
+def wall_slide(lines, team, x, y, wanted_y, moved_y, mask, height):
+    """`_-p5k._-8i` @6362-6886: in state 6, after a sweep that stopped on a vertical line, `_-Lu` = 0 and the
+    y the sweep did not use (`_-U5T`.y - `_-611`.y) is slid along the wall: a feet cast (mask, item-ignore
+    excluded, nothing ignored) and a top cast from `height` above (hard only); the top one wins when shorter.
+    The item moves by that y, and by 1.01 back (against the wanted direction) when a line stopped it.
+    Returns (x, y, lu) with lu = 0."""
+    if hasattr(lines, "candidates"):
+        def cands(cx, cy, d):
+            return lines.candidates(cx, cy, cx + d[0], cy + d[1])
+    else:
+        def cands(cx, cy, d):
+            return lines
+    d = (0.0, wanted_y - moved_y)
+    feet = ray_cast(cands(x, y, d), team, x, y, d[0], d[1], mask, 0, ITEM_IGNORE)
+    fv = d if feet is None else feet.remaining
+    hit = feet
+    top = ray_cast(cands(x, y - height, d), team, x, y - height, d[0], d[1], 1, 0, ITEM_IGNORE)
+    if top is not None and _length(top.remaining) < _length(fv):
+        fv, hit = (fv[0], top.remaining[1]), top
+    y = y + fv[1]
+    if hit is not None:
+        y = y + (-GROUND_PUSH if wanted_y > 0 else GROUND_PUSH)
+    return x, y, 0.0
+
+
 def expired(t, thrown_at, path_length):
     """@1832-1882: `_-5k()` (the item is removed) once t - `_-O13` > PathLength, when PathLength != 0."""
     return path_length != 0 and t - thrown_at > path_length
@@ -478,5 +503,17 @@ ANCHORS = {ABC_1100: {
         (15192, 1716, "negate", ""),
         (15192, 1736, "ifne", "-472"),
         (15192, 4509, "getlocal", "10"),
+    ],
+    "_-p5k._-8i wall slide in state 6: _-Lu = 0, remaining y (U5T - 611) along the wall, feet + Height casts, 1.01 back": [
+        (15192, 6370, "pushbyte", "6"),
+        (15192, 6416, "equals", ""),
+        (15192, 6428, "initproperty", "_-Lu"),
+        (15192, 6476, "subtract", ""),
+        (15192, 6596, "callproperty", "_-X2e, 13"),
+        (15192, 6650, "getproperty", "_-S2O"),
+        (15192, 6701, "callproperty", "_-X2e, 13"),
+        (15192, 6750, "lessthan", ""),
+        (15192, 6869, "getproperty", "_-x3M"),
+        (15192, 6872, "negate", ""),
     ],
 }}
