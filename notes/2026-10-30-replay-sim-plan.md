@@ -31,9 +31,9 @@ one-sided; this one can fail.
 
 ## Pieces missing (in this order)
 
-1. **Horizontal movement as code.** horizontal-11.00.md (#23) gives the max run speed, the friction choice
-   and its application, and the acceleration, but there is no module. Transcribe `Entity._-8i`
-   @519–2052 into `tools/bh/horizontal.py` with anchors. Inputs: legend stats, input bits 4 / 8.
+1. ~~Horizontal movement as code~~ — done: `tools/bh/horizontal.py` in #30 (max speed, friction choice and
+   application, acceleration and its clamp; 47 anchors). Still open: where `_-141()` (facing) and `_-81n()`
+   (a horizontal input held) are set from MoveLeft / MoveRight.
 2. **Jump.** movement-11.00.md (#16) has the impulses (Entity.Jump: dash window, grounded and dash
    impulses, `vy -= impulse`). The input → `owner.Jump(t)` path is `_-i4Z._-51o` (bit 16). Air jumps and
    the 192 ms lock are in #28. Wire them into one per-tick function.
