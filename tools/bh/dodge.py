@@ -181,7 +181,8 @@ def push(t, h2b, e3e, moving, t5l, wl, ax_mult, ay_mult, ax_formula, ay_formula,
     """`_-t1A` @1854-2097, the tick of a dodge still under way (`_-H2b` + `_-Uy` + `_-C1d` > t): from t >= `_-H2b`
     with the `_-e3e` bit 4096 clear and a moving type, `_-v1D` = `_-P5S` = 0, then the impulses
     `_-84` = ±60 `_-T5L` AccelXMult ease(AccelXFormula) (negative with Left in `_-O5C`, 0 without a side) and
-    `_-A4A` = 60 `_-WL` AccelYMult ease(AccelYFormula). Returns None when nothing is written, else (`_-84`, `_-A4A`)."""
+    `_-A4A` = 60 `_-WL` AccelYMult ease(AccelYFormula). Returns None when nothing is written, else (`_-84`, `_-A4A`). `_-8i` calls `_-t1A` @2659, before its
+    impulse folds (x @2790-2965, y @4217-4395; `step.fold_impulse` on integration), so the push lands this tick."""
     if t < h2b or e3e & FLAG_24F or not moving:
         return None
     vx = 60.0 * t5l * ax_mult * ease(ax_formula, t, h2b, uy, c1d)
@@ -641,6 +642,8 @@ ANCHORS = {ABC_1100: {
         (2992, 2021, "getproperty", "_-84"),
         (2992, 2045, "negate", ""),
         (2992, 2091, "getproperty", "_-A4A"),
+        (2984, 2794, "getproperty", "_-84"),
+        (2984, 4228, "getproperty", "_-A4A"),
         (2992, 2188, "initproperty", "_-l4A"),
         (2992, 2197, "initproperty", "_-g5E"),
         (2992, 2291, "initproperty", "_-l4A"),
