@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1504 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1547 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -1050,6 +1050,28 @@ Chained powers start from `_-h1T` through the same `_-J5R`.
 with `_-x4I` = the given target and `_-SQ` = true, then pushed to `_-pX` (the running power list). None is
 made without a power type, or when the holder `_-H6K` has the `_-e3e` bit `_-a60`. Unlike `_-J5R`, they do not
 end the running power.
+
+### 10.2 Dodge: what `Entity.Dodge` #3125 writes when it commits ([`tools/bh/dodge.py`](../tools/bh/dodge.py))
+
+`_-i4Z._-51o` #6313 @2418-2433 calls `owner.Dodge(t, keys & 15, held)` on a buffered DodgeDash (256) press.
+The one input does **four things** in the game: a dodge, a chase dodge, a dash, or (with an attack right after)
+a gravity cancel. Inside Dodge:
+
+| Step | Bytecode | Status |
+|---|---|---|
+| Gates: `_-C2E(t, dir)` (local 4), `_-46I` + 64 / + 96 windows, `IsDodgeLocked(t)` | @18-160 | [V] pinned, not transcribed |
+| Chained dodge: with local 4, `_-H2b` != `_-14W`, `_-H2b` != 0 and not `IsDodgeLocked(t, true)`, local 5 = `_-H2b` + `_-y1F` and `_-14W` = t; else `_-26R(t)` sets local 7 and local 9 = `_-O5C` | @174-303 | [V] pinned; [H] this is the **chase dodge** |
+| **Dash**: a side / down direction (4 \| 8 \| 2) and not `_-350(t)` → `Dash(t, dir)`; when it returns true, Dodge returns false | @364-427 | [V]; the dodge key on the ground with a side is a dash |
+| DodgeType `_-h3i._-26O(dir, _-wn(), local 8, team flag 64, local 10)` | @1024-1074 | [V] |
+| `_-H2b` = t, `_-O5C` = dir, facing `_-n3h` (Left → true, Right → false, else `_-r35()`) | @1084-1164 | [V] `dodge.facing` |
+| `_-Uy` = mDuration × 16, `_-C1d` = `_-53o` × 16, `_-T2R` = t + `_-Uy`, `_-G6S` (with `_-t3v`), `_-y1F` = `_-Uy` + `_-Z4S` + `_-C1d`, never ending before the chained one | @1482-1705 | [V] `dodge.timers`; [H] `_-Z4S` |
+| `_-v1D` = ±`_-K64(...)` with `_-t3v` and `_-a5a`; then `_-P5S` = `_-v1D` = 0 when dir != 0 or `_-wn()` | @1290-1446, @1876-1937 | [V] `dodge.neutral_push`, `clears_velocity` |
+| Counter `_-6K` (count in the high 16 bits, kind 1 / 2 in the low ones) | @499-520, @1708-1873 | [V] `dodge.counter`; [H] `_-f2b`, `_-E6P` |
+| 'dodge.' + type name event, power cancel `_-ZE(PowerType._-Z32)`, replay hook `_-t31` | @2089-2283 | [V] pinned by name only |
+
+Still open for the dodge: what `_-26O` picks in DodgeTypes.xml, the values of `_-F6w`, `_-S6F`, `_-Z4S`,
+`_-K64`; the motion during the dodge (dodge state of `Entity._-8i`); the **gravity cancel** (a spot air
+dodge cancelled into an attack: attack side, `_-ZE` / power code) [H]; `Dash` itself.
 
 ## 11. Still open
 
