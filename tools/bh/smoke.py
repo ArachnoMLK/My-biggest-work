@@ -10,9 +10,9 @@ the step-start landing (`_-P5S` = 0) and no gravity on a ground line (air_move.p
 """
 import re
 
-from .air_move import _back_off, air_move, gravity_applies, ground_reset
+from .air_move import LAVA, _back_off, air_move, gravity_applies, ground_reset
 from .level_collision import Grid, compute_normals, static_lines
-from .platforms import bind, dynamic_lines, move, parse_platforms
+from .platforms import bind, carry, carry_offset, dynamic_lines, move, parse_platforms
 
 GRAVITY = 3.75        # `Entity._-84Q` (Entity.<init> #2887 @133)
 STEP = 0.384          # `_-z2k._-Vj`
@@ -80,12 +80,17 @@ def fall(grid, x, y, max_ticks=1000, team=0, movers=(), t0=0):
 def stand(grid, r, start_tick, ticks=60, team=0, movers=(), t0=0):
     """After the contact `r`, more ticks with no input: the step start lands on `_-96f` (`ground_reset`:
     `_-P5S` = 0), gravity is skipped while a ground line is set (`gravity_applies`), and the move is the 2.02
-    ground push. Returns (ticks with a ground line, largest |y - contact y|)."""
+    ground push. Before that, the fighter is carried by its ground line when it moved (platforms.py `carry`).
+    Returns (ticks with a ground line, largest |y - contact y|, largest change of the height above the
+    ground line)."""
     x, y0, ground, p5s = r.x, r.y, r.ground, 0.0
-    y, kept, drift = y0, 0, 0.0
+    y, kept, drift, rel, off = y0, 0, 0.0, None, 0.0
     for tick in range(start_tick + 1, start_tick + ticks + 1):
         for plat, lines in movers:
             move(lines, plat.at(t0 + TICK_MS * tick))
+        if movers:                          # `_-d4u`: carried by the ground line kept in `_-u3j`
+            x, y = carry(lambda cx, cy, dx, dy: grid.candidates(cx, cy, cx + dx, cy + dy), team, x, y,
+                         carry_offset([ground]), ground)
         p5s, on_ground = ground_reset(ground, False, 0, False, p5s)
         if gravity_applies(False, ground, 0, t0 + TICK_MS * tick, False, GRAVITY) and p5s < FALL_CAP:
             p5s += GRAVITY * STEP
@@ -93,7 +98,11 @@ def stand(grid, r, start_tick, ticks=60, team=0, movers=(), t0=0):
         x, y, ground = m.x, m.y, m.ground
         kept += ground is not None
         drift = max(drift, abs(y - y0))
-    return kept, drift
+        if ground is not None and ground.sx != ground.ex:
+            gap = y - line_y(ground, x)
+            rel = gap if rel is None else rel
+            off = max(off, abs(gap - rel))
+    return kept, drift, off
 
 
 def check_landing(r):
@@ -114,7 +123,8 @@ def run(level_xmls, max_ticks=1000, with_platforms=False):
     c = {"maps": 0, "respawns": 0, "contact": 0, "flat": 0, "slope": 0, "wall": 0, "no_contact": 0,
          "no_contact_dynamic_map": 0,
          "within_1e-6": 0, "max_abs_error": 0.0, "max_ticks": 0,
-         "stand_60_on_ground": 0, "stand_static_ground_still": 0, "stand_static_ground": 0}
+         "lava_hit": 0, "stand_60_on_ground": 0, "stand_static_flat": 0, "stand_static_flat_still": 0,
+         "stand_static_slope": 0, "stand_static_slope_still": 0, "stand_moving": 0, "stand_moving_same_height": 0}
     for xml in level_xmls:
         c["maps"] += 1
         for x, y in respawns(xml):
@@ -135,10 +145,16 @@ def run(level_xmls, max_ticks=1000, with_platforms=False):
             c["max_abs_error"] = max(c["max_abs_error"], abs(err))
             if abs(err) <= 1e-6:
                 c["within_1e-6"] += 1
+            if r.ground.type & LAVA:        # `_-ao`: the line's power hits the fighter (lava_contact)
+                c["lava_hit"] += 1
+                continue
             on_static = r.ground not in grid.dynamic
-            kept, drift = stand(grid, r, ticks, movers=movers)
+            kept, drift, off = stand(grid, r, ticks, movers=movers)
             c["stand_60_on_ground"] += kept == 60
+            if not on_static:
+                c["stand_moving"] += 1
+                c["stand_moving_same_height"] += off <= 1e-6
             if on_static:
-                c["stand_static_ground"] += 1
-                c["stand_static_ground_still"] += drift <= 1e-6
+                c[f"stand_static_{kind}"] += 1
+                c[f"stand_static_{kind}_still"] += drift <= 1e-6
     return c

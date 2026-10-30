@@ -40,7 +40,7 @@ class Fall(unittest.TestCase):
     def test_stands_still_after_landing(self):
         grid = smoke.map_grid(FLAT)
         ticks, r = smoke.fall(grid, 0.0, 0.0)
-        kept, drift = smoke.stand(grid, r, ticks)
+        kept, drift, _ = smoke.stand(grid, r, ticks)
         self.assertEqual(kept, 60)
         self.assertLessEqual(drift, 1e-9)
 
@@ -62,6 +62,7 @@ class Fall(unittest.TestCase):
         self.assertIsNone(smoke.fall(smoke.map_grid(PLATFORM), 0.0, 0.0, max_ticks=200)[1])   # static only
         c = smoke.run([PLATFORM], with_platforms=True)
         self.assertEqual((c["contact"], c["within_1e-6"]), (1, 1))
+        self.assertEqual((c["stand_moving"], c["stand_moving_same_height"], c["stand_60_on_ground"]), (1, 1, 1))
 
     def test_run_counts(self):
         c = smoke.run([FLAT, EMPTY, MOVING], max_ticks=200)
