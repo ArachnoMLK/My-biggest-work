@@ -5,7 +5,7 @@ Which entities a power's hit area touches on one frame. This closes the gap left
 `_-F5N._-T5A` is filled.
 
 Code: [`tools/bh/hitdetect.py`](../tools/bh/hitdetect.py). Check: `python -I tools/bht.py hit-detection-verify`
-(1156 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
+(1173 anchors on ABC, ray cast included `7d308423…`, exit 1 on a mismatch, 2 on another ABC). Tests: `tests/test_hitdetect.py`.
 **[V]** = read in the bytecode and pinned by an anchor; **[H]** = interpretation.
 
 ## 0. Chain
@@ -570,6 +570,14 @@ Wall details (`wall_contact`) [V]:
   - On a no-slide wall, `_-v1D` = 0.
   - Otherwise, with no power and not `_-M5t`, `_-v1D` = ±10 toward the wall.
 
+
+**Ground and dash jumps** ([`tools/bh/jump.py`](../tools/bh/jump.py), `Entity.Jump` #3052; values first read
+in movement-11.00.md, PR #16) [V]. The grounded branch is taken when `_-96f` is set or `_-Xb` == 1:
+- the impulse is 57 × k, with k = 0.86 when the second argument is true, else 1;
+- in the dash window (`_-26T` + 160 > t, with a ground line or `_-Xb` == 1), it is 170 instead;
+- then `_-P5S` = 0, `_-96f` = null and `_-A4A` −= impulse, which the next fold adds to `_-P5S`.
+
+The air jumps (@1545–) are not transcribed.
 
 **Horizontal speed** ([`tools/bh/horizontal.py`](../tools/bh/horizontal.py), `_-8i` @519–2659; first read in
 horizontal-11.00.md, PR #23) [V]. Before the walk, `_-v1D` goes through friction, then acceleration:
