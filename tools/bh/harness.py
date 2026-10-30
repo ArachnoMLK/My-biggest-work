@@ -37,7 +37,7 @@ from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, coold
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, state_at
-from .power_pick import power_name
+from .power_pick import power_name, redirect
 from .ko import ko_mask
 from .respawn_points import candidates
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
@@ -93,7 +93,7 @@ class Fighter:
     facing_left: bool = False  # `_-n3h`
     i46: int = 0              # `_-46I`, last hit (no hits here)
     e3: int = 0               # `_-3E`
-    moves: dict = None        # {"hero": power_pick.hero_powers row, "weapon": power_pick.item_slots row}
+    moves: dict = None        # {"hero": hero_powers row, "weapon": item_slots row, "powers": power_rows}
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -234,6 +234,10 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         if press:
             slot, gc = attack(f, t, keys, heavy)
             name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
+            rows = (f.moves or {}).get("powers")
+            if name is not None and rows:
+                power = redirect(rows.get(name), rows.get, gc=gc, vx=f.v1d, facing_left=f.facing_left)
+                name = power["PowerName"] if power else None
             events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None

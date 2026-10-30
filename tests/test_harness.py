@@ -123,6 +123,11 @@ class Harness(unittest.TestCase):
         ev = harness.tick(f, 1000, smoke.map_grid(FLAT), light_press=True, keys=0)
         self.assertEqual(ev[0][0], "attack")
         self.assertEqual(len(ev[0]), 4)
+        f.moves["weapon"]["slots"] = ["J"] * 21
+        f.moves["powers"] = {"J": {"PowerName": "J", "MomentumVersion": "JM"}, "JM": {"PowerName": "JM"}}
+        f.v1d = 70.0
+        ev = harness.tick(f, 1016, smoke.map_grid(FLAT), light_press=True, keys=0)
+        self.assertEqual(ev[0][3], "JM")                      # |vx| >= 60 toward the facing (right)
 
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words

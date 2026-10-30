@@ -75,6 +75,8 @@ class Swz:
         self.heroes = power_pick.hero_powers(_read(os.path.join(game, "HeroTypes.xml")))
         path = os.path.join(game, "itemTypes.csv")
         self.items = power_pick.item_slots(_read(path)) if os.path.exists(path) else {}
+        path = os.path.join(game, "powerTypes.csv")
+        self.powers = power_pick.power_rows(_read(path)) if os.path.exists(path) else {}
         self.scoring = {}
         for t in ET.fromstring(_read(os.path.join(game, "ScoringTypes.xml"))):
             cells = {c.tag: (c.text or "") for c in t}
@@ -109,7 +111,8 @@ def setup(rep, swz):
     return {"grid": map_grid(desc), "points": parse_respawns(desc), "cam": cam, "kill": swz.kills[name],
             "drone_camera": (cam[0], cam[1], cam[2] - cam[0]), "stats": fighter_stats,
             "cells": swz.scoring.get(rep["settings"]["scoring_type_id"], {}),
-            "moves": {e["id"]: {"hero": swz.heroes.get(e["heroes"][0]["hero_id"]), "weapon": swz.items.get(UNARMED)}
+            "moves": {e["id"]: {"hero": swz.heroes.get(e["heroes"][0]["hero_id"]), "weapon": swz.items.get(UNARMED),
+                          "powers": swz.powers}
                       for e in rep["entities"] if swz.heroes.get(e["heroes"][0]["hero_id"]) and swz.items.get(UNARMED)}}
 
 
