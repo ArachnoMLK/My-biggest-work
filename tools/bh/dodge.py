@@ -446,6 +446,22 @@ def attack_air_offset(airborne, jump_flag, cancel, y1u):
     return off, False
 
 
+MOVE_DODGE_MS = 192        # `Entity._-84e` (script157.<init> #3173 @812)
+
+
+def c2e(t, dir, d532, m3h, grounded):
+    """`Entity._-C2E(t, dir)` #3073 (Dodge local 4): false once `_-532` + 192 < t (`_-532` = the start of the last
+    move / pick-up), with Left and `_-M3h` clear or Right and `_-M3h` set, with dir 0, or with Drop alone on the
+    ground; else true. [H] a dodge out of a move that just started."""
+    if d532 + MOVE_DODGE_MS < t:
+        return False
+    if (dir & LEFT and not m3h) or (dir & RIGHT and m3h):
+        return False
+    if dir == 0 or (grounded and dir == DROP):
+        return False
+    return True
+
+
 LOCK_X2C = 9               # IsDodgeLocked #3075 @216: `_-x2C` >= 9 locks when nothing else does
 
 
@@ -974,5 +990,15 @@ ANCHORS = {ABC_1100: {
         (3075, 198, "callproperty", "_-C54, 1"),
         (3075, 213, "getproperty", "_-x2C"),
         (3075, 216, "pushbyte", "9"),
+    ],
+    "Entity._-C2E #3073: _-532 + _-84e (192) >= t, not against _-M3h, dir != 0, not Drop alone on the ground": [
+        (3073, 6, "getproperty", "_-532"),
+        (3073, 14, "getproperty", "_-84e"),
+        (3073, 20, "lessthan", ""),
+        (3073, 61, "getproperty", "_-M3h"),
+        (3073, 82, "getproperty", "_-M3h"),
+        (3073, 107, "getproperty", "_-96f"),
+        (3073, 121, "pushbyte", "2"),
+        (3173, 812, "initproperty", "_-84e"),
     ],
 }}

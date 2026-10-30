@@ -6,8 +6,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import (attack_air_offset, cancel_end, cancel_flags, clears_velocity, cooldown_ms, counter,  # noqa: E402
-                      dash, dodge_over, ease, exit_speed, exit_velocity, facing, flags_51c, formula_mult,
+from bh.dodge import (attack_air_offset, c2e, cancel_end, cancel_flags, clears_velocity, cooldown_ms,  # noqa: E402
+                      counter, dash, dodge_over, ease, exit_speed, exit_velocity, facing, flags_51c, formula_mult,
                       gates, is_dodge_locked, k64, kind, landed_cooldown, moves, neutral_push, parse_types,
                       pick, push, side_latch, speed_x, speed_y, standard_flag, timers)
 
@@ -216,6 +216,15 @@ class Dodge(unittest.TestCase):
     def test_flags_51c(self):
         self.assertEqual(flags_51c(False, True, True, 7), (False, False, 0))
         self.assertEqual(flags_51c(True, False, True, 7), (True, True, 7))
+
+    def test_c2e(self):
+        self.assertTrue(c2e(1192, 8, 1000, False, False))
+        self.assertFalse(c2e(1193, 8, 1000, False, False))
+        self.assertFalse(c2e(1100, 8, 1000, True, False))
+        self.assertFalse(c2e(1100, 4, 1000, False, False))
+        self.assertFalse(c2e(1100, 0, 1000, False, False))
+        self.assertFalse(c2e(1100, 2, 1000, False, True))
+        self.assertTrue(c2e(1100, 2, 1000, False, False))
 
     def test_k64(self):
         self.assertEqual(k64(False, True, 10.0, 0.5, 20.0, 2.0), 5.0)
