@@ -8,7 +8,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from bh.items import (ITEM_DEFAULTS, after_sweep, bounce, expired, ground_walk, impact, item_type, sweep,  # noqa: E402
-                      sweep_mask, wall_slide,
+                      sweep_mask, wall_slide, linear_path, rocket_path, ease_22h, atan2_netsafe, boomerang_path,
                       target_gate, velocity)
 from bh.raycast import Line  # noqa: E402
 
@@ -190,6 +190,50 @@ class WallSlide(unittest.TestCase):
         self.assertEqual((x, lu), (10.0, 0.0))
         self.assertAlmostEqual(y, 100.0 - 1.01)
         self.assertEqual(wall_slide([], 0, 10.0, 0.0, 5.0, 2.0, 3, 0), (10.0, 3.0, 0.0))
+
+class Paths(unittest.TestCase):
+    def test_ease_and_atan2(self):
+        self.assertEqual(ease_22h(True, False, 0, 2000), 0.0)
+        self.assertEqual(ease_22h(True, False, 2000, 2000), 1.0)
+        self.assertEqual(ease_22h(True, True, 1500, 3000), 0.5)
+        self.assertEqual(ease_22h(False, False, 1000, 1000), 1.0)
+        self.assertEqual(atan2_netsafe(0.0, 0.0), 0.0)
+        self.assertEqual(atan2_netsafe(1.0, 1.0), 0.785)
+        self.assertEqual(atan2_netsafe(0.0, -5.0), 3.142)
+
+    def test_linear_keeps_launch_speed(self):
+        lu, vy = linear_path(3.0, 4.0, (0.0, 10.0))
+        self.assertAlmostEqual(lu, 6.0)
+        self.assertAlmostEqual(vy, 8.0)
+        self.assertEqual(linear_path(0.0, 0.0, (1.0, 1.0)), (0.0, 0.0))
+
+    def test_rocket_accelerates(self):
+        self.assertEqual(rocket_path(1000, 1000, (100.0, 0.0), False), (25.0, 0.0))     # 0.25 at launch
+        self.assertEqual(rocket_path(3000, 1000, (100.0, 0.0), False), (150.0, 0.0))    # 1.5 after 2 s
+        lu, vy = rocket_path(1000, 1000, (100.0, 0.0), True)                           # no wobble before 500 ms
+        self.assertAlmostEqual(lu, 25.0)
+        self.assertAlmostEqual(vy, 0.0)
+
+class Boomerang(unittest.TestCase):
+    def test_turn_moves_hits_to_contact(self):
+        r = boomerang_path(1100, 1000, 0, (10.0, 0.0), -1.0, 0.0, 50.0, 0.0, (0.0, 0.0), False, 4, 1)
+        self.assertEqual((r[2], r[3], r[4], r[5]), (1100, 0, 5, False))
+
+    def test_pull_and_cap(self):
+        lu, vy, turned, io, x5g, removed = boomerang_path(1200, 1000, 0, (10.0, 0.0), 10.0, 0.0, 100.0, 0.0,
+                                                          (0.0, 0.0), False, 0, 0)
+        self.assertAlmostEqual(lu, 10.0 - 100.0 * 10.0 * 0.05333333333333334 / 100.0)
+        self.assertFalse(removed)
+        lu, vy, *_ = boomerang_path(1200, 1000, 0, (10.0, 0.0), 0.0, -10.0, 0.0, 100.0, (0.0, 0.0), False, 0, 0)
+        self.assertAlmostEqual(math.hypot(lu, vy), 10.0)                       # capped at |launch|
+        self.assertEqual(boomerang_path(1200, 1000, 0, (10.0, 0.0), 10.0, 0.0, 100.0, 0.0, (0.0, 0.0), True,
+                                        0, 0)[0], 10.0)                         # wobble: 1800 ms delay
+
+    def test_removed_back_behind_or_without_thrower(self):
+        self.assertTrue(boomerang_path(2000, 1000, 1500, (10.0, 0.0), -10.0, 0.0, -5.0, 0.0, (0.0, 0.0), False,
+                                       0, 0)[5])
+        self.assertTrue(boomerang_path(1100, 1000, 0, (10.0, 0.0), 10.0, 0.0, 5.0, 0.0, (0.0, 0.0), False, 0, 0,
+                                       thrower_gone=True)[5])
 
 if __name__ == "__main__":
     unittest.main()
