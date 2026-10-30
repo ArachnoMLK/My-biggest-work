@@ -170,6 +170,22 @@ class Harness(unittest.TestCase):
         ev = harness.tick(v, 1016, smoke.map_grid(FLAT), jump_press=True)
         self.assertFalse(any(e[0] == "press" for e in ev))    # inputs are off in hitstun
 
+    def test_cast_impulse(self):
+        f = harness.Fighter(0.0, 0.0, v1d=3.0, p5s=4.0)
+        harness.cast_impulse(f, {"CastImpulseX": "12", "CastImpulseY": "2147483647"})
+        self.assertEqual((f.v1d, f.p5s), (12.0, 4.0))
+        f.facing_left = True
+        harness.cast_impulse(f, {"CastImpulseX": "12", "CastImpulseY": "-30"})
+        self.assertEqual((f.v1d, f.p5s), (-12.0, -30.0))
+
+    def test_fire_impulse(self):
+        f = harness.Fighter(0.0, 0.0, v1d=3.0, p5s=4.0)
+        harness.fire_impulse(f, {"FireImpulseX": "5,7", "FireImpulseY": "-20"}, 1)
+        self.assertEqual((f.v1d, f.p5s), (7.0, -20.0))
+        f.facing_left = True
+        harness.fire_impulse(f, {"FireImpulseX": "5,7"}, 3)
+        self.assertEqual((f.v1d, f.p5s), (-5.0, -20.0))
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)

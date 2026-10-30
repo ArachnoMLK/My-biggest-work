@@ -226,6 +226,55 @@ def attack(f, t, keys, heavy):
     return attack_slot(keys, heavy, off != 0), gc
 
 
+UNSET = 2147483647        # an empty CastImpulse cell (`_-l4X._-O1K` #91 @396)
+
+
+def cast_impulse(f, power):
+    """`_-l4X._-O1K` #91 @385-471 / @1087-1144 (entity-step-11.00.md): CastImpulseX (`_-C6Z`) **sets** `_-v1D`,
+    negated when `_-L0` (facing left), and CastImpulseY (`_-8S`) sets `_-P5S`, each unless unset. [H] glue: run at
+    the power start (the first `_-f14` update), `_-L0` = the facing, the other branches of #91 (@475-1083,
+    @1148-1491: `_-I2g & 2`, combo fields) are not read."""
+    def num(k):
+        v = power.get(k)
+        try:
+            v = int(float(v))
+        except (TypeError, ValueError):
+            return None
+        return None if v == UNSET else v
+    cx, cy = num("CastImpulseX"), num("CastImpulseY")
+    if cx is not None:
+        f.v1d = float(-cx if f.facing_left else cx)
+    if cy is not None:
+        f.p5s = float(cy)
+
+
+def _int_list(cell):
+    out = []
+    for x in (cell or "").split(","):
+        try:
+            out.append(int(float(x)))
+        except ValueError:
+            out.append(UNSET)
+    return out
+
+
+def fire_impulse(f, power, step):
+    """`_-l4X._-a5A` #47, run by `_-R63` when a step fires: FireImpulseX (`_-84C`)[step] (entry 0 past the end)
+    **sets** `_-v1D`, negated when `_-L0`; FireImpulseY (`_-ol`)[step] sets `_-P5S`, unless that y is > 0 under
+    `_-I2g & 2` within `_-t2b` ticks of the start; each unless unset. [H] glue: no charge factor (`_-V3`), the
+    FireImpulseMaxX branch (@249-387) and the `_-I2g` gate not modelled, the cells read as plain int lists."""
+    for col, attr in (("FireImpulseX", "v1d"), ("FireImpulseY", "p5s")):
+        vals = _int_list(power.get(col))
+        if not power.get(col):
+            continue
+        v = vals[step] if step < len(vals) else vals[0]
+        if v == UNSET:
+            continue
+        if attr == "v1d" and f.facing_left:
+            v = -v
+        setattr(f, attr, float(v))
+
+
 def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None, dodge_press=False, keys=0,
          dodge_rows=None, light_press=False, heavy_press=False):
     """One 16 ms tick at time t. `bounds` is (camera rectangle, kill dict) for the ring-out test, or None.
@@ -240,6 +289,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         if step is not None:
             events.append(("step", f.power["name"], step))
             f.power["fired"] = step
+            fire_impulse(f, f.power.get("row", {}), step)
         if f.power["tl"].done:
             f.power = None                                      # [H] the end rules (`ends_now`) are not chained
     if dodge_press and dodge_rows:
@@ -260,7 +310,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                     steps = power_steps(power)
                     if steps["CastTime"]:
                         f.power = {"name": name, "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t)),
-                                   "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set()}
+                                   "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
+                                   "row": power}
+                        cast_impulse(f, power)
             events.append(("attack", slot, gc, name))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None

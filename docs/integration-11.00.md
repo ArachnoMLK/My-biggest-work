@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 379 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 381 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -314,4 +314,12 @@ predicted early, 4 late, median gap about 30 s, 2 within 1 s; the victim was hit
 **same run without hits** gives 232 early, 5 late: the early KOs come from the movement, not the knockback. Leading
 [H]: powers do not move their owner yet (recoveries, aerials, the power's own velocity writes), there are no
 weapons, no ledge / platform behaviour beyond the static map, so the simulated fighters fall where the players
-recover. Next: the owner movement of a running power (power step velocity columns), then the `.anm` frames.
+recover.
+
+**Owner movement of a power**: `harness.cast_impulse` (`_-l4X._-O1K` #91 main branches: CastImpulseX / Y **set**
+`_-v1D` / `_-P5S` at the power start) and `harness.fire_impulse` (`_-l4X._-a5A` #47, run when a step fires:
+FireImpulseX / Y[step] set `_-v1D` (by the facing) / `_-P5S`). Glue [H]: no charge factor, no FireImpulseMaxX
+branch, no `_-I2g` gate, cells read as plain int lists. Rerun (aggregate): the cast impulse alone changes nothing;
+with the fire impulse **224 early, 13 late, 3 within 1 s**, and the harness victims live 13.8 s after the let-go
+(median; 11.9 s before) against 44.2 s in the replays. Next: why the simulated fighters still fall (weapons and
+pick-ups, recovery rules, platforms and ledges, `_-V12` knockback decay), then the `.anm` frames.
