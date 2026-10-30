@@ -396,7 +396,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     f.p5s = clamp(f.p5s, cap)
     g_term = 0.0
     fall_cap = FALL_CAP_DROP if keys & 2 else FALL_CAP           # @5097-5170: 85 with Drop held [H: `_-61h`, lock]
-    if gravity_applies(f.e6p, f.ground, f.y1l, t, False, GRAVITY) and f.p5s < fall_cap:
+    cancel = f.power is not None and _true(f.power.get("row", {}).get("CancelGravity"))   # `_-q1G` @5252
+    if gravity_applies(f.e6p, f.ground, f.y1l, t, cancel, GRAVITY) and f.p5s < fall_cap:
         g_term = GRAVITY * STEP
         f.p5s += g_term
     m = air_move(grid, team, f.x, f.y, x_step, f.p5s, f.ground is not None)

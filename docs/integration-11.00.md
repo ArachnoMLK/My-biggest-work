@@ -31,7 +31,7 @@ line merge kept a single body. Each one was taken back from its own branch. Ever
 | `input-buffer-verify` | 341 | 0 |
 | `knockback-verify` | 253 | 0 |
 
-`prng-verify`: OK. `python -I -m unittest discover -s tests`: 384 tests pass.
+`prng-verify`: OK. `python -I -m unittest discover -s tests`: 385 tests pass.
 
 ## First smoke test: one fighter falls onto a map (`smoke-fall`, [`tools/bh/smoke.py`](../tools/bh/smoke.py))
 
@@ -364,3 +364,5 @@ Then the power stays until its end tick `_-E5S` = `_-k4b` + FixedRecoverTime + R
 its last step, with the move lock cleared there under AllowRecoverMove (#46 @4677-4719): identical aggregate. [H]
 `_-E5S` counts from the start, so it often falls before the last step; what else ends or extends a power is
 not read.
+Then CancelGravity (`_-q1G`, the `_-8i` gravity gate @5252) while a power runs: 220 early, 17 late, harness life
+14.4 s (median).

@@ -222,6 +222,12 @@ class Harness(unittest.TestCase):
             harness.tick(f, 1616, grid, right=True)
             self.assertEqual(f.v1d > v, moves)                # right is ignored while move-locked
 
+    def test_cancel_gravity(self):
+        f = harness.Fighter(0.0, -400.0)
+        f.power = {"row": {"CancelGravity": "TRUE"}, "tl": harness.Timeline([100], 0), "name": "G"}
+        harness.tick(f, 1000, smoke.map_grid(FLAT))
+        self.assertEqual(f.p5s, 0.0)
+
     def test_inputs_from_records(self):
         records = [(0, 0), (1000, 8), (1290, 8 | 16), (1400, 8), (1500, 4 | 16)]   # synthetic key words
         inputs = harness.from_records(records)
