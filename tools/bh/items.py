@@ -23,15 +23,18 @@ SOFT_THROW_MS = 64      # @818-834: soft lines are ignored this long after a thr
 ITEM_COLUMNS = {"Friction": "T2P", "AirFriction": "h5M", "Gravity": "84Q", "ThrownGravity": "OY",
                 "PathLength": "G6o", "PathType": "z4P", "ForceNoHitstop": "T30", "OnlyStunnedTrigger": "N59",
                 "AllowRepeatedCollision": "A4s", "Height": "S2O", "ForceNoGeometryCollision": "p2W",
-                "Elasticity": "7c", "StickToWalls": "o1G", "AlwaysArmed": "XJ", "ConditionalStickToWalls": "o1l"}
+                "Elasticity": "7c", "StickToWalls": "o1G", "AlwaysArmed": "XJ", "ConditionalStickToWalls": "o1l",
+                "ThrownInitialVelocityMult": "I2d", "ThrownHorizontalY": "x5D", "ProximityTrigger": "r58"}
 ITEM_DEFAULTS = {"T2P": 2.5, "h5M": 0.15, "84Q": 3.75, "OY": 3.75, "G6o": 0, "z4P": 0, "T30": False,
                  "N59": False, "A4s": False, "S2O": 0, "p2W": False, "7c": 0.6, "o1G": False, "XJ": False,
-                 "o1l": 0}
+                 "o1l": 0, "I2d": 1.0, "x5D": -0.1, "r58": False}
 STICK_FLAGS = {"STRICT_ANGLE": 1, "FLOORS_ONLY": 2}           # ConditionalStickToWalls, split on "|"
 REST_SPEED2 = 2500      # `_-p5k._-Y3M` (script822.<init> #15249): a thrown item at or below this speed^2 rests
 STOP_SPEED = 5          # `_-u1I` @1366: on a flat floor, slower impacts stop instead of bouncing
 STRICT_COS = -0.7237379   # `_-u1I` @1187: STRICT_ANGLE sticks when cos(velocity, normal) is below this
 BOUNCY = 64             # `_-z2k._-B6P`
+CHARGED_MS = 2000       # `_-F5N._-M4Q` @494: a throw charged this long sets `_-W6M` (corkscrew, slow boomerang)
+SPAWN_RISE = 30.0       # `_-M4Q` @347: the item starts 30 above the thrower's feet
 BOOMERANG_DELAY_MS = 180        # `_-p5k._-L1Y` (script822.<init> #15249)
 BOOMERANG_DELAY_WOBBLE_MS = 1800   # `_-p5k._-i4S`, when `_-W6M`
 BOOMERANG_PULL = 0.05333333333333334   # `_-p5k._-o1V`
@@ -330,6 +333,55 @@ def atan2_netsafe(y, x):
     return as3_round(math.atan2(a, b) * 1000.0) / 1000.0
 
 
+def throw_speed(charge, vertical):
+    """`_-F5N._-R1O` #1721: (55 when thrown straight up / down, else 75) x (1 + 0.8 x min(charge, 1000) / 1000)."""
+    c = min(charge, 1000)
+    return (55.0 if vertical else 75.0) * (1.0 + 0.8 * (c / 1000))
+
+
+def throw_vector(charge, bits, facing_left, item, ground_type, v1d, p5s):
+    """`_-F5N._-Fi` #1722: the throw speed from the input bits `_-x10` (1 up, 2 down, 4 left, 8 right).
+
+    A ProximityTrigger item cannot be thrown down from a hard ground line (bit 2 dropped). With no bit the
+    item goes the way the thrower faces (`_-r35()`); up / down set y to -1 / 1, else y = ThrownHorizontalY.
+    The vector is normalised to `throw_speed(charge, x == 0)` (Point.normalize: x *= k / len), then gains
+    the thrower's `_-v1D` in x and `_-P5S` x 0.25 in y. `ground_type` is the thrower's `_-96f` type or None.
+    """
+    if ground_type is not None and item["r58"] and not ground_type & 2:
+        bits &= ~2
+    x = y = 0.0
+    if bits == 0:
+        x = -1.0 if facing_left else 1.0
+    elif bits & 4:
+        x = -1.0
+    elif bits & 8:
+        x = 1.0
+    if bits & 1:
+        y = -1.0
+    elif bits & 2:
+        y = 1.0
+    else:
+        y = item["x5D"]
+    k = throw_speed(charge, x == 0)
+    n = math.sqrt(x * x + y * y)
+    if n > 0:
+        x, y = x * (k / n), y * (k / n)
+    return x + v1d, y + p5s * 0.25
+
+
+def throw_start(direction, item, thrower, team, charge, t):
+    """`_-p5k._-q54` #15197 as `_-F5N._-M4Q` #1689 calls it: the item's state right after a throw.
+
+    `_-Lu` / `_-33c` = direction x ThrownInitialVelocityMult, the launch speed (`_-Wj`, `_-A5W`) = the same,
+    `_-W6M` = charge >= 2000 ms, `_-BG` = PathType != 0, state `_-5T` = 1, thrower `_-r5B`, team `_-h2B` /
+    `_-25G`, `_-74O` = 0, `_-O13` = t (set by `_-M4Q` right after). The item is created at the thrower's
+    (x, y - 30) [V]; in the air `_-M4Q` may move it by Height - 120 (`_-P4n`, not read here)."""
+    lu = direction[0] * item["I2d"]
+    vy = direction[1] * item["I2d"]
+    return {"Lu": lu, "33c": vy, "launch": (lu, vy), "W6M": charge >= CHARGED_MS, "BG": item["z4P"] != 0,
+            "state": 1, "thrower": thrower, "team": team, "74O": 0, "O13": t}
+
+
 def dot(ax, ay, bx, by):
     """`_-A6B.static._-467` #1023."""
     return ax * bx + ay * by
@@ -479,7 +531,7 @@ def item_type(cells):
             r[field] = PATH_TYPES.get(v, 0)
         elif field == "o1l":
             r[field] = sum(STICK_FLAGS.get(p, 0) for p in set(v.split("|")))   # OR of distinct bits
-        elif field in ("T30", "N59", "A4s", "p2W", "o1G", "XJ"):
+        elif field in ("T30", "N59", "A4s", "p2W", "o1G", "XJ", "r58"):
             r[field] = v.strip().lower() == "true"
         elif field in ("G6o", "S2O"):            # uint slots
             r[field] = int(v)
@@ -753,5 +805,41 @@ ANCHORS = {ABC_1100: {
         (15351, 80413, "initproperty", "_-83w"),
         (15351, 11972, "pushdouble", "180.0"),
         (15351, 11976, "initproperty", "_-661"),
+    ],
+    "Throw: _-F5N._-M4Q (spawn y - 30, charge >= 2000 -> _-W6M, _-O13 = t), _-Fi (bits 1 / 2 / 4 / 8, facing, ThrownHorizontalY, + v1D, + P5S x 0.25), _-R1O 55 / 75 x (1 + 0.8 c), _-q54": [
+        (1689, 237, "callproperty", "_-Fi, 3"),
+        (1689, 347, "pushdouble", "30.0"),
+        (1689, 353, "constructprop", "_-p5k, 6"),
+        (1689, 402, "pushdouble", "120.0"),
+        (1689, 494, "pushint", "2000"),
+        (1689, 498, "callpropvoid", "_-q54, 4"),
+        (1689, 505, "initproperty", "_-O13"),
+        (1722, 41, "getproperty", "_-r58"),
+        (1722, 81, "bitnot", ""),
+        (1722, 143, "callproperty", "_-r35, 0"),
+        (1722, 171, "pushbyte", "4"),
+        (1722, 196, "pushbyte", "8"),
+        (1722, 269, "getproperty", "_-x5D"),
+        (1722, 290, "callproperty", "_-R1O, 2"),
+        (1722, 302, "callpropvoid", "normalize, 1"),
+        (1722, 335, "getproperty", "_-v1D"),
+        (1722, 386, "pushdouble", "0.25"),
+        (1721, 1, "pushuint", "1000"),
+        (1721, 17, "pushdouble", "0.8"),
+        (1721, 35, "pushdouble", "55.0"),
+        (1721, 42, "pushdouble", "75.0"),
+        (15197, 34, "getproperty", "_-I2d"),
+        (15197, 70, "initproperty", "_-W6M"),
+        (15197, 91, "initproperty", "_-BG"),
+        (15197, 107, "initproperty", "_-Wj"),
+        (15197, 157, "initproperty", "_-5T"),
+        (4974, 3161, "pushstring", "'ThrownInitialVelocityMult'"),
+        (4974, 3179, "initproperty", "_-I2d"),
+        (4974, 3133, "pushstring", "'ThrownHorizontalY'"),
+        (4974, 3151, "initproperty", "_-x5D"),
+        (4974, 2742, "pushstring", "'ProximityTrigger'"),
+        (4974, 2759, "initproperty", "_-r58"),
+        (4963, 198, "pushdouble", "-0.1"),
+        (4963, 254, "pushdouble", "1.0"),
     ],
 }}
