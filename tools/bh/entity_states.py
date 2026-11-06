@@ -71,6 +71,10 @@ SECONDARY_POWER = "_-F5N._-33h: new _-l4X, _-x4I = target, _-SQ = true, pushed t
 # (@2610-2617, @2691-2698). `_-LY` #1701 returns when there is no owner, when `IsMoveLocked`, or while a power
 # runs; `_-I2Q` keeps a 240 ms window; the item is the one `_-N5R` #1733 finds; `_-F5N._-u30` #1709 takes it
 # from the map and `_-F5N._-s1u` #1734 equips it (`_-O2R`, Weapon `_-G3X` flag 1).
+# `_-N5R` #1733: candidates are the items `_-3z._-91X(t, owner, x, y, 150, 150, 2, out)` finds around the fighter
+# point (`_-M43`, `_-E3d`), a 150 x 150 query; with several, a score with direction weights (0.4, + 0.7 while a
+# horizontal input is held, `_-81n()`) picks one [V shape; the full score is not transcribed].
+PICK_UP_AREA = (150, 150)
 PICK_UP = ("ThrowItem 512 (_-i4Z._-51o)", "_-F5N._-LY", "_-N5R", "_-F5N._-u30", "_-F5N._-s1u")
 
 POWER_START = ("_-i4Z._-rU / _-I35", "_-F5N._-C5S / _-A3Q / _-V5I", "_-F5N._-J5R", "_-O5u", "new _-l4X")
@@ -184,6 +188,14 @@ ANCHORS = {ABC_1100: {
         (1701, 67, "callproperty", "IsMoveLocked, 1"),
         (1701, 118, "callproperty", "_-N5R, 3"),
         (1734, 80, "getproperty", "_-G3X"),
+    ],
+    "_-N5R: pick-up candidates from _-3z._-91X(t, owner, x, y, 150, 150, 2, out), then direction-weighted (0.4, + 0.7 with _-81n)": [
+        (1733, 186, "pushuint", "150"),
+        (1733, 188, "pushuint", "150"),
+        (1733, 201, "callpropvoid", "_-91X, 8"),
+        (1733, 329, "pushdouble", "0.4"),
+        (1733, 341, "callproperty", "_-81n, 0"),
+        (1733, 352, "pushdouble", "0.7"),
     ],
 }}
 

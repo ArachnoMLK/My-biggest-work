@@ -1039,11 +1039,13 @@ map collision only run in states 0 and 5**.
 2. It calls `_-F5N._-LY(t, no QuickAttack press)` (@2610–2617, @2691–2698).
 3. `_-LY` #1701 returns while the fighter is `IsMoveLocked` or a power runs, and keeps a 240 ms window
    (`_-I2Q`).
-4. `_-N5R` #1733 chooses the item.
+4. `_-N5R` #1733 chooses the item: candidates come from `_-3z._-91X(t, owner, x, y, 150, 150, 2, out)`, a 150 × 150
+   query around the fighter point. With several, a direction-weighted score picks one (0.4, + 0.7 while a
+   horizontal input is held); the full score is not transcribed.
 5. `_-F5N._-u30` #1709 takes it off the map, and `_-F5N._-s1u` #1734 equips it (`_-O2R`, flag 1 when
    `Weapon`).
 
-Not transcribed yet: `_-N5R`'s reach rule, and the item spawns that put weapons on the map (lanes `_-Y1h` /
+Not transcribed yet: the full `_-N5R` score, and the item spawns that put weapons on the map (lanes `_-Y1h` /
 `_-5J`, prng-order-11.00.md §4).
 
 **How an input starts a power** [V shape]:
