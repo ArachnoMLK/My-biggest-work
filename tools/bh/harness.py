@@ -45,7 +45,7 @@ from .power_pick import power_name, redirect
 from .power_timeline import END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
-from .jump import (BOOST_13G, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
+from .jump import (BOOST_13G, dash_jump_follow, dash_jump_marks, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
                    squat_start, wall_jump)
 from .entity_states import respawn_index
 from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
@@ -107,6 +107,8 @@ class Fighter:
     j1m: float = 0.0          # `_-J1m`, x overshoot of the impulse fold
     d4x: float = 0.0          # `_-d4x`, y overshoot
     stun_until: int = 0       # end of the hitstun (`_-5q()` until then) [H]
+    no: bool = False          # `_-no`, a dash jump waits for its follow-up
+    i1w: int = 0              # `_-I1w`, the dash jump time
     p50: bool = False         # `_-P50`, a dash is pending (set by `Dash`)
     v3x: int = 0              # `_-v3x`, the dash press time
     l3a: int = 0              # `_-L3a`, the dash kind
@@ -133,7 +135,9 @@ def jump(f, t, left, right, third_arg=False):
     side = left or right
     r = ground_jump(t, f.dash_timer, f.ground, f.xb, f.a4a)
     if r is not None:
-        f.a4a, f.p5s, f.ground, _ = r
+        f.a4a, f.p5s, f.ground, was_dash = r
+        if was_dash:                                            # #3052 @651-786: `_-no`, `_-I1w`, vx cap 66
+            f.no, f.i1w, f.v1d = dash_jump_marks(t, f.v1d)
         if side:
             boost = f.stats.get("JumpXImpulse")                 # `_-13G` = the stance JumpXImpulse (#3049 @719-729)
             f.v1d, f.h84 = ground_tail(left, False, f.v1d, f.h84, _vmax(f),
@@ -166,6 +170,9 @@ def dodge(f, t, dir, rows):
             f.p50, f.m3v, f.t5z = True, False, True
             f.k1k = w.get("_-K1k", f.k1k)
             f.w47 = w.get("_-w47", f.w47)
+            if f.no and f.p5s < -41.0:                          # `_-Q3q` #3079 from Dash
+                f.p5s = -41.0
+            f.no = False
             return "dash"
 
     def locked(flag):
@@ -184,6 +191,7 @@ def dodge(f, t, dir, rows):
     if g["clear_vx"]:
         f.v1d = 0.0
     f.e6p, f.dodge, f.h2b, f.o5c, f.l4a = True, row, t, d, False
+    f.no = False                                                # Dodge #3125 @1941
     f.facing_left = facing(d, f.facing_left)
     run, air_run = f.stats["RunSpeed"], f.stats["AirRunSpeed"]
     k = k64(standard_flag(t, airborne, f.i5a, f.air_used), airborne, air_run, 1.0, run, 1.0)
@@ -490,6 +498,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         if f.power is None:
             f.t5z = False
         f.m3v = False
+    f.no, f.p5s, f.a4a = dash_jump_follow(t, f.no, f.i1w, f.p5s, f.a4a)   # `_-d1u` @309-380
     if squat_due(t, f.xb, f.i5a):                               # `_-A2X`
         f.p5s, f.i5a = 0.0, 0
         events.append(("release", jump(f, t, left, right, third_arg=True)))
@@ -673,6 +682,7 @@ def ko_reset(f):
     """`Entity._-p1Y` #3034 on the harness fighter: velocities, impulses, ring-out mask, wall flag, ground."""
     f.v1d = f.p5s = f.h84 = f.a4a = 0.0
     f.a3d = f.r51 = 0
+    f.no = f.p50 = f.m3v = False                                # #3034 @358-378
     f.ground = None
 
 
