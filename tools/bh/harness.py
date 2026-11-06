@@ -490,6 +490,42 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         keys = 0
     if move_locked(f, t):                                          # `_-1L`: no move input while move-locked
         left = right = False
+    # #6313 @520-629, @2357-2433: Dodge (and so Dash) runs only when !(IsMoveLocked || `_-Xb` != 0 || `_-C54(t)` ||
+    # `_-f6R` > t || `_-e3e & _-m1t`) or under the dodge cancel (local 34) [H: `_-C54`, `_-m1t` and local 34 false]
+    l15 = move_locked(f, t) or f.xb != 0 or f.f6r > t           # #6313 @557-629 (local 15), before the dodge
+    acted = False                                               # local 14: an action already taken this pass
+    if dodge_press and dodge_rows and not l15:
+        name = dodge(f, t, keys & DIR_MASK, dodge_rows)
+        if name is not None:
+            events.append(("dodge", name))
+            acted = l15 = True                                  # #6313 @2442-2455 after a Dodge that ran
+    if jump_press and not acted:                                # Jump @2567 / @3445 needs local 14 false
+        events.append(("press", jump(f, t, left, right)))
+    for press, heavy in ((light_press, False), (heavy_press, True)):
+        if press:
+            slot, gc = attack(f, t, keys, heavy)
+            # #6313 @2763-2798 / @2968-3003: the attack goes on only when local 15 is false (not locked, no `_-Xb`,
+            # `_-f6R` passed, no dodge this pass) or under the gravity cancel (local 32) [H: local 17]; a running
+            # power keeps the press buffered [H]
+            busy = f.power is not None or (l15 and not gc)
+            name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
+            rows = (f.moves or {}).get("powers")
+            if name is not None and rows:
+                power = redirect(rows.get(name), rows.get, exhausted=f.ut, gc=gc, vx=f.v1d, facing_left=f.facing_left)
+                name = power["PowerName"] if power else None
+                if power is not None and not busy and not cooldown_allows(f, t, power):   # `_-O5u` #1744
+                    busy = True
+                if power is not None and not busy:              # [H] no chain / cancel into a running power
+                    start_power(f, t, power)
+                    l15 = True                                  # #6313 @2932: local 15 set once `_-rU` ran
+            events.append(("attack", slot, gc, name, not busy))
+    f.g1a = g1a_next(f, t, keys)
+    if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
+        if keys & MOVE_LEFT:                                    # faces left, else held right faces right
+            f.facing_left = True                                # (@348-436 free, @229-344 move-locked by a
+        elif keys & MOVE_RIGHT:                                 # power: the same unless `_-t5z` [H])
+            f.facing_left = False
+    # `Entity._-k5H` #2991: `_-1L` (@75: the inputs above) runs before the power update `_-Kc._-25` (@522)
     if f.power is not None and f.power.get("g4i") in (6, 9):   # `_-O5N` #56 read by `_-R63` @4061-4339
         g = f.ground
         reason = 0
@@ -532,41 +568,6 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                 rows = (f.moves or {}).get("powers") or {}
                 if nxt and rows.get(nxt) is not None and start_power(f, t, rows[nxt]):
                     events.append(("combo", nxt))
-    # #6313 @520-629, @2357-2433: Dodge (and so Dash) runs only when !(IsMoveLocked || `_-Xb` != 0 || `_-C54(t)` ||
-    # `_-f6R` > t || `_-e3e & _-m1t`) or under the dodge cancel (local 34) [H: `_-C54`, `_-m1t` and local 34 false]
-    l15 = move_locked(f, t) or f.xb != 0 or f.f6r > t           # #6313 @557-629 (local 15), before the dodge
-    acted = False                                               # local 14: an action already taken this pass
-    if dodge_press and dodge_rows and not l15:
-        name = dodge(f, t, keys & DIR_MASK, dodge_rows)
-        if name is not None:
-            events.append(("dodge", name))
-            acted = l15 = True                                  # #6313 @2442-2455 after a Dodge that ran
-    if jump_press and not acted:                                # Jump @2567 / @3445 needs local 14 false
-        events.append(("press", jump(f, t, left, right)))
-    for press, heavy in ((light_press, False), (heavy_press, True)):
-        if press:
-            slot, gc = attack(f, t, keys, heavy)
-            # #6313 @2763-2798 / @2968-3003: the attack goes on only when local 15 is false (not locked, no `_-Xb`,
-            # `_-f6R` passed, no dodge this pass) or under the gravity cancel (local 32) [H: local 17]; a running
-            # power keeps the press buffered [H]
-            busy = f.power is not None or (l15 and not gc)
-            name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
-            rows = (f.moves or {}).get("powers")
-            if name is not None and rows:
-                power = redirect(rows.get(name), rows.get, exhausted=f.ut, gc=gc, vx=f.v1d, facing_left=f.facing_left)
-                name = power["PowerName"] if power else None
-                if power is not None and not busy and not cooldown_allows(f, t, power):   # `_-O5u` #1744
-                    busy = True
-                if power is not None and not busy:              # [H] no chain / cancel into a running power
-                    start_power(f, t, power)
-                    l15 = True                                  # #6313 @2932: local 15 set once `_-rU` ran
-            events.append(("attack", slot, gc, name, not busy))
-    f.g1a = g1a_next(f, t, keys)
-    if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
-        if keys & MOVE_LEFT:                                    # faces left, else held right faces right
-            f.facing_left = True                                # (@348-436 free, @229-344 move-locked by a
-        elif keys & MOVE_RIGHT:                                 # power: the same unless `_-t5z` [H])
-            f.facing_left = False
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
     vmax = _vmax(f)

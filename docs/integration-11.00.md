@@ -428,3 +428,8 @@ false) and no attack (@2763-2798 / @2968-3003 need local 15 false unless the gra
 pass; a started attack sets local 15 (@2932). Also: a CastTime part without a number is 0 (#30). Aggregate:
 life 10.6 → 10.2 s (248 early / 2 within 1 s / 4 late). On replay 186 MAM now dashes at 10.336 s instead of
 starting the heavy (the clip shows the heavy: open, likely an earlier state difference).
+**Order inside a fighter's step (6 Nov).** [V] `Entity._-k5H` #2991 calls `_-1L` (@75, which runs the input pass
+`_-51o` first) before the power update `_-Kc._-25` (@522) and the physics `_-8i` (@585). The harness ran the power
+update before the inputs; now inputs → power update → physics, so a press seen on the tick a power ends waits one
+tick, and a power started by a press gets its first update on the same tick. Aggregate: life 10.0 s (247 early /
+2 within 1 s / 4 late / 1 late within 1 s).
