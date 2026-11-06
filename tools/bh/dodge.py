@@ -601,6 +601,17 @@ def cooldown_ms(cooldown, cooldown_ground, air_or_wall):
 
 
 ANCHORS = {ABC_1100: {
+    "Facing: Entity._-1L #2986 after _-51o turns with the held side (66U & 4 -> _-CV(true), & 8 -> _-CV(false)), free @348-436 or move-locked by a power @198-344 (_-t5z: the power's _-L0)": [
+        (2986, 34, "callpropvoid", "_-51o, 1"),
+        (2986, 222, "callproperty", "_-65i, 0"),
+        (2986, 237, "getproperty", "_-t5z"),
+        (2986, 259, "getproperty", "_-L0"),
+        (2986, 301, "callpropvoid", "_-CV, 1"),
+        (2986, 368, "pushbyte", "4"),
+        (2986, 385, "callpropvoid", "_-CV, 1"),
+        (2986, 406, "pushbyte", "8"),
+        (2986, 423, "callpropvoid", "_-CV, 1"),
+    ],
     "Friction while dodging: _-8i @764-798 runs it when !_-E6P() or _-H6t(); _-H6t #3063 = dodging with a Neutral (_-h2L 0) ground-only (_-6H 1) type; then 9.0 / 3.25 by the held side _-66U": [
         (2984, 768, "getproperty", "_-83l"),
         (2984, 782, "callproperty", "_-E6P, 0"),
