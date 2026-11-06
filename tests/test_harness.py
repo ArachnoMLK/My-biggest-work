@@ -325,5 +325,32 @@ class Play(unittest.TestCase):
         self.assertTrue(out[1]["kos"] and out[2]["kos"])
 
 
+class DropLockAndFastFall(unittest.TestCase):
+    def test_u55_blocks_side_input_until_landing(self):
+        f, grid = harness.Fighter(0.0, -400.0, u55=True), smoke.map_grid(FLAT)
+        t = 1000
+        while f.ground is None and t < 4000:
+            harness.tick(f, t, grid, False, True, keys=8)
+            t += 16
+            if f.ground is None:
+                self.assertEqual(f.x, 0.0)                    # IsMoveLocked while `_-u55`
+        self.assertIsNotNone(f.ground)
+        self.assertFalse(f.u55)
+        harness.tick(f, t, grid, False, True, keys=8)
+        self.assertGreater(f.x, 0.0)
+
+    def test_drop_press_starts_a_fast_fall(self):
+        f, grid = harness.Fighter(0.0, -900.0), smoke.map_grid(FLAT)
+        f.p5s = -20.0
+        harness.tick(f, 1000, grid, keys=2)                   # fresh Drop: `_-76H` = 1000
+        self.assertFalse(f.ff)
+        for t in (1016, 1032):
+            harness.tick(f, t, grid, keys=2)
+        self.assertFalse(f.ff)
+        harness.tick(f, 1048, grid, keys=2)                   # `_-76H` + 48
+        self.assertTrue(f.ff)
+        self.assertGreaterEqual(f.p5s, 0.0)                   # the rise is cut
+
+
 if __name__ == "__main__":
     unittest.main()

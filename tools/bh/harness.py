@@ -30,7 +30,8 @@ fighters are independent.
 """
 from dataclasses import dataclass, field
 
-from .air_move import WallState, air_move, gravity_applies, ground_reset, ground_walk, respond, steep, wall_contact
+from .air_move import (WallState, air_move, drop_held_flag, fall_cap, fall_step, fast_fall, gravity_applies, ground_reset,
+                       ground_walk, respond, steep, wall_contact)
 from .dodge import (LEFT as LEFT_BIT, RIGHT as RIGHT_BIT, DROP as DROP_BIT, dash, dash_start, dash_update, attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
                     gates, is_dodge_locked, k64, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x,
                     speed_y, standard_flag, timers)
@@ -49,7 +50,7 @@ from .jump import (BOOST_13G, dash_jump_follow, dash_jump_marks, air_jump, dash_
                    squat_start, wall_jump)
 from .entity_states import respawn_index
 from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
-from .smoke import FALL_CAP, GRAVITY, STEP, TICK_MS
+from .smoke import GRAVITY, STEP, TICK_MS
 from .spawn_bot import IDLE, REPLAY_W35, SPAWNED_AT_MATCH_START, SPAWNED_IN_PLAY, Drone, scoring_rules, timing_flags
 from .step import clamp, fold_impulse, speed_cap
 
@@ -57,7 +58,6 @@ DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFrict
                  "Acceleration": 3.0, "AirAcceleration": 2.0}   # synthetic defaults; real ones from stats.py
 AIR_JUMPS = 2       # `Entity._-56T()` #3095 returns 2 [V]
 MOVE_LEFT, MOVE_RIGHT, JUMP = 4, 8, 16   # replay.INPUT_BITS: bit i = 1 << i
-FALL_CAP_DROP = 85.0                      # movement-11.00.md: `Entity._-8i` @5127-5170 with the Drop bit
 DODGE_DASH, DIR_MASK = 256, 15            # the dodge key; Dodge's dir = keys & 15 (#6313 @2427)
 LIGHT, HEAVY = 128, 64                    # LightAttack, HeavyAttack (input-buffer-11.00.md)
 
@@ -107,6 +107,13 @@ class Fighter:
     j1m: float = 0.0          # `_-J1m`, x overshoot of the impulse fold
     d4x: float = 0.0          # `_-d4x`, y overshoot
     stun_until: int = 0       # end of the hitstun (`_-5q()` until then) [H]
+    ff: bool = False          # `_-4V` / `_-61h()`: fast fall (#2939; set / cleared by `_-8i` @4492-5053)
+    g1a: bool = False         # `_-W3w` / `_-G1a()` #2940, written by `Entity._-1L` #2986 (`_-e21`)
+    h76: int = -100000        # `_-R5q._-76H`: time of the last fresh Drop press (#6313 @3966-4007)
+    b5: int = -100000         # `_-R5q._-B5`: the last pick-up / throw handled (#6313 @2630, @2711)
+    prev_keys: int = 0        # the previous tick's `_-66U` (#6313 local 7)
+    u55: bool = False         # `_-u55`: set by the drone drop (SpawnBot._-m1O #11857 @461-526), cleared on a
+                              # ground line (`_-8i` #2984 @13288-13335); `IsMoveLocked` #3061 @128-137 tests it
     no: bool = False          # `_-no`, a dash jump waits for its follow-up
     i1w: int = 0              # `_-I1w`, the dash jump time
     p50: bool = False         # `_-P50`, a dash is pending (set by `Dash`)
@@ -132,6 +139,7 @@ def jump(f, t, left, right, third_arg=False):
         f.xb, f.i5a = squat_start(t, f.ground, f.r51)
         return "squat"
     f.i5a = t                                                   # @540: `_-I5A` = t on the jump path
+    f.ff = False                                                # #3052 @524-535: `_-w3i` = 0, `_-rA(false)`
     side = left or right
     r = ground_jump(t, f.dash_timer, f.ground, f.xb, f.a4a)
     if r is not None:
@@ -323,6 +331,8 @@ def move_locked(f):
     nor AllowMoveForward (`_-T20`); `_-R63` #46 @4677-4719 clears it with AllowRecoverMove (`_-r4W`). While locked,
     `Entity._-1L` #2986 @50-348 does not take the move inputs. [H] glue: cleared when the harness drops the power,
     `_-Kc._-H6I(t)` not tested, AllowRecoverMove not modelled."""
+    if f.u55:                                                   # #3061 @128-137: after a drone drop, until landing
+        return True
     return f.power is not None and f.power.get("move_lock", False)
 
 
@@ -427,6 +437,10 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     `dodge_press` with `dodge_rows` (dodge.parse_types) tries `Entity.Dodge(t, keys & 15)` first (#6313 tries the
     dodge before the jump). Returns the list of events of this tick."""
     events = []
+    if keys & 2 and not f.prev_keys & 2:                        # #6313 @3966-4007: `_-76H` = t on a fresh Drop
+        f.h76 = t
+    drop_held = bool(keys & 2)
+    f.prev_keys = keys
     if t < f.stun_until:                                        # `_-5q()`: no input acts in hitstun [H]
         left = right = jump_press = dodge_press = light_press = heavy_press = False
         keys = 0
@@ -472,16 +486,18 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         events.append(("press", jump(f, t, left, right)))
     for press, heavy in ((light_press, False), (heavy_press, True)):
         if press:
-            busy = f.power is not None                          # a running power keeps the press buffered [H]
+            busy = f.power is not None or f.u55                 # a running power keeps the press buffered [H];
+            # #6313 @2763-2798: a move-locked fighter (local 15 false, here `_-u55`) does not reach `_-rU` [H: l17, l32]
             slot, gc = attack(f, t, keys, heavy)
             name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
             rows = (f.moves or {}).get("powers")
             if name is not None and rows:
                 power = redirect(rows.get(name), rows.get, exhausted=f.ut, gc=gc, vx=f.v1d, facing_left=f.facing_left)
                 name = power["PowerName"] if power else None
-                if power is not None and f.power is None:       # [H] no chain / cancel into a running power
+                if power is not None and not busy:              # [H] no chain / cancel into a running power
                     start_power(f, t, power)
             events.append(("attack", slot, gc, name, not busy))
+    f.g1a = g1a_next(f, t, keys)
     if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
         if keys & MOVE_LEFT:                                    # faces left, else held right faces right
             f.facing_left = True                                # (@348-436 free, @229-344 move-locked by a
@@ -545,11 +561,16 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         f.d4x = over
     f.p5s = clamp(f.p5s, cap)
     g_term = 0.0
-    fall_cap = FALL_CAP_DROP if keys & 2 else FALL_CAP           # @5097-5170: 85 with Drop held [H: `_-61h`, lock]
+    stun = t < f.stun_until
+    f.ff = fast_fall(f.ff, t, f.g1a, f.r51, f.e6p, stun, f.ground is None, f.power is not None, f.p5s, f.h76,
+                     f.i5a, drop_held, f.xb)                    # `_-8i` @4492-5053 [H: `_-t46`, `_-w3i`]
+    locked = move_locked(f)
+    cap = fall_cap(f.ff, drop_held, locked)                     # @5067-5170
     cancel = power_cancels_gravity(f, t)                        # `_-q1G` @5252
-    if gravity_applies(f.e6p, f.ground, f.y1l, t, cancel, GRAVITY) and f.p5s < fall_cap:
-        g_term = GRAVITY * STEP
-        f.p5s += g_term
+    if gravity_applies(f.e6p, f.ground, f.y1l, t, cancel, GRAVITY):
+        if f.p5s < cap:
+            g_term = GRAVITY * STEP
+        f.p5s = fall_step(f.p5s, cap, stun, f.ff, drop_held, locked, f.power is not None, GRAVITY)   # @5277-5853
     m = air_move(grid, team, f.x, f.y, x_step, f.p5s, f.ground is not None)
     f.x, f.y, f.ground = m.x, m.y, m.ground
     r51_before, f.r51 = f.r51, 0                                # @8869-8886
@@ -572,6 +593,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     if f.ground is not None and t >= f.stun_until:              # `_-8i` refresh on a line -> `_-C3x` #1712 @112-116
         f.ut = False
     landed = was_airborne and f.ground is not None
+    if f.u55 and f.ground is not None:                          # `_-8i` @13288-13335: `_-u55` cleared on a line
+        f.u55 = False
     if landed:
         f.t322 = t
         f.i5a = squat_on_landing(f.xb, f.i5a, True)
@@ -585,6 +608,13 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     f.h84 = f.a4a = 0.0
     f.events.extend((t, e) for e in events)
     return events
+
+
+def g1a_next(f, t, keys):
+    """`_-G1a()` for the harness fighter (`air_move.drop_held_flag`). [H] glue: `_-T5W` false, no `_-d38` / NT,
+    `_-r5b` long past; `_-B5` is the last pick-up / throw tick of `play`."""
+    return drop_held_flag(f.g1a, t, keys, move_locked(f), f.e6p and f.o5c & 2, False, f.b5, f.h76,
+                          f.power is not None, f.dash_timer, f.i5a)
 
 
 def run(f, grid, inputs, ticks, t0=0, team=0, bounds=None, stop_on_ko=False):
@@ -705,6 +735,7 @@ def match_start(entities, seed, points, camera, cells=None, team_type=0, spawned
 
 def ko_reset(f):
     """`Entity._-p1Y` #3034 on the harness fighter: velocities, impulses, ring-out mask, wall flag, ground."""
+    f.ff = f.g1a = False                                        # #3034: `_-rA(false)`, `_-e21(false)`
     f.v1d = f.p5s = f.h84 = f.a4a = 0.0
     f.a3d = f.r51 = 0
     f.no = f.p50 = f.m3v = False                                # #3034 @358-378
@@ -750,7 +781,8 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 if d.phase == IDLE and body["state"] in (0, 5):
                     st = stats_by_id.get(p["e"]["id"])
                     p["f"] = Fighter(body["x"], body["y"], p5s=body["vy"], stats=dict(st) if st else dict(DEFAULT_STATS),
-                                     moves=(moves_by_id or {}).get(p["e"]["id"]))
+                                     moves=(moves_by_id or {}).get(p["e"]["id"]),
+                                     u55=body["state"] == 5 or bool(body["spawned"]))   # `_-m1O` @461-526
                     p["weapon"] = None                      # [H] a respawned fighter is unarmed
                     p["let_go"].append(t)
             if body["state"] in (0, 5) and p["f"] is not None:
@@ -778,6 +810,7 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                         if e[4]:                                # refused while a power runs: retried [H]
                             done[a] = fresh[a]
                 if world is not None and "PickUpThrow" in fresh and f.moves and not move_locked(f) and f.power is None:
+                    f.b5 = t                                    # #6313 @2630 / @2711: `_-B5` = t with `_-LY`
                     if p["weapon"] is not None:                 # a throw (`_-M4Q`) [H: a tap, no hit]
                         world.throw(t, p["e"]["id"], p["weapon"], f, keys & DIR_MASK)
                         p["weapon"] = None

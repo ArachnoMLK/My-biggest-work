@@ -375,3 +375,23 @@ Then the speed limits of `_-O1K` #91 @714-1083 at a power start without CastImpu
 for a backward speed, else SpeedLimit `_-u1G` toward the facing): identical aggregate.
 Then the power's gravity cancel as `_-o4b` #45 sets it (while the step is held: tick < start + AntigravTime, from
 #59 @515-592; else CancelGravity): identical aggregate.
+
+**Video oracle, 6 Nov (owner's Medal clip of the in-game replay player, local only).** [V by frame reading] The clip
+runs about **0.45 s behind the replay clock** (replay time = clip time + 0.45): CLO's dash and dash jump (inputs at
+6768 / 6816 ms) show at clip 6.33 / 6.36 s, the match timer flips at clip 6.55 / 7.55 s (start at replay 6.0 s),
+and CLO's first KO shows at clip 40.8 s (replay 41.2 s). The earlier comparison that assumed clip = replay time was
+off by that much. With the offset, the first real hit on replay 186 is MAM's unarmed side heavy
+(`BaseSmashSideCombo`, 18 damage) at replay ~10.69 s, not a side light; no damage before.
+Three rules found from that clip and wired (transcribed on #30 in `air_move.py`, 2259 anchors):
+- **`_-u55` drop lock**: the drone drop (`SpawnBot._-m1O` #11857 @489 / @516) sets `_-u55` (= `_-44x` in state 0,
+  true in state 5); `IsMoveLocked` #3061 tests it and `_-8i` @13288-13335 clears it on a ground line. The harness
+  let MAM drift ~150 units right while falling at the match start; the clip shows a straight fall.
+- **Apex gravity** `Entity._-71A` #3171 (3.25 − |vy| × 3.25 / 48 for |vy| ≤ 48, × 0.384, out of hitstun).
+- **Fast fall** (`_-61h` / `_-rA`, `_-G1a` from `_-1L`): 48-80 ms after a Drop press in the air (P5S ≥ −38, no
+  power), a rise is cut to 0 and 12 × 0.384 is added each falling tick; plus the 85 cap and the ease back to 70
+  (− 6 × 0.384) of @5604-5853. CLO's dash-jump hop now lands at ~7.06 s (clip: ~7.04 s), it stayed in the air
+  ~0.6 s longer before.
+Aggregate (own script, first KO of the real victim, 254 1v1 11.00 replays): before 243 early / 5 early within
+1 s / 2 late within 1 s / 4 none, harness life median 12.5 s; after 248 early / 2 early within 1 s / 2 late /
+1 off by one tick / 1 none, **life 10.2 s** (real 44.3 s). The fall terms make jumps shorter, so fighters fall
+sooner; the rules are bytecode-backed and match the clip, so the remaining gap is elsewhere (open [H]).
