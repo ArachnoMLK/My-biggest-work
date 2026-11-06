@@ -97,11 +97,13 @@ that can happen is limit L2.
 | `_-E1V._-13p` #4908 | @2–9 `I._-24O(seed)`; @13–27 `_-Y1h = I.next`; @30–44 `_-5J = I.next` | [V] (prng-11.00 §3) |
 | `_-E1V._-b2A` #4874 | arg 3 selects lane A (`_-T6S`, `_-O5i`, `_-Y1h`, `_-K4U`) or lane B (`_-k5F`, `_-z4Q`, `_-5J`, `_-c44`) | [V]; [H] two spawn lanes |
 | `_-E1V._-O3d` #4879 (phase 4) | @51 `_-96d(…)`, @58 `_-u43(…)` | [V] |
-| `_-96d` #4876 / `_-u43` #4880 | conditionally: `_-e3K(…)` (@562 / @560), then `_-Y1h = I.next` (@566–580) / `_-5J = I.next` (@564–578) | [V] shape; branch conditions not traced |
+| `_-96d` #4876 / `_-u43` #4880 | conditionally: `_-e3K(…)` (@562 / @560), then `_-Y1h = I.next` (@566–580) / `_-5J = I.next` (@564–578) | [V]; branch conditions traced in hit-detection-11.00.md §10.4 (`item_spawns.py`) |
 | `_-Z3n` #4872, `_-B5T` #4900, `_-SH` #4899 | snapshot write / read of both values; reset to 0 | [V] |
 
-`_-e3K` #4920 is the only method referencing `_-K5X` (an I draw site) and one of seven referencing
-`_-p1K`; so phase 4 may draw I inside `_-e3K` *before* the lane refresh. [H] until `_-e3K` is traced.
+`_-e3K` #4920 = `_-K5X` (type pick: one I draw when the list has two types or more) then `_-p1K` (one I draw for
+the position, after an I shuffle of the ItemSpawn list `_-e4H` when the cursor runs past its end). So a lane
+spawn draws I in this order: [shuffle], [type], position, then the lane refresh; a first drop on init rects
+redraws no lane value. [V] (`item_spawns.py`, hit-detection-11.00.md §10.4)
 
 ## 4b. Match start: `_-X6R._-b3x` (added from hit-detection-11.00.md §10)
 

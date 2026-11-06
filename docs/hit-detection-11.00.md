@@ -1114,6 +1114,29 @@ locals 32 / 33 of the input buffer, so the third argument is the **gravity cance
 | `PowerType._-p4G(name)` #6493 reads the StringMap `_-kl` (`getReserved` for reserved keys); `power_pick.power_rows` keys powerTypes.csv by PowerName. Local check (aggregate): 3,768 powers; 161 of the 172 item slot names found, 11 not [H: key or reserved names] | #6493 | [V] read path; [H] the `_-kl` key |
 | Lookup `PowerType._-p4G(name)`; team flag 64: `name_TESTFEATURE` when it exists; then ExhaustedVersion under `_-UT`, **GCVersion under the gravity cancel**, OriginOverrideIfInMode under `_-b3A` > 1, MomentumVersion when \|vx\| >= 60 toward the facing | @894-1331 | [V] `power_pick.redirect`; [H] `_-UT`, `_-b3A` |
 
+### 10.4 Item spawns: ItemManager `_-E1V` and the generator I ([`tools/bh/item_spawns.py`](../tools/bh/item_spawns.py))
+
+What puts the weapons (and gadgets) on the map that the pick-up chain of §10 grabs. Group "Item spawns" of
+`hit-detection-verify`.
+
+| Step | Bytecode | Status |
+|---|---|---|
+| Data: `ItemSpawnRateTypes.xml` -> `_-T4A` (InitSpawnDelay `_-41r`, FixedTimeBetweenSpawns `_-T2X`, VariableTimeBetweenSpawns `_-E3k`, RandomTimeBetweenSpawns `_-j5F`, ExtraTimeBeforeMax `_-n1a`, MaxItemCountFixed `_-93K`, MaxItemCountMultiplier `_-dD`, RoundUpMaxItemMultiplier `_-rL`, SpawnAllZonesSimultaneously `_-k4w`, SpawnAllZonesFirstDrop `_-M2s`; InheritSpawnRate copies a parent; "Disabled" = id 0 = `_-02s`); `ItemSpawnRuleSetTypes.xml` -> `_-w2j` (WeaponList, GadgetList, Use1v1AndTeamInitialWeaponSpawns `_-63N`) | #4949, #4944, #4948, #4958 | [V] `parse_rates`, `parse_rule_sets` |
+| Settings: the reader `_-I3W._-G5` reads `_-Z2Y` (flags) first and `_-46U` / `_-O2B` / `_-O4I` / `_-i48` as fields 11-14, i.e. the header's item_spawn_ruleset_id, weapon_spawn_rate_id, gadget_spawn_rate_id, custom_gadget_selection; the rates are Disabled unless `_-52d()` (not variation 3, no `_-L5u` on the scoring type) | #3875 @6-207, #3901, #3903, #3896 | [V] |
+| Seeding `_-13p`: I seeded with the match seed (same as R), draw 0 -> weapon lane `_-Y1h`, draw 1 -> gadget lane `_-5J`, then `_-A1o`: rates (Disabled -> none), weapons = WeaponList without TestFeature types, gadgets = GadgetList without the indices set in `_-i48`; `_-SH` puts the spawn cursor `_-S3D` at 0xFFFFFFFF | #4908, #4907, #4899 | [V] `ItemManager.seed_lanes` |
+| Level lists: ItemSpawn -> `_-X69`, ItemInitSpawn -> `_-i4e`, TeamItemInitSpawn -> `_-03f`, ItemSet -> `_-v3h`; default H 10, ItemSet 40 x 40, init spawns 50 x 50 | #5231, #5289, #15351 | [V] `parse_level_spawns`; [H] DynamicItemSpawn (on moving platforms) left out |
+| Phase 4 `_-O3d`: `_-y4V`, `_-I4n` (flag 64), weapon lane `_-96d`, gadget lane `_-u43`, item updates `_-418` | #4879 | [V] |
+| Lane gate `_-n3V`: a rate and a rule set, no `_-w35` bit 0x1000000, `_-n4k` set, t >= `_-n4k` + InitSpawnDelay | #4921 | [V] `gate` |
+| Lane `_-96d` / `_-u43`: once the lane has a base time, max = `_-Z2q` (min(100, players x multiplier rounded + fixed), 100 when both 0), counted once; count = held + live items of the lane (weapon lane: ItemType Weapon `_-G3X`; gadget lane: not Weapon and not `_-a3s()`); count >= max resets the base to t; else spawn when base + Fixed (+ Extra when count + 1 = max) + floor((count + 1) x Variable / max) + (lane value % (2 Random + 1)) - Random < t (`_-b2A`). First weapon drop (`_-s3q`): with `_-63N`, 2 players and ItemInitSpawn rects -> one item at the centre of each; flag 1 -> TeamItemInitSpawn rects (or a sided shuffle and two random drops); then the base is set and nothing is redrawn. Otherwise a spawn: all ItemSpawn rects at once (`_-k4w`, or `_-M2s` on the first drop) or one random (`_-e3K`), then the lane value is redrawn from I and the base set to t | #4876, #4880, #4874, #4952, #4922, #4886 | [V] `ItemManager.lane_tick`, `lane_due`, `max_items`, `first_spawn` |
+| Type pick `_-K5X`: one type -> no draw; else weights total - (picked count + live share), live share = ceil(total / n) per live item, one I draw % (total (n - 1)); sudden death drops RemoveDuringSuddenDeath types; the picked count is bumped (`_-v57._-a4o`) | #4911, #100 | [V] `pick_type` |
+| Place `_-p1K`: the next rect of `_-X69` at the cursor; past the end, `_-e4H` shuffles `_-X69` with I (`_-A6B._-eV`, sided: leftmost to 0, rightmost to 1) and restarts at 0; one I draw: y = y + (r >>> 16) / 65535 h, x = x + (r & 65535) / 65535 w; then `new _-64Z` / `new _-p5k` | #4888, #4892 | [V] `ItemManager.place`, `spawn_pos`, `shuffle_spawns`; [H] `_-T1v` true for static rects (it tests only platform spawns) |
+
+Local aggregate (no values): 22 spawn rates, 25 rule sets, all rate names resolve; 122 LevelDescs give 636 static
+ItemSpawn rects (84 more inside 28 DynamicItemSpawn blocks), 103 ItemInitSpawn, 60 TeamItemInitSpawn, 15 ItemSet;
+10 maps have no static ItemSpawn. The standard rule sets list a single weapon type (WeaponCrate), so a weapon
+drop draws I only for its position. [H] left: `_-s3D._-8W()` = player count, `_-a3s()`, the name -> ItemType
+resolution of the lists (`_-w2j._-L3T`), and what the crate becomes when picked up.
+
 ## 11. Still open
 
 - Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
