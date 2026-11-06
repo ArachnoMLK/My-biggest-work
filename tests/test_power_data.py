@@ -45,5 +45,15 @@ class Expand(unittest.TestCase):
         self.assertEqual(out["D6M"], 7.0)
 
 
+class FireImpulse(unittest.TestCase):
+    def test_ranges_and_unset(self):
+        from bh.power_data import power_steps, UNSET
+        s = power_steps({"CastTime": "0:1,5", "FireImpulseY": "-80~-76,!", "FireImpulseX": "10"})
+        self.assertEqual(s["FireImpulseY"][:2], [-80, -76])
+        self.assertEqual(s["FireImpulseY"][2:], [UNSET] * (len(s["CastTime"]) - 2))
+        self.assertEqual(set(s["FireImpulseX"]), {10})
+        self.assertIsNone(s["q24"])
+
+
 if __name__ == "__main__":
     unittest.main()
