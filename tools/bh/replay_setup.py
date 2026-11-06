@@ -21,7 +21,8 @@ from .respawn_points import parse_respawns
 from .smoke import map_grid
 
 UNARMED = "Unarmed"        # `ItemType._-m4V` (ItemType._-R2Z #4965 @313-330); fighters start unarmed [H]
-HARNESS_STATS = ("RunSpeed", "AirRunSpeed", "Friction", "AirFriction", "Acceleration", "AirAcceleration",
+HARNESS_STATS = ("RunSpeed", "AirRunSpeed", "Friction", "AirFriction", "Acceleration", "AirAcceleration", "RecoverMod",
+                 "AirRecoverMod", "SigRecoverMod",
                  "ImpulseMult", "HPOffset", "ImpulseNegation", "Recovery", "JumpXImpulse")
 
 

@@ -352,5 +352,15 @@ class DropLockAndFastFall(unittest.TestCase):
         self.assertGreaterEqual(f.p5s, 0.0)                   # the rise is cut
 
 
+class RecoverEnd(unittest.TestCase):
+    def test_at_cells_and_recover_mod(self):
+        row = {"FixedRecoverTime": "2", "RecoverTime": "18@14"}
+        self.assertEqual(harness.end_tick(row, 632), 652)
+        self.assertEqual(harness.end_tick(row, 632, {"RecoverMod": 0.5}), 643)       # floor(632 + 2 + 9)
+        self.assertEqual(harness.end_tick(dict(row, ComboOverrideIfHit="X"), 632, {"RecoverMod": 0.5}), 652)
+        self.assertEqual(harness.end_tick(dict(row, IsAirPower="TRUE"), 632,
+                                          {"RecoverMod": 0.5, "AirRecoverMod": 0.25}), 638)
+
+
 if __name__ == "__main__":
     unittest.main()

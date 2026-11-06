@@ -395,3 +395,13 @@ Aggregate (own script, first KO of the real victim, 254 1v1 11.00 replays): befo
 1 s / 2 late within 1 s / 4 none, harness life median 12.5 s; after 248 early / 2 early within 1 s / 2 late /
 1 off by one tick / 1 none, **life 10.2 s** (real 44.3 s). The fall terms make jumps shorter, so fighters fall
 sooner; the rules are bytecode-backed and match the clip, so the remaining gap is elsewhere (open [H]).
+**Recovery times (6 Nov).** [V] `PowerType._-A3R` #6483 reads FixedRecoverTime / RecoverTime as `split('@')[0]`
+through Std.parseInt (the part after '@' is an animation frame for `_-g1x`); the harness read the whole cell as a
+float, so **707 cells written "N@F" gave no recovery at all** (`power_data.recover_times`, #30 at 2270 anchors).
+The end tick also takes the fighter's recover factor: `_-E5S` = floor(`_-k4b` + FixedRecoverTime + RecoverTime ×
+`_-01d`) under `_-s5C` = not (ComboOverrideIfHit and not EndOnHit), `_-01d` = AirRecoverMod for an IsAirPower,
+else RecoverMod (#59 @214-289, #39 @265-379; SigRecoverMod only for legend signatures, flags 512|64 from
+`PowerType._-z24` #6491). Aggregate: life 10.2 → **10.7 s** (246 early / 2 early within 1 s / 1 exact / 3 late /
+1 late within 1 s / 1 none). On replay 186 MAM's missed side light now recovers until ~10.32 s instead of 10.13 s;
+the clip still shows no second side light at ~10.34 s but the side heavy charge (open [H]: why the light press at
+10.304 does not fire).

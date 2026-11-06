@@ -30,6 +30,8 @@ fighters are independent.
 """
 from dataclasses import dataclass, field
 
+import math
+
 from .air_move import (WallState, air_move, drop_held_flag, fall_cap, fall_step, fast_fall, gravity_applies, ground_reset,
                        ground_walk, respond, steep, wall_contact)
 from .dodge import (LEFT as LEFT_BIT, RIGHT as RIGHT_BIT, DROP as DROP_BIT, dash, dash_start, dash_update, attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
@@ -41,7 +43,7 @@ from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_decay,
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, buffered_presses, state_at
-from .power_data import fire_x, momentum, power_steps
+from .power_data import recover_times, fire_x, momentum, power_steps
 from .power_pick import power_name, redirect
 from .power_timeline import END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
@@ -271,16 +273,17 @@ def attack(f, t, keys, heavy):
 UNSET = 2147483647        # an empty CastImpulse cell (`_-l4X._-O1K` #91 @396)
 
 
-def end_tick(power, k4b):
-    """`_-E5S` = floor(`_-k4b` + FixedRecoverTime (`_-f5c`) + RecoverTime (`_-Sp`)) (`_-l4X._-f14` #59 @214-289,
-    entity-step-11.00.md). [H] glue: the RecoverMod / AirRecoverMod / SigRecoverMod factor `_-01d` = 1, no charge
-    share, no AntigravTime."""
-    def num(k):
-        try:
-            return float(power.get(k) or 0)
-        except ValueError:
-            return 0.0
-    return int(k4b + num("FixedRecoverTime") + num("RecoverTime"))
+def end_tick(power, k4b, stats=None):
+    """`_-E5S` = floor(`_-k4b` + FixedRecoverTime (`_-f5c`) + RecoverTime (`_-Sp`) x `_-01d`) (`_-l4X._-f14` #59
+    @214-289), `_-01d` only under `_-s5C` = not (ComboOverrideIfHit and not EndOnHit) (#6483 @13418-13442);
+    `_-01d` (`_-l4X.<init>` #39 @265-379) = the owner's AirRecoverMod `_-G6R` for an IsAirPower (`_-NT`) power,
+    else RecoverMod `_-yD` (stats.py, Dexterity). [H] glue: the SigRecoverMod case (`_-I45 & (512|64)`) left out,
+    no charge share, no AntigravTime."""
+    f5c, sp = recover_times(power)                              # '@' cells: the part before '@' (#6483)
+    st = stats or {}
+    s5c = not (power.get("ComboOverrideIfHit") and not _true(power.get("EndOnHit")))
+    mod = st.get("AirRecoverMod", 1.0) if _true(power.get("IsAirPower")) else st.get("RecoverMod", 1.0)
+    return int(math.floor(k4b + f5c + (sp * mod if s5c else sp)))
 
 
 def power_accel(f, left_held):
@@ -414,7 +417,7 @@ def start_power(f, t, power):
     cast_impulse(f, power)
     f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
     f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
-    f.power["end_tick"] = end_tick(power, tick_index(t))
+    f.power["end_tick"] = end_tick(power, tick_index(t), f.stats)
     f.lock_start = t                                            # `_-532` = t: `Entity._-c1r` at the move start
     if power.get("ExhaustedVersion"):                           # `_-h1T` #1742 @540-581 (`_-8u`, not `_-P5D`) [H: at the start]
         f.ut = True
