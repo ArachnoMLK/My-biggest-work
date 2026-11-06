@@ -20,7 +20,7 @@ Version → patch: 261 = 10.02 … 268 = 10.09 … 271 = 11.00 (`PATCHES`).
 | 6 | Results | `u32 length_ms`, scores (`5-bit entity`, `i16 score`), `u32 end_of_match_fanfare`. Can repeat (up to 11 times seen) |
 | 1 | Inputs | per entity (while bit = 1): `5-bit entity`, `i32 count`, then `count` × (`i32 timestamp_ms`, `bit has_flags`, `14-bit flags`) |
 | 5 | KnockoutFaces | (`5-bit entity`, `i32 timestamp_ms`) while bit = 1 |
-| 7 | Faces (other) | same layout; holds point events in score modes **[V]** on one file, meaning **[H]** |
+| 7 | Faces (other) | same layout; only in SOCCER and BRAWLBALL replays **[V]** (634 / 9,683, see [`settings-flags-11.00.md`](settings-flags-11.00.md)), goal events **[H]** |
 | 2 | End | — |
 
 Order seen in the corpus: `3-4-6…6-1-5-[7]-2` **[V]**.
