@@ -433,6 +433,11 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                         if power.get("ExhaustedVersion"):       # `_-h1T` #1742 @540-581 (`_-8u`, not `_-P5D`) [H: at the start]
                             f.ut = True
             events.append(("attack", slot, gc, name, not busy))
+    if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
+        if keys & MOVE_LEFT:                                    # faces left, else held right faces right
+            f.facing_left = True                                # (@348-436 free, @229-344 move-locked by a
+        elif keys & MOVE_RIGHT:                                 # power: the same unless `_-t5z` [H])
+            f.facing_left = False
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
     vmax = _vmax(f)
