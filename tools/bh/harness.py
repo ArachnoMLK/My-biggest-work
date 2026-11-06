@@ -31,7 +31,7 @@ fighters are independent.
 from dataclasses import dataclass, field
 
 from .air_move import WallState, air_move, gravity_applies, ground_reset, ground_walk, respond, steep, wall_contact
-from .dodge import (attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
+from .dodge import (LEFT as LEFT_BIT, RIGHT as RIGHT_BIT, DROP as DROP_BIT, dash, dash_start, dash_update, attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
                     gates, is_dodge_locked, k64, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x,
                     speed_y, standard_flag, timers)
 from .hitdetect import (area_center, capsules_touch, frame_window, hit_capsule, hurtbox_capsule, row_values,
@@ -107,13 +107,20 @@ class Fighter:
     j1m: float = 0.0          # `_-J1m`, x overshoot of the impulse fold
     d4x: float = 0.0          # `_-d4x`, y overshoot
     stun_until: int = 0       # end of the hitstun (`_-5q()` until then) [H]
+    p50: bool = False         # `_-P50`, a dash is pending (set by `Dash`)
+    v3x: int = 0              # `_-v3x`, the dash press time
+    l3a: int = 0              # `_-L3a`, the dash kind
+    m3v: bool = False         # `_-M3V`, the dash run
+    t5z: bool = False         # `_-t5z`
+    k1k: int = 0              # `_-K1k`
+    w47: bool = False         # `_-w47`, ground max speed x 1.16
     ut: bool = False          # `_-Kc._-UT`, exhausted: set by a power with an ExhaustedVersion, cleared by `_-C3x`
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
 
 def _vmax(f):
-    return max_speed(f.stats["RunSpeed"], f.stats["AirRunSpeed"], f.ground is None)
+    return max_speed(f.stats["RunSpeed"], f.stats["AirRunSpeed"], f.ground is None, w47=f.w47)
 
 
 def jump(f, t, left, right, third_arg=False):
@@ -151,6 +158,15 @@ def dodge(f, t, dir, rows):
     the power multipliers `_-Kc._-u5j` / `_-04K` = 1, Set "Default", the `_-6K` counter not kept."""
     airborne = f.ground is None
     c = c2e(t, dir, f.lock_start, False, not airborne)
+    if not airborne and dir & (LEFT_BIT | RIGHT_BIT | DROP_BIT):   # `gates`: a ground side / Drop dodge tries `Dash`
+        w = dash(t, dir, False, False, True, dir, bool(dir & LEFT_BIT), f.facing_left, 0, 0, 0, f.t5z, f.m3v,
+                 f.k1k, f.lock_start, f.e3, False, f.v1d, f.p5s, f.l3a, f.dash_timer, f.w47)
+        if w is not None:                                   # [H] `_-y1U` / `_-w4c` false, no tap history, `_-350` false
+            f.l3a, f.facing_left, f.v3x = w["_-L3a"], w["dir_left"], w["_-v3x"]
+            f.p50, f.m3v, f.t5z = True, False, True
+            f.k1k = w.get("_-K1k", f.k1k)
+            f.w47 = w.get("_-w47", f.w47)
+            return "dash"
 
     def locked(flag):
         return is_dodge_locked(move_locked(f), f.u5e, flag, f.e6p, False, f.r51, False, f.xb, False, 0)
@@ -463,6 +479,17 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             a *= reversal_factor(f.v1d)
         f.v1d = apply_acceleration(f.v1d, left, a, vm)
     dodge_tick(f, t, vmax, keys & DIR_MASK)                     # `_-t1A` @2659
+    du = dash_update(t, f.p50, f.v3x, f.l3a, f.m3v, f.dash_timer)   # `_-d1u` @2669
+    if du == "start":
+        s = dash_start(t, f.l3a, f.facing_left)
+        f.p50, f.m3v, f.dash_timer, f.w47 = False, True, t, s["_-w47"]
+        f.v1d = f.p5s = 0.0
+        f.h84 = s["_-84"]
+        events.append(("dash", f.l3a))
+    elif du == "end":
+        if f.power is None:
+            f.t5z = False
+        f.m3v = False
     if squat_due(t, f.xb, f.i5a):                               # `_-A2X`
         f.p5s, f.i5a = 0.0, 0
         events.append(("release", jump(f, t, left, right, third_arg=True)))
