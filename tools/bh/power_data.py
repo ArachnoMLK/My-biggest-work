@@ -12,6 +12,7 @@ import math
 import re
 
 from .movement import ABC_1100, check, listing
+from .power_timeline import momentum  # noqa: F401  (`_-qm`, #39; used with fire_x)
 
 _NUM = re.compile(r"\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?")
 _INT = re.compile(r"\s*[-+]?\d+")
@@ -123,14 +124,6 @@ COLUMNS = ("VariableImpulse", "FixedImpulse", "AoERadiusX", "AoERadiusY", "Cente
 # '2147483647')`, i.e. "!" = unset), expanded per step by `_-42F` like the columns above (@12022-12068).
 FIRE_COLUMNS = ("FireImpulseX", "FireImpulseY", "FireImpulseMaxX")   # FireImpulseMaxX -> `_-L3` (@5183-5234)
 UNSET = 2147483647
-
-
-def momentum(v1d, facing_left):
-    """`_-l4X.<init>` #39 @760-880: `_-qm` = min(|vx| / 60, 1) when the owner moves the way it faces
-    (`(vx < 0) == _-L0`), else 0."""
-    if (v1d < 0) != facing_left:
-        return 0.0
-    return min(abs(v1d) / 60.0, 1.0)
 
 
 def fire_x(base, max_v, l27, v2f, qm, charge=1.0):
