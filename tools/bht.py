@@ -5,6 +5,7 @@ never commit game files, decrypted data, decompiled code or replays.
 """
 import argparse
 import csv
+import glob
 import hashlib
 import json
 import os
@@ -15,11 +16,22 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
+from bh import anm as anmmod, collision as collisionmod, commands as commandsmod, hitdetect as hitdetectmod, input_buffer as inputbufmod, ko as komod  # noqa: E402
+from bh import callgraph as callgraphmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
+from bh import oracle as oraclemod  # noqa: E402
+from bh import replay_setup as replaysetupmod  # noqa: E402
+from bh import knockback as knockbackmod  # noqa: E402
+from bh import powertypes as powertypesmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
+from bh import smoke as smokemod  # noqa: E402
+from bh import ko_gaps as kogapsmod  # noqa: E402
+from bh import level_bounds as levelboundsmod  # noqa: E402
+from bh import step as stepmod  # noqa: E402
 from bh import replay as replaymod  # noqa: E402
+from bh import stats as statsmod  # noqa: E402
 from bh import swf as swfmod  # noqa: E402
 from bh import swz as swzmod  # noqa: E402
 
@@ -171,6 +183,28 @@ def cmd_abc_disasm(a):
         print()
 
 
+def cmd_abc_reach(a):
+    """Typed call graph: the references to --name reachable from --roots (receiver text and path)."""
+    abc = open_abc(a)
+    g = callgraphmod.Graph(abc)
+    stop = set()
+    for cname in a.stop_classes or []:
+        todo = [g.classes[cname]] if cname in g.classes else []
+        while todo:
+            ci = todo.pop()
+            stop |= {m for m, c in g.method_class.items() if c == ci}
+            todo += g.subclasses.get(ci, [])
+    prev = g.reach(a.roots, stop)
+    print(f"{len(prev)} methods reachable from {a.roots}")
+    for m in sorted(prev):
+        if m in stop:
+            continue
+        for off, op, name, _, rtext, args, _ in g.walk(m):
+            if name == a.name and (a.receiver is None or a.receiver in rtext or any(a.receiver in x for x in args)):
+                print(f"#{m} {g.owner.get(m, '?')} @{off} {op} {name} [{rtext}]")
+                print("    <- " + " <- ".join(g.path(prev, m)[1:8]))
+
+
 def cmd_abc_refs(a):
     """Summarize what one method touches: members read/written/called/constructed and constants pushed."""
     abc = open_abc(a)
@@ -210,16 +244,16 @@ def cmd_abc_strings(a):
             print(f"  #{i:6d} {s[:200]!r}")
 
 
-def cmd_movement_verify(a):
-    """Check the pinned bytecode anchors of the jump/gravity chain (Q4); exit 1 on mismatch, 2 on unknown ABC."""
+def _verify_anchors(a, table):
+    """Check pinned bytecode anchors; exit 1 on mismatch, 2 on unknown ABC. Returns normally when all match."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
     if not os.path.exists(p):
         sys.exit("run `abc-extract` first (or pass --abc)")
     data = open(p, "rb").read()
     sha = hashlib.sha256(data).hexdigest()
-    anchors = movementmod.ANCHORS.get(sha)
+    anchors = table.get(sha)
     if anchors is None:
-        print(f"no anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in movementmod.ANCHORS)})")
+        print(f"no anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in table)})")
         sys.exit(2)
     abc = abcmod.Abc(data)
     owner = abc.method_owner()
@@ -229,9 +263,87 @@ def cmd_movement_verify(a):
     print(f"ABC {sha[:8]}...  anchors {len(anchors)}  ok {len(anchors) - len(bad)}  mismatches {len(bad)}")
     if bad:
         sys.exit(1)
+
+
+def cmd_movement_verify(a):
+    """Check the pinned bytecode anchors of the jump/gravity chain (Q4)."""
+    _verify_anchors(a, movementmod.ANCHORS)
     scale = 0.384
     for label, v in (("grounded jump 57", 57.0), ("dash jump 170", 170.0), ("gravity 3.75", 3.75)):
         print(f"  {label:<18} x {scale} = {v * scale!r} per tick")
+
+
+def cmd_commands_verify(a):
+    """Check the pinned anchors of the input command table (names of input bits 1 and 32)."""
+    _verify_anchors(a, commandsmod.ANCHORS)
+
+
+def cmd_stats_verify(a):
+    """Check the pinned anchors of the stance -> StatType chain (Q5)."""
+    _verify_anchors(a, statsmod.ANCHORS)
+
+
+def cmd_legend_stats(a):
+    """Print the effective fighter stats of one legend and stance from the local swz dump (Q5)."""
+    base = os.path.join(a.swz or os.path.join(WORK, "swz"), "Game.swz")
+    stat_types = statsmod.parse_stat_types(rendermod.read_text(os.path.join(base, "StatTypes.xml")))
+    stances = statsmod.parse_stances(rendermod.read_text(os.path.join(base, "RuneTypes.xml")))
+    if a.hero is None:
+        print(" ".join(sorted({h for h, _ in stances})))
+        return
+    levels = stances.get((a.hero, a.stance))
+    if levels is None:
+        sys.exit(f"no stance {a.stance} for {a.hero!r} (run without --hero for the list)")
+    print(f"{a.hero} stance {a.stance}: " + ", ".join(f"{k} {v}" for k, v in levels.items()))
+    for field, value in statsmod.fighter_stats(levels, stat_types).items():
+        print(f"  {field:<16} {value!r}")
+
+
+def cmd_anm_info(a):
+    """Summarize .anm files (sets, animations, frames, bones); with --anim, print one animation's header."""
+    files = [a.file] if a.file else sorted(glob.glob(os.path.join(a.game, "anims", "*.anm")))
+    total = Counter()
+    for path in files:
+        sets = anmmod.parse(open(path, "rb").read())
+        anims = [an for s in sets.values() for an in s["animations"]]
+        frames = sum(len(an["frames"]) for an in anims)
+        total.update(files=1, anims=len(anims), frames=frames, bones=sum(len(f["bones"]) for an in anims for f in an["frames"]))
+        if a.file or a.verbose:
+            print(f"{os.path.basename(path)}: {len(sets)} sets, {len(anims)} animations, {frames} frames")
+        for an in anims:
+            if a.anim and an["name"] == a.anim:
+                print("  " + ", ".join(f"{k} {an[k]}" for k in ["name"] + anmmod.ANIM_FIELDS) + f", data {an['data']}")
+    print(" ".join(f"{k} {v}" for k, v in total.items()))
+
+
+def cmd_collision_verify(a):
+    """Check the pinned anchors of the level collision flags (Q6) and print the type compositions."""
+    _verify_anchors(a, collisionmod.ANCHORS)
+    for name, value in collisionmod.TYPES.items():
+        bits = [f for f, b in collisionmod.FLAGS.items() if value & b]
+        print(f"  {name:<27} {value:4d}  {' | '.join(bits)}")
+
+
+def cmd_hit_detection_verify(a):
+    """Check the pinned shape of hit detection (hit area, hurtbox, capsule test); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in hitdetectmod.ANCHORS:
+        print(f"no hit detection anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in hitdetectmod.ANCHORS)})")
+        sys.exit(2)
+    bad = hitdetectmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    print(f"ABC {sha[:8]}...  anchors {hitdetectmod.count(sha)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in hitdetectmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/hit-detection-11.00.md)")
 
 
 def cmd_prng_order_verify(a):
@@ -255,6 +367,218 @@ def cmd_prng_order_verify(a):
     for group in prngordermod.ANCHORS[sha]:
         print(f"  ok  {group}")
     print("static bytecode evidence only: no execution, no runtime oracle (docs/prng-order-11.00.md)")
+
+
+def cmd_step_verify(a):
+    """Check the pinned order of operations of Entity._-8i; exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in stepmod.ANCHORS:
+        print(f"no step anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in stepmod.ANCHORS)})")
+        sys.exit(2)
+    bad = stepmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    anchors, slots = stepmod.counts(sha)
+    print(f"ABC {sha[:8]}...  anchors {anchors}  slot types {slots}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in stepmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/entity-step-11.00.md)")
+
+
+def cmd_ko_verify(a):
+    """Check the pinned static evidence of the KO bounds test; exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in komod.ANCHORS:
+        print(f"no KO anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in komod.ANCHORS)})")
+        sys.exit(2)
+    bad = komod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    anchors, slots = komod.counts(sha)
+    print(f"ABC {sha[:8]}...  anchors {anchors}  slot types {slots}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in komod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/ko-11.00.md)")
+
+
+def cmd_input_buffer_verify(a):
+    """Check the pinned shape of the input buffer (#6313, #6323); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in inputbufmod.ANCHORS:
+        print(f"no input-buffer anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in inputbufmod.ANCHORS)})")
+        sys.exit(2)
+    bad = inputbufmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    print(f"ABC {sha[:8]}...  anchors {inputbufmod.count(sha)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in inputbufmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/input-buffer-11.00.md)")
+
+
+def cmd_knockback_verify(a):
+    """Check the pinned shape of the damage / knockback formula (#1674, #1675); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in knockbackmod.ANCHORS:
+        print(f"no knockback anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in knockbackmod.ANCHORS)})")
+        sys.exit(2)
+    bad = knockbackmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    print(f"ABC {sha[:8]}...  anchors {knockbackmod.count(sha)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in knockbackmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/knockback-11.00.md)")
+
+
+def cmd_ko_gap_check(a):
+    """No KO of the same victim before the respawn drone has dropped it (oracle + spawn bot); aggregate only."""
+    base = os.path.join(a.swz or os.path.join(WORK, "swz"), "Game.swz", "ScoringTypes.xml")
+    if not os.path.exists(base):
+        sys.exit("no ScoringTypes.xml; run swz-dump first (or pass --swz)")
+    cells = kogapsmod.scoring_cells(rendermod.read_text(base))
+    reps = []
+    for p in glob.glob(os.path.join(a.dir, "*.replay")):
+        try:
+            with open(p, "rb") as f:
+                rep = replaymod.parse(f.read())
+        except Exception:
+            continue
+        if rep.get("version") == 271:
+            reps.append(rep)
+    for k, v in kogapsmod.check(reps, cells).items():
+        print(f"  {k:<22} {v}")
+    print("one-sided check from the replays' own KO faces; nothing is published (tools/bh/ko_gaps.py)")
+
+
+def cmd_replay_start_check(a):
+    """Match start, both fighters in lockstep with their own inputs, KO commit and respawn, on local 1v1 replays (aggregate counts only)."""
+    from collections import Counter
+    swz = replaysetupmod.Swz(a.swz or os.path.join(WORK, "swz"))
+    c = Counter()
+    for p in glob.glob(os.path.join(a.dir, "*.replay")):
+        try:
+            with open(p, "rb") as f:
+                rep = replaymod.parse(f.read())
+        except Exception:
+            continue
+        if rep.get("version") != 271:
+            continue
+        try:
+            out = replaysetupmod.run(rep, swz, ticks=a.ticks)
+        except ValueError as e:
+            c[f"skipped ({e})"] += 1
+            continue
+        c["replays run"] += 1
+        for r in out.values():
+            c["fighters let go at least once"] += bool(r["let_go"])
+            c["first let-go at 6000 ms"] += bool(r["let_go"]) and r["let_go"][0] == 6000
+            c["predicted KOs"] += len(r["kos"])
+            c["respawns let go"] += max(len(r["let_go"]) - 1, 0)
+    for k, v in sorted(c.items()):
+        print(f"  {k:<28} {v}")
+    print("both fighters in lockstep, no hits; not compared with the replays' KOs yet; nothing is published (tools/bh/replay_setup.py)")
+
+
+def cmd_ko_compare(a):
+    """Plan step 5: predicted first KO vs the replay's KO face, first KO with no attack by the opponent (aggregate counts only)."""
+    from bh import ko_compare as kocomparemod
+    swz = replaysetupmod.Swz(a.swz or os.path.join(WORK, "swz"))
+    reps = []
+    for p in glob.glob(os.path.join(a.dir, "*.replay")):
+        try:
+            with open(p, "rb") as f:
+                reps.append(replaymod.parse(f.read()))
+        except Exception:
+            continue
+    for k, v in sorted(kocomparemod.check(reps, swz, ticks=a.ticks).items()):
+        print(f"  {k:<48} {v}")
+    print("two-sided: harness first KO vs the replay's own KO face; nothing is published (tools/bh/ko_compare.py)")
+
+
+def cmd_smoke_fall(a):
+    """One fighter, no input, falls from every respawn point of the local LevelDescs (aggregate counts only)."""
+    import glob
+    folder = os.path.join(a.swz or os.path.join(WORK, "swz"), "Dynamic.swz")
+    files = sorted(glob.glob(os.path.join(folder, "LevelDesc_*.xml")))
+    if not files:
+        sys.exit("no LevelDesc files; run swz-dump first (or pass --swz)")
+    xmls = [rendermod.read_text(f) for f in files]
+    counts = smokemod.run(xmls, with_platforms=not a.static_only)
+    for k, v in counts.items():
+        print(f"  {k:<24} {v}")
+    print("walking both ways at x step 6 after landing (static lines):")
+    for k, v in smokemod.run_walk(xmls).items():
+        print(f"  {k:<24} {v}")
+    print("items (default ItemType, static lines):")
+    for k, v in smokemod.run_items(xmls, smokemod.items.ITEM_DEFAULTS).items():
+        print(f"  {k:<24} {v}")
+    lt = os.path.join(a.swz or os.path.join(WORK, "swz"), "Init.swz", "LevelTypes.xml")
+    if os.path.exists(lt):
+        names = [os.path.basename(f)[len("LevelDesc_"):-len(".xml")] for f in files]
+        print("KO bounds (CameraBounds + LevelType kill values), falls into the void:")
+        for k, v in levelboundsmod.run(list(zip(names, xmls)), levelboundsmod.level_kills(rendermod.read_text(lt))).items():
+            print(f"  {k:<24} {v}")
+    print("item thrown from every landing, 6 directions x (no charge, 2.5 s) (static lines):")
+    for k, v in smokemod.run_throws(xmls, smokemod.items.ITEM_DEFAULTS).items():
+        print(f"  {k:<24} {v}")
+    print("item pushed both ways (_-Lu = 10) after it stopped (static lines):")
+    for k, v in smokemod.run_item_slide(xmls, smokemod.items.ITEM_DEFAULTS).items():
+        print(f"  {k:<24} {v}")
+    print("static bytecode evidence only: not compared with the running game (tools/bh/smoke.py)")
+    if counts["contact"] != counts["within_1e-6"]:
+        sys.exit(1)
+
+
+def cmd_power_columns(a):
+    """Print the powerTypes column -> PowerType field map rebuilt from the ABC (#6483); no game data is read."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha != movementmod.ABC_1100:
+        print(f"the parser id #{powertypesmod.PARSER} is pinned to patch 11.00 (ABC {movementmod.ABC_1100[:8]}...)")
+        sys.exit(2)
+    cmap = powertypesmod.column_map(abcmod.Abc(data))
+    if a.markdown:
+        print("| Column | Fields |")
+        print("|---|---|")
+        for col in sorted(cmap):
+            print(f"| {col} | {', '.join('`' + x + '`' for x in cmap[col]) or '—'} |")
+    else:
+        for col in sorted(cmap):
+            print(f"{col:28} {' '.join(cmap[col]) or '-'}")
+    print(f"{len(cmap)} columns", file=sys.stderr)
 
 
 def cmd_swz_key(a):
@@ -348,6 +672,33 @@ def cmd_replay(a):
         print(f"  inputs ent {who}: {len(lst)} records, last at {lst[-1][0] if lst else 0} ms")
         for ts, fl in lst[: a.limit]:
             print(f"    {ts:7d} ms  {fl:014b}  {replaymod.describe_flags(fl)}")
+
+
+def cmd_ko_oracle(a):
+    """Print the KO ticks of one replay (Q10 oracle, part 1); with --dir, aggregate counts only."""
+    if a.dir:
+        files = glob.glob(os.path.join(a.dir, "*.replay"))
+        n = kos = bad = err = 0
+        for p in files:
+            try:
+                with open(p, "rb") as f:
+                    rep = replaymod.parse(f.read())
+            except Exception:
+                err += 1
+                continue
+            n += 1
+            try:
+                kos += len(oraclemod.ko_ticks(rep))
+            except ValueError:
+                bad += 1
+        print(f"replays {n}  parse errors {err}  KO faces {kos}  replays with a non-tick KO time {bad}")
+        return
+    if not a.file:
+        sys.exit("pass a replay file, or --dir")
+    with open(a.file, "rb") as f:
+        rep = replaymod.parse(f.read())
+    for tick, victim in oraclemod.ko_ticks(rep):
+        print(f"  tick {tick:6d}  ({tick * oraclemod.TICK_MS:7d} ms)  victim {victim}")
 
 
 def cmd_render_summary(a):
@@ -447,8 +798,20 @@ def main():
     add("abc-disasm", cmd_abc_disasm, abc, (["--method"], {"type": int}), (["--class"], {"dest": "cls"}))
     add("abc-find", cmd_abc_find, abc, (["value"], {}), (["--member"], {"action": "store_true", "help": "value is a member name"}))
     add("abc-refs", cmd_abc_refs, abc, (["--method"], {"type": int, "required": True}))
+    add("abc-reach", cmd_abc_reach, abc, (["--roots"], {"type": int, "nargs": "+", "required": True}),
+        (["--name"], {"required": True, "help": "member name to report, e.g. _-f4c"}),
+        (["--receiver"], {"help": "keep only references whose receiver or an argument text contains this"}),
+        (["--stop-classes"], {"nargs": "*", "help": "classes (and subclasses) whose methods are not entered"}))
     add("abc-strings", cmd_abc_strings, abc, (["pattern"], {}))
     add("movement-verify", cmd_movement_verify, abc)
+    add("commands-verify", cmd_commands_verify, abc)
+    add("stats-verify", cmd_stats_verify, abc)
+    add("legend-stats", cmd_legend_stats, (["--hero"], {"help": "HeroName as in RuneTypes.xml"}),
+        (["--stance"], {"type": int, "default": 0}), (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
+    add("anm-info", cmd_anm_info, game, (["--file"], {}), (["--anim"], {"help": "animation name to print"}),
+        (["--verbose"], {"action": "store_true"}))
+    add("collision-verify", cmd_collision_verify, abc)
+    add("hit-detection-verify", cmd_hit_detection_verify, abc)
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
@@ -462,6 +825,20 @@ def main():
                            "default": [0, 1, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 123456789]})
     add("prng-verify", cmd_prng_verify, abc, seeds, (["--draws"], {"type": _bounded_int(1, 100000), "default": 256}))
     add("prng-order-verify", cmd_prng_order_verify, abc)
+    add("step-verify", cmd_step_verify, abc)
+    add("ko-verify", cmd_ko_verify, abc)
+    add("ko-oracle", cmd_ko_oracle, (["file"], {"nargs": "?"}), (["--dir"], {"help": "replay folder: aggregate counts only"}))
+    add("input-buffer-verify", cmd_input_buffer_verify, abc)
+    add("knockback-verify", cmd_knockback_verify, abc)
+    add("replay-start-check", cmd_replay_start_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
+        (["--swz"], {"help": "swz-dump folder (default work/swz)"}), (["--ticks"], {"type": int, "default": 6000}))
+    add("ko-compare", cmd_ko_compare, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "folder of .replay files"}),
+        (["--swz"], {"help": "swz-dump folder (default work/swz)"}), (["--ticks"], {"type": int, "default": 6000}))
+    add("ko-gap-check", cmd_ko_gap_check, (["--dir"], {"required": True, "help": "folder of .replay files"}),
+        (["--swz"], {"help": "swz-dump folder (default work/swz)"}))
+    add("smoke-fall", cmd_smoke_fall, (["--swz"], {"help": "swz-dump folder (default work/swz)"}),
+        (["--static-only"], {"action": "store_true", "help": "leave the moving platforms' lines out"}))
+    add("power-columns", cmd_power_columns, abc, (["--markdown"], {"action": "store_true"}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),

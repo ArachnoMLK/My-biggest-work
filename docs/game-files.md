@@ -27,3 +27,20 @@ Per-file list with hashes and research status: [`ledger/game-files.csv`](../ledg
 | Attack hitboxes and active frames | `.anm` + `powerTypes` [H] |
 | Movement constants and formulas | **code only** (`BrawlhallaAir.swf`) [H] |
 | Tick order, state machines, damage/knockback formulas, PRNG | **code only** [H] |
+
+## Ledger roles (Q8)
+
+Every row of `ledger/game-files.csv` now carries a `role:` tag in `notes` (rule-based on folder, name
+and kind; `status` stays `unread` until someone studies the file):
+
+| Role | Files | What it is | Needed to re-simulate? |
+|---|---|---|---|
+| `sim-code` | 1 | `BrawlhallaAir.swf`: the main ABC (simulation, replay reader) | yes |
+| `sim-data` | 88 | the 4 `.swz` archives (levels, powers, stats…) and the `.anm` animation timelines | yes |
+| `render` | 6,309 | `Gfx_*.swf`, `bones/`, `sprites/`, `mapArt/` | only to draw the result |
+| `audio` | 348 | `SFX_*.swf`, sound banks, `.wem` | no |
+| `ui` | 981 | `UI_*.swf`, `images/`, `languages/`, fonts, icons | no |
+| `runtime` | 54 | launcher, Steam DLLs, AIR packaging (`META-INF/`) | no (never run or modified) |
+
+So the simulator itself depends on **89 files** out of 7,781. Next for Q8: set `status: read` and a short
+note for each `sim-data` file once its sections are described (start with the `.anm` format, issue #13).
