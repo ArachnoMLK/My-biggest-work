@@ -179,7 +179,32 @@ def power_steps(row):
     return out
 
 
+def recover_times(row):
+    """(FixedRecoverTime `_-f5c`, RecoverTime `_-Sp`) as `PowerType._-A3R` #6483 reads them (@5529-5635, @8327-8435):
+    the cell is split on '@' and the first part goes through Std.parseInt (None -> 0 here [H: the null coerced to
+    the int field]); the part after '@' is only an animation frame for `_-g1x` (@12723-12821), not a duration."""
+    out = []
+    for col in ("FixedRecoverTime", "RecoverTime"):
+        cell = row.get(col) or ""
+        v = parse_int(cell.split("@")[0]) if cell else None
+        out.append(v or 0)
+    return tuple(out)
+
+
 ANCHORS = {ABC_1100: {
+    "_-A3R FixedRecoverTime / RecoverTime: split '@', _-F5E.parseInt(part 0) -> _-f5c / _-Sp; part 1 -> local 25 -> _-g1x frame": [
+        (6483, 5529, "pushstring", "'FixedRecoverTime'"),
+        (6483, 5547, "pushstring", "'@'"),
+        (6483, 5580, "callproperty", "parseInt, 1"),
+        (6483, 5586, "initproperty", "_-f5c"),
+        (6483, 8327, "pushstring", "'RecoverTime'"),
+        (6483, 8346, "pushstring", "'@'"),
+        (6483, 8379, "callproperty", "parseInt, 1"),
+        (6483, 8385, "initproperty", "_-Sp"),
+        (6483, 8433, "setlocal", "25"),
+        (6483, 12739, "pushstring", "'end'"),
+        (6483, 12821, "callpropvoid", "_-g1x, 2"),
+    ],
     "_-A3R CastTime: split ',', D:R@F-G or D@F, a2.push(D) + R extra 0 steps; empty -> '0'": [
         (6483, 2368, "pushstring", "','"),
         (6483, 10959, "pushstring", "'0'"),
