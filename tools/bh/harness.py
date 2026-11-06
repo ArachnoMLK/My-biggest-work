@@ -48,7 +48,7 @@ from .power_pick import Cooldowns, cooldown_ms as power_cooldown_ms, origin_row,
 from .power_timeline import charge_released, min_charge, smash_release, END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
-from .jump import (BOOST_13G, dash_jump_follow, dash_jump_marks, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
+from .jump import (jump_guard, BOOST_13G, dash_jump_follow, dash_jump_marks, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
                    squat_start, wall_jump)
 from .entity_states import respawn_index
 from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
@@ -135,24 +135,11 @@ def _vmax(f):
     return max_speed(f.stats["RunSpeed"], f.stats["AirRunSpeed"], f.ground is None, w47=f.w47)
 
 
-JUMP_RELOCK_MS = 176       # `Entity._-Y35` (script157.<init> #3173 @829)
-JUMP_HIT_LOCK_MS = 256     # `Entity._-R6Q` (#3173 @819)
-
-
 def jump_blocked(f, t, third_arg=False):
-    """`Entity._-H5F(t, third_arg)` #3065, the guard at the top of `Entity.Jump` (@36-59): true in states other
-    than 0 / 5; with (IsMoveLocked, `_-u4F()`, `_-Xb` != 0, `_-Kc._-cr` or `_-C54(t)`) unless third_arg; while
-    `_-f6R` > t; airborne with no air jump left (`_-P5Y()` >= `_-56T()`) and no wall (`_-r51` == 0); while t <=
-    `_-I5A` + 176; while t <= `_-I5A` + 256 and t <= `_-46I` + 256. [H] glue: `_-u4F`, `_-cr`, `_-C54` false."""
-    if (move_locked(f, t) or f.xb != 0) and not third_arg:
-        return True
-    if f.f6r > t:
-        return True
-    if f.ground is None and f.air_used >= f.air_allowed and f.r51 == 0:
-        return True
-    if t <= f.i5a + JUMP_RELOCK_MS:
-        return True
-    return t <= f.i5a + JUMP_HIT_LOCK_MS and t <= f.i46 + JUMP_HIT_LOCK_MS
+    """`Entity._-H5F(t, third_arg)` #3065 for the harness fighter (`jump.jump_guard`). [H] glue: `_-u4F`, `_-cr`,
+    `_-C54` false; the harness fighter is in state 0 / 5 here."""
+    return jump_guard(t, 0, move_locked(f, t) or f.xb != 0, third_arg, f.f6r, f.ground is None, f.air_used,
+                      f.air_allowed, f.r51, f.i5a, f.i46)
 
 
 def jump(f, t, left, right, third_arg=False):
