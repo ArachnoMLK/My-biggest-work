@@ -392,6 +392,35 @@ def fire_impulse(f, power, step):
         setattr(f, attr, float(v))
 
 
+def start_power(f, t, power):
+    """A power starts on the harness fighter (`new _-l4X`, `_-l4X.<init>` #39, the first update's cast impulse).
+    Returns True when it started (a CastTime is needed)."""
+    steps = power_steps(power)
+    if not steps["CastTime"]:
+        return False
+    f.power = {"name": power.get("PowerName"), "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t)),
+               "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
+               "row": power, "qm": momentum(f.v1d, f.facing_left), "start": tick_index(t)}
+    cast_impulse(f, power)
+    f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
+    f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
+    f.power["end_tick"] = end_tick(power, tick_index(t))
+    f.lock_start = t                                            # `_-532` = t: `Entity._-c1r` at the move start
+    if power.get("ExhaustedVersion"):                           # `_-h1T` #1742 @540-581 (`_-8u`, not `_-P5D`) [H: at the start]
+        f.ut = True
+    return True
+
+
+def combo_next(power):
+    """The next power when one ends, as `_-F5N._-V5s` #1729 orders it, reduced [H]: the button / direction /
+    interrupt / release / wall overrides (@0-431, @489-545) are left out; ComboOverrideIfHit (`_-S1T`) when the
+    power hit someone (`_-D28` != 0, @431-488), else ComboName (`_-35E`, @745). Returns a name or None."""
+    row = power.get("row", {})
+    if power.get("hit") and row.get("ComboOverrideIfHit"):
+        return row["ComboOverrideIfHit"]
+    return row.get("ComboName") or None
+
+
 def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None, dodge_press=False, keys=0,
          dodge_rows=None, light_press=False, heavy_press=False):
     """One 16 ms tick at time t. `bounds` is (camera rectangle, kill dict) for the ring-out test, or None.
@@ -427,8 +456,15 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             if f.power.get("recover_move"):                     # `_-R63` #46 @4677-4719: AllowRecoverMove
                 f.power["move_lock"] = False
             if tick_index(t) >= f.power.get("end_tick", 0):     # `_-E5S` (#59 @253-289) [H: other end rules]
+                nxt = combo_next(f.power)
                 f.power = None
-    if dodge_press and dodge_rows:
+                rows = (f.moves or {}).get("powers") or {}
+                if nxt and rows.get(nxt) is not None and start_power(f, t, rows[nxt]):
+                    events.append(("combo", nxt))
+    # #6313 @520-629, @2357-2433: Dodge (and so Dash) runs only when !(IsMoveLocked || `_-Xb` != 0 || `_-C54(t)` ||
+    # `_-f6R` > t || `_-e3e & _-m1t`) or under the dodge cancel (local 34) [H: `_-C54`, `_-m1t` and local 34 false]
+    dodge_ok = not (move_locked(f) or f.xb != 0 or f.f6r > t)
+    if dodge_press and dodge_rows and dodge_ok:
         name = dodge(f, t, keys & DIR_MASK, dodge_rows)
         if name is not None:
             events.append(("dodge", name))
@@ -444,18 +480,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                 power = redirect(rows.get(name), rows.get, exhausted=f.ut, gc=gc, vx=f.v1d, facing_left=f.facing_left)
                 name = power["PowerName"] if power else None
                 if power is not None and f.power is None:       # [H] no chain / cancel into a running power
-                    steps = power_steps(power)
-                    if steps["CastTime"]:
-                        f.power = {"name": name, "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t)),
-                                   "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
-                                   "row": power, "qm": momentum(f.v1d, f.facing_left), "start": tick_index(t)}   # `_-l4X.<init>` #39
-                        cast_impulse(f, power)
-                        f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
-                        f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
-                        f.power["end_tick"] = end_tick(power, tick_index(t))
-                        f.lock_start = t                        # `_-532` = t: `Entity._-c1r` at the move start
-                        if power.get("ExhaustedVersion"):       # `_-h1T` #1742 @540-581 (`_-8u`, not `_-P5D`) [H: at the start]
-                            f.ut = True
+                    start_power(f, t, power)
             events.append(("attack", slot, gc, name, not busy))
     if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
         if keys & MOVE_LEFT:                                    # faces left, else held right faces right
