@@ -304,3 +304,13 @@ class ThrowSpawn(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Incoming(unittest.TestCase):
+    def test_state_4_turns_2_after_z4f(self):
+        from bh.items import incoming, INCOMING_MS, PICK_DELAY_MS
+        self.assertEqual((INCOMING_MS, PICK_DELAY_MS), (1168, 1418))
+        self.assertEqual(incoming(4, 1000, 1000 + 1167), 4)
+        self.assertEqual(incoming(4, 1000, 1000 + 1168), 2)
+        self.assertEqual(incoming(4, 1000, 9999, k1k=True), 4)
+        self.assertEqual(incoming(0, 1000, 9999), 0)

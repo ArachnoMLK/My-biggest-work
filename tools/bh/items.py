@@ -589,7 +589,41 @@ def item_type(cells):
     return r
 
 
+# --- an item spawned by the ItemManager arrives after a delay ---
+SPAWN_STATE = 4             # `_-E1V._-p1K` #4888: optional parameter 5 (the state) defaults to uint pool #33 = 4
+INCOMING_MS = 1168          # `_-p5k._-Z4f` = 1536 - 368 (`_-y2E.init` #15351 @80346-80353)
+PICK_DELAY_MS = 1418        # `_-p5k._-E4u` = `_-Z4f` + 250 (@80364-80372), used by `_-86Q` in state 3
+
+
+def incoming(state, b37, t, k1k=False):
+    """`_-p5k._-N5M` #15191 @591-651: an item in state 4 (just spawned, the falling-comet look) turns to state 2
+    once `_-b37` (its spawn time) + `_-Z4f` (1168 ms) <= t, unless `_-k1K`. While in state 4 the motion step
+    `_-p5k._-8i` #15192 returns at once (@153-192: only the visibility `_-u3c` is set), so the item stays where
+    it spawned. Returns the new state."""
+    if state == SPAWN_STATE and b37 + INCOMING_MS <= t and not k1k:
+        return 2
+    return state
+
+
 ANCHORS = {ABC_1100: {
+    "incoming items: _-p1K spawns with state 4 (optional default), _-8i returns in state 4, _-N5M turns 4 -> 2 at _-b37 + _-Z4f (1536 - 368); _-E4u = _-Z4f + 250": [
+        (4888, 488, "constructprop", "_-p5k, 6"),
+        (15177, 43, "initproperty", "_-b37"),
+        (15177, 247, "initproperty", "_-5T"),
+        (15192, 159, "pushbyte", "4"),
+        (15192, 192, "returnvoid", ""),
+        (15191, 599, "pushbyte", "4"),
+        (15191, 612, "getproperty", "_-b37"),
+        (15191, 620, "getproperty", "_-Z4f"),
+        (15191, 636, "getproperty", "_-k1K"),
+        (15191, 648, "pushbyte", "2"),
+        (15191, 651, "initproperty", "_-5T"),
+        (15351, 80346, "pushuint", "1536"),
+        (15351, 80348, "pushuint", "368"),
+        (15351, 80353, "initproperty", "_-Z4f"),
+        (15351, 80367, "pushint", "250"),
+        (15351, 80372, "initproperty", "_-E4u"),
+    ],
     "_-p5k._-8i friction: _-Lu toward 0 by (Friction on ground / AirFriction) x _-Vj, + _-B66, cap _-Z5d or 350": [
         (15192, 993, "getproperty", "_-T2P"),
         (15192, 1006, "getproperty", "_-h5M"),
