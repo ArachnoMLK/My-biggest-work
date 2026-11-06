@@ -15,6 +15,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
+from bh import collision as collisionmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
@@ -210,16 +211,16 @@ def cmd_abc_strings(a):
             print(f"  #{i:6d} {s[:200]!r}")
 
 
-def cmd_movement_verify(a):
-    """Check the pinned bytecode anchors of the jump/gravity chain (Q4); exit 1 on mismatch, 2 on unknown ABC."""
+def _verify_anchors(a, table):
+    """Check pinned bytecode anchors; exit 1 on mismatch, 2 on unknown ABC. Returns normally when all match."""
     p = a.abc or os.path.join(WORK, "abc", "main.abc")
     if not os.path.exists(p):
         sys.exit("run `abc-extract` first (or pass --abc)")
     data = open(p, "rb").read()
     sha = hashlib.sha256(data).hexdigest()
-    anchors = movementmod.ANCHORS.get(sha)
+    anchors = table.get(sha)
     if anchors is None:
-        print(f"no anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in movementmod.ANCHORS)})")
+        print(f"no anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in table)})")
         sys.exit(2)
     abc = abcmod.Abc(data)
     owner = abc.method_owner()
@@ -229,9 +230,22 @@ def cmd_movement_verify(a):
     print(f"ABC {sha[:8]}...  anchors {len(anchors)}  ok {len(anchors) - len(bad)}  mismatches {len(bad)}")
     if bad:
         sys.exit(1)
+
+
+def cmd_movement_verify(a):
+    """Check the pinned bytecode anchors of the jump/gravity chain (Q4)."""
+    _verify_anchors(a, movementmod.ANCHORS)
     scale = 0.384
     for label, v in (("grounded jump 57", 57.0), ("dash jump 170", 170.0), ("gravity 3.75", 3.75)):
         print(f"  {label:<18} x {scale} = {v * scale!r} per tick")
+
+
+def cmd_collision_verify(a):
+    """Check the pinned anchors of the level collision flags (Q6) and print the type compositions."""
+    _verify_anchors(a, collisionmod.ANCHORS)
+    for name, value in collisionmod.TYPES.items():
+        bits = [f for f, b in collisionmod.FLAGS.items() if value & b]
+        print(f"  {name:<27} {value:4d}  {' | '.join(bits)}")
 
 
 def cmd_prng_order_verify(a):
@@ -449,6 +463,7 @@ def main():
     add("abc-refs", cmd_abc_refs, abc, (["--method"], {"type": int, "required": True}))
     add("abc-strings", cmd_abc_strings, abc, (["pattern"], {}))
     add("movement-verify", cmd_movement_verify, abc)
+    add("collision-verify", cmd_collision_verify, abc)
     add("swz-key", cmd_swz_key, game, (["--suffix"], {"type": int, "help": "brute-force fallback, e.g. 1100 for patch 11.00"}))
     add("swz-dump", cmd_swz_dump, game, (["--key"], {"type": int, "required": True}))
     add("swf-info", cmd_swf_info, (["file"], {}), (["--limit"], {"type": int, "default": 30}))
