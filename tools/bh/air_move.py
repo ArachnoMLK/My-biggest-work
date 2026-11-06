@@ -414,6 +414,105 @@ def gravity_applies(e6p, ground, y1l, t, cancel_gravity, gravity):
             and gravity != 0)
 
 
+
+# --- fall terms of `Entity._-8i` #2984 @4492-5912 (inside the gravity gate of `gravity_applies`) ---
+FALL_CAP = 70.0             # `_-8i` @5127 (local 19)
+FALL_CAP_FAST = 85.0        # @5132 (local 21): with `_-61h()` or Drop held and not `IsMoveLocked`
+APEX_LIMIT = 48.0           # `Entity._-71A` #3171: 0 beyond +-48
+APEX_BASE = 3.25            # #3171 @51
+APEX_SLOPE = 0.06770833333333333   # `Entity._-U1K` (script157.<init> #3173 @1573) = 3.25 / 48
+FAST_FALL = 12.0            # @5504: added (x 0.384) under `_-61h()` when `_-P5S` >= 0
+FAST_FALL_MIN_VY = -38.0    # `Entity._-X3L` (#3173 @1762)
+DROP_WINDOW = 80            # `Entity._-D2E` (`_-y2E.init` #15351 @30088)
+FALL_EASE = 6.0             # @5801: `_-P5S` above 70 eases back by 6 x 0.384 a tick
+
+
+def apex_gravity(vy):
+    """`Entity._-71A(vy)` #3171: the extra fall term near the apex, 3.25 - |vy| x `_-U1K` for |vy| <= 48, else 0.
+    `_-8i` @5357-5456 adds it (x 0.384) after the plain gravity, outside hitstun."""
+    if vy > APEX_LIMIT or vy < -APEX_LIMIT:
+        return 0
+    k = -APEX_SLOPE if vy > 0 else APEX_SLOPE
+    return APEX_BASE + k * vy
+
+
+def fall_cap(fast_fall, drop_held, move_locked):
+    """`_-8i` @5067-5170 (local 23): 85 under `_-61h()` or with Drop (bit 2) held and not `IsMoveLocked`, else 70."""
+    return FALL_CAP_FAST if fast_fall or (drop_held and not move_locked) else FALL_CAP
+
+
+def fall_step(p5s, cap, hitstun, fast_fall, drop_held, move_locked, power, gravity=3.75):
+    """The vertical part of `_-8i` @5277-5853 once the gravity gate holds: below the cap, gravity x 0.384 and, out
+    of hitstun, `apex_gravity` x 0.384; under `_-61h()`, + 12 x 0.384 when falling (0 when rising) and a rise is
+    cut to 0; then, out of hitstun ([H] `_-Kc._-KC` false), above 85 -> 85, and above 70 -> 70 during a power,
+    else (no fast fall and not (Drop held and not locked)) - 6 x 0.384, not below 70. Returns `_-P5S`."""
+    if p5s < cap:
+        p5s = p5s + gravity * STEP
+        if not hitstun:
+            a = apex_gravity(p5s)
+            if a != 0:
+                p5s = p5s + a * STEP
+    if fast_fall:
+        p5s = p5s + (0.0 if p5s < 0.0 else FAST_FALL) * STEP
+        if p5s < 0:
+            p5s = 0.0
+    if not hitstun:
+        if p5s > FALL_CAP_FAST:
+            p5s = FALL_CAP_FAST
+        if p5s > FALL_CAP:
+            if power:
+                p5s = FALL_CAP
+            elif not fast_fall and not (drop_held and not move_locked):
+                p5s = p5s - FALL_EASE * STEP
+                if p5s < FALL_CAP:
+                    p5s = FALL_CAP
+    return p5s
+
+
+def fast_fall(state, t, g1a, r51, dodging, hitstun, airborne, power, p5s, h76, i5a, drop_held, xb, t46=False):
+    """`_-4V` (`_-61h()` #2939) after `_-8i` @4492-5053. Set when not set and `_-G1a()`, `_-r51` == 0, not
+    dodging (`_-E6P()`), not in hitstun, airborne (`_-wn()`), not `_-t46()`, no power, `_-P5S` >= -38 (`_-X3L`),
+    `_-76H` + 48 <= t and local 16 = (t <= `_-76H` + 80 (`_-D2E`)) or (`_-76H` + 160 > `_-I5A`, Drop held and
+    `_-I5A` + 272 <= t <= `_-I5A` + 480). When set, cleared if not `_-G1a()`, dodging, in hitstun, not airborne,
+    `_-t46()`, on a wall or in a power. Always cleared while `_-Xb` != 0 (@5032-5053). [H] the `_-w3i` + 96 gate
+    (@4765-4803) is left to the caller."""
+    l16 = t <= h76 + DROP_WINDOW or (h76 + 160 > i5a and drop_held and i5a + 272 <= t <= i5a + 480)
+    if (not state and g1a and r51 == 0 and not dodging and not hitstun and airborne and not t46 and not power
+            and p5s >= FAST_FALL_MIN_VY and h76 + 48 <= t and l16):
+        state = True
+    elif state and (not g1a or dodging or hitstun or not airborne or t46 or r51 != 0 or power):
+        state = False
+    if xb != 0:
+        state = False
+    return state
+
+
+def drop_held_flag(state, t, keys, move_locked, dodge_dir2, t5w, b5, h76, power, dash_t, i5a, power_free=True):
+    """`_-W3w` (`_-G1a()` #2940) as `Entity._-1L` #2986 writes it (`_-e21`). Move-locked branch (@87-194): true when
+    dodging with `_-O5C & 2` (`dodge_dir2`), else `_-Kc._-T5W`. Free branch (@520-1008): local 3 / 4 are false
+    unless (a side key or no Drop) and `_-26T` > `_-I5A`, then local 3 = `_-26T` + 160 > `_-76H`, local 4 =
+    `_-26T` + 560 > t; false when `_-B5` == t; true when already set and Drop held; true with `_-T5W`; false without
+    Drop; false in a power without `_-d38` / NT ([H] both false); else (`_-76H` > `_-B5` and not local 3) or
+    (no power, `_-r5b` + 275 < t, not local 4) ([H] `power_free` stands for the `_-r5b` term)."""
+    if move_locked:
+        return bool(dodge_dir2) or bool(t5w)
+    drop = bool(keys & 2)
+    l3 = l4 = False
+    if (keys & 12 or not drop) and dash_t > i5a:
+        l3 = dash_t + 160 > h76
+        l4 = dash_t + 560 > t
+    if b5 == t:
+        return False
+    if state and drop:
+        return True
+    if t5w:
+        return True
+    if not drop:
+        return False
+    if power:
+        return False
+    return (h76 > b5 and not l3) or (power_free and not l4)
+
 LAVA = 512             # `_-z2k._-s2O`
 GAME_MODE_LINE = 128   # `_-z2k._-J6w`: lines that call `Entity._-ao`
 LAVA_REPEAT_MS = 240   # `Entity._-ao` @883-895
@@ -622,6 +721,73 @@ ANCHORS = {ABC_1100: {
         (2984, 4130, "pushbyte", "-1"),
         (2984, 4161, "pushdouble", "50.0"),
         (2984, 4213, "iftrue", "-1084"),
+    ],
+    "_-8i fall terms: + _-71A(P5S) x Vj out of hitstun, fast fall (_-61h) + 12 x Vj when falling and rise cut to 0, cap 85 / ease 6 x Vj to 70": [
+        (2984, 5360, "callproperty", "_-5q, 0"),
+        (2984, 5391, "callproperty", "_-71A, 1"),
+        (2984, 5449, "getproperty", "_-Vj"),
+        (2984, 5464, "callproperty", "_-61h, 0"),
+        (2984, 5491, "pushdouble", "0.0"),
+        (2984, 5504, "pushdouble", "12.0"),
+        (2984, 5600, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (2984, 5608, "callproperty", "_-5q, 0"),
+        (2984, 5625, "getproperty", "_-KC"),
+        (2984, 5652, "getlocal", "21"),
+        (2984, 5693, "getlocal", "19"),
+        (2984, 5705, "getproperty", "_-o3I"),
+        (2984, 5744, "callproperty", "_-61h, 0"),
+        (2984, 5801, "pushdouble", "6.0"),
+        (2984, 5811, "subtract", ""),
+        (3171, 2, "pushdouble", "48.0"),
+        (3171, 10, "pushdouble", "-48.0"),
+        (3171, 32, "getproperty", "_-U1K"),
+        (3171, 51, "pushdouble", "3.25"),
+        (3173, 1573, "pushdouble", "0.06770833333333333"),
+        (3173, 1576, "initproperty", "_-U1K"),
+    ],
+    "_-8i fast fall _-rA: set with _-G1a, airborne, no power, P5S >= _-X3L (-38), _-76H + 48 <= t, Drop within _-D2E (80) or held 272-480 ms after _-I5A; clear; cap 70 / 85": [
+        (2984, 4509, "getproperty", "_-D2E"),
+        (2984, 4536, "pushuint", "160"),
+        (2984, 4589, "pushuint", "272"),
+        (2984, 4609, "pushuint", "480"),
+        (2984, 4636, "callproperty", "_-61h, 0"),
+        (2984, 4652, "callproperty", "_-G1a, 0"),
+        (2984, 4831, "getproperty", "_-X3L"),
+        (2984, 4861, "pushbyte", "48"),
+        (2984, 4877, "callpropvoid", "_-rA, 1"),
+        (2984, 5028, "callpropvoid", "_-rA, 1"),
+        (2984, 5036, "getproperty", "_-Xb"),
+        (2984, 5053, "callpropvoid", "_-rA, 1"),
+        (2984, 5127, "pushdouble", "70.0"),
+        (2984, 5132, "pushdouble", "85.0"),
+        (3173, 1762, "pushdouble", "-38.0"),
+        (3173, 1764, "initproperty", "_-X3L"),
+        (15351, 30088, "pushbyte", "80"),
+        (15351, 30091, "initproperty", "_-D2E"),
+        (2939, 6, "getproperty", "_-4V"),
+        (3052, 536, "callpropvoid", "_-rA, 1"),
+        (6313, 4007, "initproperty", "_-76H"),
+    ],
+    "_-1L writes _-G1a (_-e21): locked branch, _-B5 == t, kept while Drop held, _-T5W, locals 3 / 4 (_-26T + 160 / + 560), _-r5b + 275": [
+        (2986, 144, "findproperty", "_-e21"),
+        (2986, 194, "callpropvoid", "_-e21, 1"),
+        (2986, 602, "pushuint", "160"),
+        (2986, 629, "pushuint", "560"),
+        (2986, 646, "getproperty", "_-B5"),
+        (2986, 660, "callpropvoid", "_-e21, 1"),
+        (2986, 713, "callpropvoid", "_-e21, 1"),
+        (2986, 727, "getproperty", "_-T5W"),
+        (2986, 942, "getproperty", "_-B5"),
+        (2986, 990, "pushuint", "275"),
+        (2986, 1008, "callpropvoid", "_-e21, 1"),
+    ],
+    "_-u55: the drone drop sets it (state 0: = _-44x, state 5: true), _-8i clears it on a ground line, IsMoveLocked tests it": [
+        (11857, 489, "initproperty", "_-u55"),
+        (11857, 516, "initproperty", "_-u55"),
+        (2984, 13293, "getproperty", "_-u55"),
+        (2984, 13305, "getproperty", "_-96f"),
+        (2984, 13335, "initproperty", "_-u55"),
+        (3061, 132, "getproperty", "_-u55"),
     ],
 }}
 

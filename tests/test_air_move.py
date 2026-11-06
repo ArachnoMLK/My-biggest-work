@@ -206,3 +206,55 @@ class Walk(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+from bh.air_move import apex_gravity, drop_held_flag, fall_cap, fall_step, fast_fall  # noqa: E402
+
+
+class FallTerms(unittest.TestCase):
+    def test_apex(self):
+        self.assertEqual(apex_gravity(0.0), 3.25)
+        self.assertAlmostEqual(apex_gravity(24.0), 1.625)
+        self.assertAlmostEqual(apex_gravity(-24.0), 1.625)
+        self.assertEqual(apex_gravity(48.5), 0)
+        self.assertEqual(apex_gravity(-60.0), 0)
+
+    def test_fall_step_plain_and_fast(self):
+        g = 3.75 * 0.384
+        v = fall_step(-10.0, 70.0, False, False, False, False, False)
+        self.assertAlmostEqual(v, -10.0 + g + apex_gravity(-10.0 + g) * 0.384)
+        self.assertEqual(fall_step(-30.0, 85.0, False, True, True, False, False), 0.0)   # a rise is cut
+        v = fall_step(10.0, 85.0, True, True, True, False, False)                       # hitstun: no apex
+        self.assertAlmostEqual(v, 10.0 + g + 12.0 * 0.384)
+
+    def test_caps(self):
+        self.assertEqual(fall_cap(False, True, False), 85.0)
+        self.assertEqual(fall_cap(False, True, True), 70.0)
+        self.assertEqual(fall_step(90.0, 70.0, False, False, False, False, False), 85.0 - 6.0 * 0.384)
+        self.assertEqual(fall_step(71.0, 70.0, False, False, False, False, False), 70.0)
+        self.assertEqual(fall_step(80.0, 70.0, False, False, False, False, True), 70.0)
+        self.assertAlmostEqual(fall_step(80.0, 85.0, False, False, True, False, False), 80.0 + 3.75 * 0.384)
+
+    def test_fast_fall_gate(self):
+        args = dict(g1a=True, r51=0, dodging=False, hitstun=False, airborne=True, power=False, p5s=-30.0,
+                    h76=1000, i5a=0, drop_held=True, xb=0)
+        self.assertFalse(fast_fall(False, 1032, **args))          # before _-76H + 48
+        self.assertTrue(fast_fall(False, 1048, **args))
+        self.assertFalse(fast_fall(False, 1096, **args))          # past the 80 ms window
+        self.assertFalse(fast_fall(False, 1048, **dict(args, p5s=-40.0)))
+        self.assertTrue(fast_fall(True, 2000, **args))            # stays set
+        self.assertFalse(fast_fall(True, 2000, **dict(args, airborne=False)))
+        self.assertFalse(fast_fall(True, 2000, **dict(args, xb=1)))
+
+    def test_drop_flag(self):
+        self.assertFalse(drop_held_flag(False, 100, 0, False, False, False, -1, 90, False, 0, 0))
+        self.assertTrue(drop_held_flag(False, 100, 2, False, False, False, -1, 90, False, 0, 0))
+        self.assertFalse(drop_held_flag(False, 100, 2, False, False, False, -1, 90, True, 0, 0))
+        self.assertTrue(drop_held_flag(True, 100, 2, False, False, False, -1, 90, True, 0, 0))
+        self.assertFalse(drop_held_flag(False, 100, 2, True, False, False, -1, 90, False, 0, 0))
+        # a dash just before the Drop press, after the last jump: local 3 / 4 hold
+        self.assertFalse(drop_held_flag(False, 100, 2 | 4, False, False, False, -1, 90, False, 50, 0))
+
+
+if __name__ == "__main__":
+    unittest.main()
