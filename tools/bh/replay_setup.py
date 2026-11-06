@@ -22,7 +22,7 @@ from .smoke import map_grid
 
 UNARMED = "Unarmed"        # `ItemType._-m4V` (ItemType._-R2Z #4965 @313-330); fighters start unarmed [H]
 HARNESS_STATS = ("RunSpeed", "AirRunSpeed", "Friction", "AirFriction", "Acceleration", "AirAcceleration",
-                 "ImpulseMult", "HPOffset", "ImpulseNegation", "Recovery")
+                 "ImpulseMult", "HPOffset", "ImpulseNegation", "Recovery", "JumpXImpulse")
 
 
 def _read(path):

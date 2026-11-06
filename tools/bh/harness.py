@@ -45,7 +45,7 @@ from .power_pick import power_name, redirect
 from .power_timeline import END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
-from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
+from .jump import (BOOST_13G, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
                    squat_start, wall_jump)
 from .entity_states import respawn_index
 from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
@@ -128,7 +128,9 @@ def jump(f, t, left, right, third_arg=False):
     if r is not None:
         f.a4a, f.p5s, f.ground, _ = r
         if side:
-            f.v1d, f.h84 = ground_tail(left, False, f.v1d, f.h84, _vmax(f))
+            boost = f.stats.get("JumpXImpulse")                 # `_-13G` = the stance JumpXImpulse (#3049 @719-729)
+            f.v1d, f.h84 = ground_tail(left, False, f.v1d, f.h84, _vmax(f),
+                                       BOOST_13G if boost is None else float(boost))
         return "ground"
     r = wall_jump(f.r51, f.xb, f.a4a, f.h84, left, side)
     if r is not None:
