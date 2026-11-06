@@ -165,7 +165,49 @@ def air_jump(used, allowed, a4a, v1d, left, side_held, max_speed, k=1.0, second_
     return a4a - impulse, 0.0, v1d, used + 1
 
 
+JUMP_RELOCK_MS = 176       # `Entity._-Y35` (script157.<init> #3173 @829)
+JUMP_HIT_LOCK_MS = 256     # `Entity._-R6Q` (#3173 @819)
+
+
+def jump_guard(t, state, locked, third_arg, f6r, airborne, air_used, air_allowed, r51, i5a, i46):
+    """`Entity._-H5F(t, third_arg)` #3065, checked at the top of `Entity.Jump` (@36-59: return when the second
+    argument is false and this is true). True in states other than 0 / 5; with `locked` (IsMoveLocked, `_-u4F()`,
+    `_-Xb` != 0, `_-Kc._-cr` or `_-C54(t)`) unless third_arg; while `_-f6R` > t; airborne (`_-wn()`) with
+    `_-P5Y()` >= `_-56T()` and `_-r51` == 0; while t <= `_-I5A` + 176; while t <= `_-I5A` + 256 and
+    t <= `_-46I` + 256."""
+    if state not in (0, 5):
+        return True
+    if locked and not third_arg:
+        return True
+    if f6r > t:
+        return True
+    if airborne and air_used >= air_allowed and r51 == 0:
+        return True
+    if t <= i5a + JUMP_RELOCK_MS:
+        return True
+    return t <= i5a + JUMP_HIT_LOCK_MS and t <= i46 + JUMP_HIT_LOCK_MS
+
+
 ANCHORS = {ABC_1100: {
+    "_-H5F jump guard: states 0 / 5, IsMoveLocked / _-u4F / _-Xb / _-cr / _-C54 unless arg 2, _-f6R, no air jump left, _-I5A + _-Y35 (176), _-I5A / _-46I + _-R6Q (256)": [
+        (3052, 49, "callproperty", "_-H5F, 2"),
+        (3065, 27, "lookupswitch", "23, 29, 23, 23, 23, 23, 29"),
+        (3065, 65, "callproperty", "IsMoveLocked, 1"),
+        (3065, 79, "callproperty", "_-u4F, 0"),
+        (3065, 94, "getproperty", "_-Xb"),
+        (3065, 115, "getproperty", "_-cr"),
+        (3065, 134, "callproperty", "_-C54, 1"),
+        (3065, 164, "getproperty", "_-f6R"),
+        (3065, 199, "callproperty", "_-P5Y, 0"),
+        (3065, 208, "callproperty", "_-56T, 0"),
+        (3065, 255, "getproperty", "_-Y35"),
+        (3065, 286, "getproperty", "_-R6Q"),
+        (3065, 301, "getproperty", "_-46I"),
+        (3173, 819, "pushuint", "256"),
+        (3173, 822, "initproperty", "_-R6Q"),
+        (3173, 829, "pushuint", "176"),
+        (3173, 831, "initproperty", "_-Y35"),
+    ],
     "Entity.Jump grounded branch: dash window _-26T + 160 > t and (_-96f or _-Xb == 1); 57 x (0.86 | 1) or 170; _-P5S = 0, _-96f = null, _-A4A -= impulse": [
         (3052, 80, "getproperty", "_-26T"),
         (3052, 84, "pushuint", "160"),
