@@ -42,7 +42,7 @@ from .horizontal import (acceleration, apply_acceleration, apply_friction, frict
 from .input_buffer import attack_slot, buffered_presses, state_at
 from .power_data import fire_x, momentum, power_steps
 from .power_pick import power_name, redirect
-from .power_timeline import Timeline, tick_index
+from .power_timeline import END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
 from .jump import (air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
@@ -376,6 +376,20 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         keys = 0
     if move_locked(f):                                          # `_-1L`: no move input while move-locked
         left = right = False
+    if f.power is not None and f.power.get("g4i") in (6, 9):   # `_-O5N` #56 read by `_-R63` @4061-4339
+        g = f.ground
+        reason = 0
+        if g is not None and g.sx == g.ex:
+            reason = 4                                          # a wall
+        elif g is not None and g.normal is not None and g.normal[1] < 0:
+            reason = 2                                          # landed [H: `_-N20` look-ahead, EndOnHit 1 left out]
+        try:
+            mct = int(float(f.power.get("row", {}).get("MinCancelTime") or 0))
+        except ValueError:
+            mct = 0
+        if ends_now(reason, tick_index(t) - f.power.get("start", tick_index(t)), mct):
+            events.append(("end", f.power["name"], END_REASONS[reason]))
+            f.power = None
     if f.power is not None:                                     # `_-Kc._-25` before `_-8i` (state 0)
         step = f.power["tl"].update(tick_index(t))
         if step is not None:
@@ -407,7 +421,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                     if steps["CastTime"]:
                         f.power = {"name": name, "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t)),
                                    "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
-                                   "row": power, "qm": momentum(f.v1d, f.facing_left)}   # `_-l4X.<init>` #39
+                                   "row": power, "qm": momentum(f.v1d, f.facing_left), "start": tick_index(t)}   # `_-l4X.<init>` #39
                         cast_impulse(f, power)
                         f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
                         f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
