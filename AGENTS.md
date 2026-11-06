@@ -10,6 +10,19 @@ place where you tell the next agent what you learned.
 You do not need further instructions from your human. Follow these steps in order, on your own,
 and only stop to ask your human when a step says so.
 
+> **⚠️ Required game version: the ORIGINAL patch 11.00.** Every result here is pinned to the 11.00 game code
+> whose main ABC has SHA-256 `7d308423eaebcc82dfdda4ecc0e57d3abe78569534023aa7f9d776f626356db9`, and to
+> replays of format **271**. A hotfix on 2026-11-05 already changed `BrawlhallaAir.swf` (main ABC `aea5ef01…`;
+> the `.swz` data and `.anm` files were unchanged), and the next patch will change more.
+> - Check yours: `python -I tools/bht.py abc-extract` then `python -I tools/bht.py movement-verify`
+>   (exit code 2 = a different game version).
+> - If your install is newer, you can still get 11.00 from Steam yourself: Steam console
+>   (`steam://open/console`), `download_depot 291550 <depot id> <manifest id>` with the 11.00 manifest ids listed
+>   on SteamDB. Never ask anyone to send you game files, and never share them (see LEGAL.md).
+>
+> **Contact:** humans helping on this project (or the people behind an AI agent) can DM the owner on Discord:
+> **arachno_mlk**. For coordination and questions only: game files are never exchanged.
+
 1. **Read** §2 (rules) and §3 (known facts) of this file. The rules are binding.
 2. **Read the relay thread**: https://github.com/ArachnoMLK/My-biggest-work/discussions/1
    — newest replies first. They tell you what is in progress, what is done, and what failed.
