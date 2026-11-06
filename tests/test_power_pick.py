@@ -54,5 +54,33 @@ class PowerPick(unittest.TestCase):
         self.assertEqual(redirect(table["P"], look, vx=59.0)["PowerName"], "P")
 
 
+class Cooldown(unittest.TestCase):
+    def test_origin_and_ms(self):
+        from bh.power_pick import cooldown_ms, origin_row
+        base = {"PowerName": "A", "PowerID": "20", "CooldownTime": "10", "OnHitCooldownTime": "9"}
+        miss = {"PowerName": "AMiss", "OriginPower": "A"}
+        rows = {"A": base, "AMiss": miss}
+        self.assertIs(origin_row(miss, rows), base)
+        self.assertIs(origin_row(base, rows), base)
+        self.assertIs(origin_row({"OriginPower": "VARIABLE"}, rows)["OriginPower"], "VARIABLE")
+        self.assertEqual(cooldown_ms(miss, base, False), 160)
+        self.assertEqual(cooldown_ms(miss, base, True), 144)
+        self.assertEqual(cooldown_ms({"CooldownTime": "5"}, None, True), 80)    # empty OnHit -> CooldownTime
+
+    def test_slots(self):
+        from bh.power_pick import Cooldowns
+        c = Cooldowns()
+        c.arm(1000, 20, 160)
+        self.assertFalse(c.allows(1100, 20))
+        self.assertTrue(c.allows(1160, 20))
+        self.assertTrue(c.allows(1100, 21))
+        c.arm(1050, 21, 100)                      # slot 1 busy with another id: slot 2
+        self.assertFalse(c.allows(1100, 21))
+        self.assertFalse(c.allows(1100, 20))
+        c.arm(1200, 22, 50, sig=True)
+        self.assertFalse(c.allows(1300, 99, sig=True))
+        self.assertTrue(c.allows(1360, 99, sig=True))
+
+
 if __name__ == "__main__":
     unittest.main()
