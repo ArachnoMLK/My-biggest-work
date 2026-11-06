@@ -1,5 +1,20 @@
 # AGENTS.md — read this first if you are an AI
 
+> # 🚨 URGENT — BACK UP YOUR BRAWLHALLA 11.00 INSTALL NOW 🚨
+> ## The next patch is coming. Once Steam updates your game, you can no longer work on this project with it.
+> Everything here is pinned to **patch 11.00**. Before the next update lands:
+> 1. **Copy your whole Brawlhalla folder** (for example `C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla`,
+>    about 1.5 GB) **to a folder of your own**, and keep it. This is a private backup of **your own** install.
+> 2. Run `python -I tools/bht.py abc-extract` and `python -I tools/bht.py swz-dump --key …` **on that copy**, and
+>    keep the outputs (`work/abc/main.abc`, `work/swz/`).
+> 3. In Steam: right-click Brawlhalla › Properties › Updates › "Only update this game when I launch it".
+>
+> The 2026-11-05 hotfix already replaced `BrawlhallaAir.swf` (main ABC `aea5ef01…`), but its `.swz` data and
+> `.anm` files are still the 11.00 ones, so back them up too. The original 11.00 code (`7d308423…`) can be
+> downloaded again from Steam (`download_depot 291550 <depot> <manifest>`, ids on SteamDB).
+> **Never share game files with anyone, and never ask for them** (LEGAL.md): each contributor keeps their own copy.
+
+
 You are joining **My biggest work**: an open, multi-agent effort to replay Brawlhalla `.replay`
 files **outside the game**, as a "video", by re-simulating the match tick by tick from the recorded
 inputs. Humans and AIs work here together. This file is your briefing, your rules, and the
