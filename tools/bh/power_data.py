@@ -119,6 +119,10 @@ def expand(cell_list, cast_index, count, as_int=True):
 
 COLUMNS = ("VariableImpulse", "FixedImpulse", "AoERadiusX", "AoERadiusY", "CenterOffsetX", "CenterOffsetY",
            "BaseDamage", "ImpulseOffsetX", "ImpulseOffsetY", "FixedStunTime")
+# FireImpulseX -> `_-84C`, FireImpulseY -> `_-ol` (#6483 @5244-5344: split ',', then `_-a3P(cells, '!',
+# '2147483647')`, i.e. "!" = unset), expanded per step by `_-42F` like the columns above (@12022-12068).
+FIRE_COLUMNS = ("FireImpulseX", "FireImpulseY")
+UNSET = 2147483647
 
 
 def power_steps(row):
@@ -127,17 +131,19 @@ def power_steps(row):
     Values go into int vectors (parseInt-style truncation of the expanded value) [V shape]."""
     a2, entries = cast_steps(row.get("CastTime", ""))
     cells = {c: (row.get(c) or "").split(",") if row.get(c) else [] for c in COLUMNS}
+    for c in FIRE_COLUMNS:
+        cells[c] = [s.replace("!", str(UNSET)) for s in row.get(c).split(",")] if row.get(c) else []
     if cells["AoERadiusX"] and not cells["AoERadiusY"]:
         cells["AoERadiusY"] = cells["AoERadiusX"]
     out = {"CastTime": a2, "q24": None, "D6M": 0}
-    lists = {c: [] for c in COLUMNS}
+    lists = {c: [] for c in COLUMNS + FIRE_COLUMNS}
     windows, defaults = {}, {}
     for idx, (first, count) in enumerate(entries):
-        for c in COLUMNS:
+        for c in COLUMNS + FIRE_COLUMNS:
             start = len(lists[c])
             vals, total, groups = expand(cells[c], idx, count)
             lists[c].extend(vals)
-            if groups is not None:
+            if groups is not None and c not in FIRE_COLUMNS:
                 for step in range(first, first + count):
                     windows.setdefault(step, (start, groups))
             if c == "BaseDamage":
@@ -171,6 +177,20 @@ ANCHORS = {ABC_1100: {
         (6483, 12381, "callproperty", "_-42F, 6"),
         (6483, 12388, "initproperty", "_-D6M"),
         (6483, 12686, "callpropvoid", "_-v5o, 4"),
+    ],
+    "_-A3R FireImpulseX / Y: split ',', '!' -> '2147483647' (_-a3P), then _-42F per step into _-84C / _-ol": [
+        (6483, 5244, "pushstring", "'FireImpulseX'"),
+        (6483, 5283, "pushstring", "'!'"),
+        (6483, 5285, "pushstring", "'2147483647'"),
+        (6483, 5289, "callpropvoid", "_-a3P, 3"),
+        (6483, 5299, "pushstring", "'FireImpulseY'"),
+        (6483, 5344, "callpropvoid", "_-a3P, 3"),
+        (6483, 10735, "initproperty", "_-84C"),
+        (6483, 10763, "initproperty", "_-ol"),
+        (6483, 12036, "getproperty", "_-84C"),
+        (6483, 12043, "callpropvoid", "_-42F, 6"),
+        (6483, 12061, "getproperty", "_-ol"),
+        (6483, 12068, "callpropvoid", "_-42F, 6"),
     ],
     "_-42F: '&' simultaneous (v5o), 't' total / n, '|' alternating, '~' ranges, plain value; _-965 fill; v5o packs (k << 16) | first": [
         (6484, 166, "callpropvoid", "_-965, 4"),

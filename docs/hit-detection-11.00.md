@@ -1149,6 +1149,10 @@ resolution of the lists (`_-w2j._-L3T`), and what the crate becomes when picked 
 
 So the "direction weights" of §10 belong to the opponent check, not to the item score (correction).
 
+### 10.6 FireImpulseX / Y per step (`power_data.FIRE_COLUMNS`)
+
+`PowerType.static._-A3R` #6483 splits FireImpulseX / FireImpulseY on ',' and replaces '!' by '2147483647' (`_-a3P`, @5244-5344; '!' = unset), then expands them per step with `_-42F` (@12022-12068) into `_-84C` / `_-ol`, like VariableImpulse / FixedImpulse: so the 'a~b~c' ranges, 'a|b' alternation and 'tN' totals apply. [V] Local aggregate: 3,768 powers build, 2,492 have a FireImpulse cell, 1,083 of them use '~' (a plain int read loses them).
+
 ## 11. Still open
 
 - Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
