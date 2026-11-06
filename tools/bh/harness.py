@@ -356,6 +356,11 @@ def move_locked(f, t=None):
     return f.power is not None and f.power.get("move_lock", False)
 
 
+def _l0(f):
+    """The running power's facing `_-L0` (set at its creation), else the fighter's."""
+    return f.power.get("L0", f.facing_left) if f.power is not None else f.facing_left
+
+
 def cast_impulse(f, power):
     """`_-l4X._-O1K` #91 @385-471 / @1087-1144 (entity-step-11.00.md): CastImpulseX (`_-C6Z`) **sets** `_-v1D`,
     negated when `_-L0` (facing left), and CastImpulseY (`_-8S`) sets `_-P5S`, each unless unset. Without a
@@ -372,15 +377,15 @@ def cast_impulse(f, power):
         return None if v == UNSET else v
     cx, cy = num("CastImpulseX"), num("CastImpulseY")
     if cx is not None:
-        f.v1d = float(-cx if f.facing_left else cx)
+        f.v1d = float(-cx if _l0(f) else cx)
     else:                                                       # @714-1083 (the @475-710 branches left out [H])
         back, lim = num("SpeedLimitBackward") or 0, num("SpeedLimit") or 0
-        backward = (f.v1d < 0) != f.facing_left
+        backward = (f.v1d < 0) != _l0(f)
         if back != 0 and backward:
             if abs(f.v1d) > back:                               # SpeedLimitBackward `_-M2J`
-                f.v1d = float(back if f.facing_left else -back)
+                f.v1d = float(back if _l0(f) else -back)
         elif lim != 0 and abs(f.v1d) > lim:                     # SpeedLimit `_-u1G`, toward the facing
-            f.v1d = float(-lim if f.facing_left else lim)
+            f.v1d = float(-lim if _l0(f) else lim)
     if cy is not None:
         f.p5s = float(cy)
 
@@ -417,7 +422,7 @@ def fire_impulse(f, power, step):
             l27 = bool(power.get("FireImpulseMaxX") or power.get("ImpulseOffsetMaxX"))
             v = fire_x(v, None if m == UNSET else m, l27, _true(power.get("ImpulseMaxOnDCOnly")),
                        f.power.get("qm", 0.0) if f.power else 0.0)
-        if attr == "v1d" and f.facing_left:
+        if attr == "v1d" and _l0(f):                         # #47 @394-410: `_-L0`
             v = -v
         setattr(f, attr, float(v))
 
@@ -463,7 +468,8 @@ def start_power(f, t, power):
         return False
     f.power = {"name": power.get("PowerName"), "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t)),
                "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
-               "row": power, "qm": momentum(f.v1d, f.facing_left), "start": tick_index(t)}
+               "row": power, "qm": momentum(f.v1d, f.facing_left), "start": tick_index(t),
+               "L0": f.facing_left}                             # `_-L0` = owner `_-G4T()` (#39 @120-131)
     cast_impulse(f, power)
     f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
     f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
@@ -485,7 +491,7 @@ def combo_next(power):
 
 
 def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None, dodge_press=False, keys=0,
-         dodge_rows=None, light_press=False, heavy_press=False):
+         dodge_rows=None, light_press=False, heavy_press=False, press_keys=None):
     """One 16 ms tick at time t. `bounds` is (camera rectangle, kill dict) for the ring-out test, or None.
     `dodge_press` with `dodge_rows` (dodge.parse_types) tries `Entity.Dodge(t, keys & 15)` first (#6313 tries the
     dodge before the jump). Returns the list of events of this tick."""
@@ -513,7 +519,10 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         events.append(("press", jump(f, t, left, right)))
     for press, heavy in ((light_press, False), (heavy_press, True)):
         if press:
-            slot, gc = attack(f, t, keys, heavy)
+            # #6313 keeps the key word of the press tick (locals 19 / 21) and `_-rU` #6334 reads its direction
+            # (@93-99: local 13 = keys & 15) [V]; `press_keys` holds it per action, else the current word
+            pk = (press_keys or {}).get("HeavyAttack" if heavy else "LightAttack", keys)
+            slot, gc = attack(f, t, pk, heavy)
             # #6313 @2763-2798 / @2968-3003: the attack goes on only when local 15 is false (not locked, no `_-Xb`,
             # `_-f6R` passed, no dodge this pass) or under the gravity cancel (local 32) [H: local 17]; a running
             # power keeps the press buffered [H]
@@ -521,6 +530,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
             rows = (f.moves or {}).get("powers")
             if name is not None and rows:
+                if not busy and pk & (MOVE_LEFT | MOVE_RIGHT) and not f.t5z:
+                    f.facing_left = bool(pk & MOVE_LEFT)        # #6334 @525-585: `_-CV(_-q2o(keys & 4))`
                 power = redirect(rows.get(name), rows.get, exhausted=f.ut, gc=gc, vx=f.v1d, facing_left=f.facing_left)
                 name = power["PowerName"] if power else None
                 if power is not None and not busy and not cooldown_allows(f, t, power):   # `_-O5u` #1744
@@ -735,7 +746,7 @@ def step_hits(f, step, victim, hurtbox):
     for i in range(first, first + count):
         if not all(i < len(st[c]) for c in ("CenterOffsetX", "CenterOffsetY", "AoERadiusX", "AoERadiusY")):
             continue
-        c = area_center(f.power["g4i"], f.x, f.y, i, st["CenterOffsetX"], st["CenterOffsetY"], f.facing_left)
+        c = area_center(f.power["g4i"], f.x, f.y, i, st["CenterOffsetX"], st["CenterOffsetY"], _l0(f))
         if c is None:
             continue
         if capsules_touch(hit_capsule(c[0], c[1], st["AoERadiusX"][i], st["AoERadiusY"][i]), hb):
@@ -765,7 +776,7 @@ def apply_hit(f, v, i, t):
     m = final_magnitude(u, _at(st["FixedImpulse"], i), 0.0, vi)
     dx = _at(st["ImpulseOffsetX"], i)
     dy = _at(st["ImpulseOffsetY"], i)
-    if f.facing_left:
+    if _l0(f):
         dx = -dx
     n = (dx * dx + dy * dy) ** 0.5
     v.v1d = v.p5s = 0.0
@@ -873,7 +884,8 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                          if a in bp and bp[a] > done.get(a, -1)}
                 ev = tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT), "Jump" in fresh, 0,
                           bounds, "DodgeDash" in fresh, keys, dodge_rows, "LightAttack" in fresh,
-                          "HeavyAttack" in fresh)
+                          "HeavyAttack" in fresh,
+                          {a: state_at(records, fresh[a]) for a in ("LightAttack", "HeavyAttack") if a in fresh})
                 attacks = [a for a in ("LightAttack", "HeavyAttack") if a in fresh]   # tick's order
                 for e in ev:                                    # a press is handled once its action ran [H]
                     if e[0] == "press" and e[1] is not None:

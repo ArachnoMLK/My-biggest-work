@@ -446,3 +446,10 @@ release `_-A2X` passes it after `_-I5A` = 0); `_-f6R` > t; airborne with no air 
 pressed during an attack's recovery fired at once. Replay 186: MAM's jump press at 7.568 s (inside BaseSideMiss)
 is now refused, the press at 7.712 s jumps, and MAM lands at 8.688 s — the clip shows the landing at ~8.67 s.
 Aggregate: life 10.6 s (247 early / 1 within 1 s / 6 late). [H] `_-u4F`, `_-cr`, `_-C54` false.
+**Attack direction from the press (6 Nov).** [V] #6313 keeps the key word of the tick a light / heavy press was
+seen (locals 19 / 21) and `_-rU` #6334 reads its direction (@93-99: local 13 = keys & 15) and, with a side in it
+and no `_-t5z`, turns the fighter that way (@525-585, `_-CV(_-q2o(keys & 4))`); the power keeps that facing as
+`_-L0` (`_-l4X.<init>` #39 @120-131), which its cast / fire impulses (#91, #47 @394) and areas use. The harness
+used the current keys and the current facing. Replay 186: MAM's side air pressed with Left at 7.712 s now pushes
+left; MAM is at x ≈ 965 at 8.35 s (clip ≈ 1046, scale from CLO and the stage edge) and lands at 1175 at 8.69 s
+(clip ≈ 1221), instead of 1357 / 1652. Aggregate: life 10.9 s (248 early / 1 within 1 s / 5 late).
