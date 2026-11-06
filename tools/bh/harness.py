@@ -40,7 +40,7 @@ from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_decay,
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
                          reversal_factor)
 from .input_buffer import attack_slot, buffered_presses, state_at
-from .power_data import power_steps
+from .power_data import fire_x, momentum, power_steps
 from .power_pick import power_name, redirect
 from .power_timeline import Timeline, tick_index
 from .ko import ko_mask
@@ -354,6 +354,12 @@ def fire_impulse(f, power, step):
             f.power["fx_set"] = v != UNSET                      # `_-759` (#47 @451-460)
         if v == UNSET:
             continue
+        if attr == "v1d" and v != UNSET:                    # @204-392: FireImpulseMaxX by `_-qm`
+            mx = (steps or {}).get("FireImpulseMaxX") or []
+            m = (mx[step] if step < len(mx) else mx[0]) if mx and power.get("FireImpulseMaxX") else None
+            l27 = bool(power.get("FireImpulseMaxX") or power.get("ImpulseOffsetMaxX"))
+            v = fire_x(v, None if m == UNSET else m, l27, _true(power.get("ImpulseMaxOnDCOnly")),
+                       f.power.get("qm", 0.0) if f.power else 0.0)
         if attr == "v1d" and f.facing_left:
             v = -v
         setattr(f, attr, float(v))
@@ -401,7 +407,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                     if steps["CastTime"]:
                         f.power = {"name": name, "steps": steps, "tl": Timeline(steps["CastTime"], tick_index(t)),
                                    "g4i": target_method(power.get("TargetMethod", ""))[0], "hit": set(),
-                                   "row": power}
+                                   "row": power, "qm": momentum(f.v1d, f.facing_left)}   # `_-l4X.<init>` #39
                         cast_impulse(f, power)
                         f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
                         f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
