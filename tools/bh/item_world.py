@@ -9,7 +9,7 @@ else `mBaseWeapon2`, and `_-56C` += 1. `_-56C` starts at R % 2 (`_-F5N.<init>`, 
 The glue is [H]: the settings -> rates mapping skips `_-L5u`; I is seeded like R (`seed_from_header`, both come
 from `_-h3U._-669`); the `_-56C` draws are taken in replay entity order; the item choice is pickup.choose
 (`_-N5R`) with a2 true, the fighter point = the harness (x, y) and the item centre = its (x, y); a press while armed throws the
-weapon away (no thrown item is simulated); a KO loses the weapon (the respawned fighter starts unarmed); held
+weapon (`throw`, a tap, no hit on the opponent); a KO loses the weapon (the respawned fighter starts unarmed); held
 weapons count for the weapon lane; `_-a3s()` is false for every item; items move in phase 4 after the spawns.
 """
 import csv
@@ -73,7 +73,8 @@ class World:
         self.mgr.spawned = []
         for i in self.live:
             it = i["type"]
-            i["lu"], i["vy"], mv = items.velocity(i["lu"], i["vy"], 0.0, 0.0, i["ground"], it, thrown=False, o2o=False)
+            i["lu"], i["vy"], mv = items.velocity(i["lu"], i["vy"], 0.0, 0.0, i["ground"], it,
+                                                  thrown=bool(i.get("dropped_by")), o2o=False)
             i["x"], i["y"], ground, _ = items.sweep(self.grid, 0, i["x"], i["y"], mv, 3, it["S2O"])
             if ground is None and i.get("rest"):            # smoke.item_fall: a resting item keeps its line
                 ground = i["ground"]
@@ -89,6 +90,22 @@ class World:
         self.live.remove(best)
         self.picked += 1
         return best["type"]
+
+    def throw(self, t, me, it, f, bits, charge=0):
+        """A press while armed (`_-F5N._-M4Q` #1689): the held weapon leaves as a thrown item from
+        `items.throw_spawn`, speed `items.throw_vector`, state `items.throw_start` (state 1, `_-r5B` = me,
+        `_-O13` = t). [H] charge 0 (a tap), no hit on the opponent, the weapon's own ItemType row."""
+        if it is None or "S2O" not in it:
+            return None
+        x, y = items.throw_spawn(self.grid, 0, f.x, f.y, f.ground is None, it["S2O"])
+        d = items.throw_vector(charge, bits, f.facing_left, it, None if f.ground is None else f.ground.type,
+                               f.v1d, f.p5s)
+        s = items.throw_start(d, it, me, 0, charge, t)
+        item = {"type": it, "x": x, "y": y, "lu": s["Lu"], "vy": s["33c"], "ground": None, "state": 1,
+                "dropped_by": me, "dropped_at": t}
+        self.live.append(item)
+        self.thrown = getattr(self, "thrown", 0) + 1
+        return item
 
     def crate_weapon(self, k, hero):
         """`_-u30` @440-512: the base weapon a crate gives fighter k (`_-56C` parity), and `_-56C` += 1."""

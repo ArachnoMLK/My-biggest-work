@@ -46,6 +46,20 @@ class ItemWorld(unittest.TestCase):
         self.assertEqual(w.pick_up(0, 1, 40, -10, {})["name"], "Crate")
         self.assertEqual(w.live, [])
 
+    def test_throw_lands_and_is_pickable(self):
+        from bh.harness import Fighter
+        w = self.world()
+        side = w.throw(1000, 1, w.types["Crate"], Fighter(0.0, -1.0), 0)
+        self.assertGreater(side["lu"], 0)                # no direction: the way the thrower faces (right)
+        w.live.remove(side)
+        it = w.throw(1000, 1, w.types["Crate"], Fighter(0.0, -300.0), 2)   # thrown down from the air
+        self.assertEqual((it["state"], it["dropped_by"], it["lu"]), (1, 1, 0.0))
+        self.assertIsNone(w.pick_up(1010, 1, it["x"], it["y"], {}))   # 64 ms drop guard
+        for k in range(300):
+            w.tick(1016 + 16 * k, 16, [None, None])
+        self.assertEqual(it["state"], 0)                 # came to rest on the floor
+        self.assertLessEqual(abs(it["y"]), 1.5)
+
     def test_crate_weapon_parity(self):
         w = self.world(c56=(0, 1))
         hero = {"mBaseWeapon1": "A", "mBaseWeapon2": "B"}

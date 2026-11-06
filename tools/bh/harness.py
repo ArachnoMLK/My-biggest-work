@@ -675,7 +675,8 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                         a = attacks.pop(0)
                         done[a] = fresh[a]
                 if world is not None and "PickUpThrow" in fresh and f.moves and not move_locked(f) and f.power is None:
-                    if p["weapon"] is not None:                 # [H] a throw: the weapon leaves, no thrown item
+                    if p["weapon"] is not None:                 # a throw (`_-M4Q`) [H: a tap, no hit]
+                        world.throw(t, p["e"]["id"], p["weapon"], f, keys & DIR_MASK)
                         p["weapon"] = None
                         f.moves = dict(f.moves, weapon=(weapon_slots or {}).get("Unarmed", f.moves["weapon"]))
                         done["PickUpThrow"] = fresh["PickUpThrow"]
