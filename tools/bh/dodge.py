@@ -601,6 +601,18 @@ def cooldown_ms(cooldown, cooldown_ground, air_or_wall):
 
 
 ANCHORS = {ABC_1100: {
+    "Friction while dodging: _-8i @764-798 runs it when !_-E6P() or _-H6t(); _-H6t #3063 = dodging with a Neutral (_-h2L 0) ground-only (_-6H 1) type; then 9.0 / 3.25 by the held side _-66U": [
+        (2984, 768, "getproperty", "_-83l"),
+        (2984, 782, "callproperty", "_-E6P, 0"),
+        (2984, 702, "callproperty", "_-H6t, 0"),
+        (2984, 1061, "iffalse", "175"),
+        (2984, 1141, "pushdouble", "9.0"),
+        (2984, 1235, "pushdouble", "3.25"),
+        (3063, 12, "callproperty", "_-E6P, 0"),
+        (3063, 87, "getproperty", "_-h2L"),
+        (3063, 101, "getproperty", "_-6H"),
+        (3063, 104, "pushbyte", "1"),
+    ],
     "Entity.Dodge gates: _-C2E(t, dir), _-46I + 64 / + 96 windows, IsDodgeLocked(t), chained dodge (_-H2b, _-14W, _-y1F), _-26R, Dash": [
         (3125, 23, "callproperty", "_-C2E, 2"),
         (3125, 63, "pushbyte", "64"),
