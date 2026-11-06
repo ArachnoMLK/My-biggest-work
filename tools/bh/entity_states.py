@@ -66,6 +66,13 @@ TRANSITIONS = {(None, 3): "Entity._-eR (KO commit)", (None, 7): "_-X6R._-U6W(eli
                (None, 0): "_-X6R.Respawn -> Entity._-hq", (None, 9): "_-d2C._-85Y -> Entity._-220"}
 
 SECONDARY_POWER = "_-F5N._-33h: new _-l4X, _-x4I = target, _-SQ = true, pushed to _-pX (refused without a power or with _-H6K._-e3e & _-a60)"
+# How a weapon is picked up [V shape]: the input consumer `_-i4Z._-51o` #6313 takes the latest ThrowItem press
+# (bit 512, local 26, @1240-1270) inside the buffer window and calls `_-F5N._-LY(t, no QuickAttack press)`
+# (@2610-2617, @2691-2698). `_-LY` #1701 returns when there is no owner, when `IsMoveLocked`, or while a power
+# runs; `_-I2Q` keeps a 240 ms window; the item is the one `_-N5R` #1733 finds; `_-F5N._-u30` #1709 takes it
+# from the map and `_-F5N._-s1u` #1734 equips it (`_-O2R`, Weapon `_-G3X` flag 1).
+PICK_UP = ("ThrowItem 512 (_-i4Z._-51o)", "_-F5N._-LY", "_-N5R", "_-F5N._-u30", "_-F5N._-s1u")
+
 POWER_START = ("_-i4Z._-rU / _-I35", "_-F5N._-C5S / _-A3Q / _-V5I", "_-F5N._-J5R", "_-O5u", "new _-l4X")
 
 
@@ -167,6 +174,16 @@ ANCHORS = {ABC_1100: {
         (1704, 102, "initproperty", "_-x4I"),
         (1704, 108, "initproperty", "_-SQ"),
         (1704, 114, "getproperty", "_-pX"),
+    ],
+    "Weapon pick-up: ThrowItem (512) press -> _-F5N._-LY (not move-locked, no power, 240 ms _-I2Q) -> _-N5R -> _-u30 -> _-s1u": [
+        (6313, 1253, "pushint", "512"),
+        (6313, 1270, "setlocal", "26"),
+        (6313, 2617, "callproperty", "_-LY, 2"),
+        (6313, 2698, "callproperty", "_-LY, 2"),
+        (1701, 41, "pushuint", "240"),
+        (1701, 67, "callproperty", "IsMoveLocked, 1"),
+        (1701, 118, "callproperty", "_-N5R, 3"),
+        (1734, 80, "getproperty", "_-G3X"),
     ],
 }}
 

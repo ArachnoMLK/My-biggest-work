@@ -1033,6 +1033,19 @@ map collision only run in states 0 and 5**.
 
 `Entity._-b6D` #3015 is true for 4000 ms after the elimination, from `_-164` in state 7 or `_-a2O` in state 8 (it first requires the `_-8` bit of `_-e3e`) [V]. [H] It drives the post-elimination display.
 
+**How a weapon is picked up** [V shape]:
+1. The input consumer `_-i4Z._-51o` #6313 takes the latest **ThrowItem** press (bit 512) inside the buffer
+   window (local 26, @1240–1270).
+2. It calls `_-F5N._-LY(t, no QuickAttack press)` (@2610–2617, @2691–2698).
+3. `_-LY` #1701 returns while the fighter is `IsMoveLocked` or a power runs, and keeps a 240 ms window
+   (`_-I2Q`).
+4. `_-N5R` #1733 chooses the item.
+5. `_-F5N._-u30` #1709 takes it off the map, and `_-F5N._-s1u` #1734 equips it (`_-O2R`, flag 1 when
+   `Weapon`).
+
+Not transcribed yet: `_-N5R`'s reach rule, and the item spawns that put weapons on the map (lanes `_-Y1h` /
+`_-5J`, prng-order-11.00.md §4).
+
 **How an input starts a power** [V shape]:
 1. The input consumer `_-i4Z._-rU` / `_-I35` (input-buffer-11.00.md, PR #28) calls one of:
    - `_-F5N._-C5S`: attack slot → power through `_-42t`, with extra checks for slot 9;
