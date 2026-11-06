@@ -420,3 +420,11 @@ flags the release (`_-e3f` → `_-64U` → `_-43C`) once HeavyAttack (64; 64|512
 Replay 186: MAM's side heavy is released at 10.528 s and its hit step fires at 10.640 s (clip: the 18-damage hit at
 ~10.69 s). Aggregate: life 10.6 s (248 early / 2 within 1 s / 1 exact / 1 late / 1 late within 1 s / 1 none).
 Not modelled yet: the charge factor of the release (`_-a6i` / `_-I6c` on damage, impulse and `_-Q1n`).
+**IsMoveLocked and the action pass (6 Nov).** [V] `move_locked(f, t)` now follows `Entity.IsMoveLocked` #3061:
+the power lock, dodging (`_-E6P`), hitstun, `_-u55`, a pending dash (`_-P50`), then `_-q2B` #3084 (a kind 3 / 7
+dash within 112 ms); [H] `_-cr`, `_-P4K`, `_-H6I` left out. #6313 computes local 15 (locked, `_-Xb`, `_-f6R`)
+before the dodge; a Dodge that ran sets locals 14 / 15 (@2442-2455), so no jump (@2567 / @3445 need local 14
+false) and no attack (@2763-2798 / @2968-3003 need local 15 false unless the gravity cancel, local 32) on the same
+pass; a started attack sets local 15 (@2932). Also: a CastTime part without a number is 0 (#30). Aggregate:
+life 10.6 → 10.2 s (248 early / 2 within 1 s / 4 late). On replay 186 MAM now dashes at 10.336 s instead of
+starting the heavy (the clip shows the heavy: open, likely an earlier state difference).

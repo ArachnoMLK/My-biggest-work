@@ -187,7 +187,7 @@ def dodge(f, t, dir, rows):
             return "dash"
 
     def locked(flag):
-        return is_dodge_locked(move_locked(f), f.u5e, flag, f.e6p, False, f.r51, False, f.xb, False, 0)
+        return is_dodge_locked(move_locked(f, t), f.u5e, flag, f.e6p, False, f.r51, False, f.xb, False, 0)
 
     g = gates(t, dir, c, f.i46, airborne, locked(False), locked(c), f.h2b, f.w14, f.y1f, False, f.o5c, False,
               False, not airborne, 0, f.lock_start, f.facing_left, None)
@@ -329,13 +329,19 @@ def _true(v):
     return str(v or "").upper() == "TRUE"
 
 
-def move_locked(f):
+def move_locked(f, t=None):
     """`IsMoveLocked` from a running power: `_-l4X._-f14` #59 @682-725 calls the owner's `_-a6l(true)` (the flag
     `_-23G`, read by `_-65i()`, which `IsMoveLocked` #3061 tests) when the power has neither AllowMove (`_-Y5V`)
     nor AllowMoveForward (`_-T20`); `_-R63` #46 @4677-4719 clears it with AllowRecoverMove (`_-r4W`). While locked,
     `Entity._-1L` #2986 @50-348 does not take the move inputs. [H] glue: cleared when the harness drops the power,
     `_-Kc._-H6I(t)` not tested, AllowRecoverMove not modelled."""
-    if f.u55:                                                   # #3061 @128-137: after a drone drop, until landing
+    # `Entity.IsMoveLocked` #3061 in states 0 / 5: the power lock (`_-65i` without `_-H6I`), dodging (`_-E6P`),
+    # hitstun (`_-5q`), `_-cr`, `_-u55`, `_-P4K`, a pending dash (`_-P50`); else `_-q2B(t)` #3084 (a dash of kind 3 /
+    # 7 within 112 ms of `_-26T`). [H] glue: `_-cr`, `_-P4K` and `_-H6I` not modelled; without t the time terms
+    # (hitstun, `_-q2B`) are skipped.
+    if f.u55 or f.e6p or f.p50:                                 # #3061 @77-161
+        return True
+    if t is not None and (t < f.stun_until or (f.m3v and f.l3a in (3, 7) and f.dash_timer + 112 > t)):
         return True
     return f.power is not None and f.power.get("move_lock", False)
 
@@ -482,7 +488,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     if t < f.stun_until:                                        # `_-5q()`: no input acts in hitstun [H]
         left = right = jump_press = dodge_press = light_press = heavy_press = False
         keys = 0
-    if move_locked(f):                                          # `_-1L`: no move input while move-locked
+    if move_locked(f, t):                                          # `_-1L`: no move input while move-locked
         left = right = False
     if f.power is not None and f.power.get("g4i") in (6, 9):   # `_-O5N` #56 read by `_-R63` @4061-4339
         g = f.ground
@@ -528,18 +534,22 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                     events.append(("combo", nxt))
     # #6313 @520-629, @2357-2433: Dodge (and so Dash) runs only when !(IsMoveLocked || `_-Xb` != 0 || `_-C54(t)` ||
     # `_-f6R` > t || `_-e3e & _-m1t`) or under the dodge cancel (local 34) [H: `_-C54`, `_-m1t` and local 34 false]
-    dodge_ok = not (move_locked(f) or f.xb != 0 or f.f6r > t)
-    if dodge_press and dodge_rows and dodge_ok:
+    l15 = move_locked(f, t) or f.xb != 0 or f.f6r > t           # #6313 @557-629 (local 15), before the dodge
+    acted = False                                               # local 14: an action already taken this pass
+    if dodge_press and dodge_rows and not l15:
         name = dodge(f, t, keys & DIR_MASK, dodge_rows)
         if name is not None:
             events.append(("dodge", name))
-    if jump_press:
+            acted = l15 = True                                  # #6313 @2442-2455 after a Dodge that ran
+    if jump_press and not acted:                                # Jump @2567 / @3445 needs local 14 false
         events.append(("press", jump(f, t, left, right)))
     for press, heavy in ((light_press, False), (heavy_press, True)):
         if press:
-            busy = f.power is not None or f.u55                 # a running power keeps the press buffered [H];
-            # #6313 @2763-2798: a move-locked fighter (local 15 false, here `_-u55`) does not reach `_-rU` [H: l17, l32]
             slot, gc = attack(f, t, keys, heavy)
+            # #6313 @2763-2798 / @2968-3003: the attack goes on only when local 15 is false (not locked, no `_-Xb`,
+            # `_-f6R` passed, no dodge this pass) or under the gravity cancel (local 32) [H: local 17]; a running
+            # power keeps the press buffered [H]
+            busy = f.power is not None or (l15 and not gc)
             name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
             rows = (f.moves or {}).get("powers")
             if name is not None and rows:
@@ -549,6 +559,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                     busy = True
                 if power is not None and not busy:              # [H] no chain / cancel into a running power
                     start_power(f, t, power)
+                    l15 = True                                  # #6313 @2932: local 15 set once `_-rU` ran
             events.append(("attack", slot, gc, name, not busy))
     f.g1a = g1a_next(f, t, keys)
     if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
@@ -617,7 +628,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     stun = t < f.stun_until
     f.ff = fast_fall(f.ff, t, f.g1a, f.r51, f.e6p, stun, f.ground is None, f.power is not None, f.p5s, f.h76,
                      f.i5a, drop_held, f.xb)                    # `_-8i` @4492-5053 [H: `_-t46`, `_-w3i`]
-    locked = move_locked(f)
+    locked = move_locked(f, t)
     cap = fall_cap(f.ff, drop_held, locked)                     # @5067-5170
     cancel = power_cancels_gravity(f, t)                        # `_-q1G` @5252
     if gravity_applies(f.e6p, f.ground, f.y1l, t, cancel, GRAVITY):
@@ -666,7 +677,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
 def g1a_next(f, t, keys):
     """`_-G1a()` for the harness fighter (`air_move.drop_held_flag`). [H] glue: `_-T5W` false, no `_-d38` / NT,
     `_-r5b` long past; `_-B5` is the last pick-up / throw tick of `play`."""
-    return drop_held_flag(f.g1a, t, keys, move_locked(f), f.e6p and f.o5c & 2, False, f.b5, f.h76,
+    return drop_held_flag(f.g1a, t, keys, move_locked(f, t), f.e6p and f.o5c & 2, False, f.b5, f.h76,
                           f.power is not None, f.dash_timer, f.i5a)
 
 
@@ -862,7 +873,7 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                         a = attacks.pop(0)
                         if e[4]:                                # refused while a power runs: retried [H]
                             done[a] = fresh[a]
-                if world is not None and "PickUpThrow" in fresh and f.moves and not move_locked(f) and f.power is None:
+                if world is not None and "PickUpThrow" in fresh and f.moves and not move_locked(f, t) and f.power is None:
                     f.b5 = t                                    # #6313 @2630 / @2711: `_-B5` = t with `_-LY`
                     if p["weapon"] is not None:                 # a throw (`_-M4Q`) [H: a tap, no hit]
                         world.throw(t, p["e"]["id"], p["weapon"], f, keys & DIR_MASK)
