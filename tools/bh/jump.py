@@ -49,6 +49,29 @@ def ground_jump(t, dash_timer, ground, xb, a4a, second_arg=False):
     return a4a - impulse, 0.0, None, dash
 
 
+DASH_JUMP_VX_CAP = 66.0     # Entity.Jump #3052 @704-786: a dash jump clamps `_-v1D` to +-66
+DASH_JUMP_FOLLOW_MS = 16    # `Entity._-d1u` #2993 @309-334: `_-no` and t >= `_-I1w` + 16
+DASH_JUMP_FOLLOW = 41.0     # ... then `_-P5S` = 0 and `_-A4A` = -41 (@338-372), `_-no` = false
+
+
+def dash_jump_marks(t, v1d):
+    """Entity.Jump @651-786 in the dash window: `_-no` = true, `_-I1w` = t, the impulse 170 (instead of 57 x k),
+    `_-v1D` clamped to +-66. Returns (no, i1w, v1d)."""
+    if v1d >= DASH_JUMP_VX_CAP:
+        v1d = DASH_JUMP_VX_CAP
+    elif v1d <= -DASH_JUMP_VX_CAP:
+        v1d = -DASH_JUMP_VX_CAP
+    return True, t, v1d
+
+
+def dash_jump_follow(t, no, i1w, p5s, a4a):
+    """`Entity._-d1u` @309-380: 16 ms after a dash jump the vertical speed is reset and a -41 impulse set.
+    Returns (no, p5s, a4a)."""
+    if no and t >= i1w + DASH_JUMP_FOLLOW_MS:
+        return False, 0.0, -DASH_JUMP_FOLLOW
+    return no, p5s, a4a
+
+
 def squat_gate(t, second_arg, third_arg, power, lock_start, dash, l3a):
     """@223-320: a press with neither the second nor the third argument, no running power `_-Kc._-o3I`, the
     jump lock over (`_-532` == 0 or t > `_-532` + 192) and (no dash window or `_-L3a` == 2) does not jump yet."""
@@ -173,6 +196,17 @@ ANCHORS = {ABC_1100: {
         (3052, 1234, "pushbyte", "0"),
         (3052, 1264, "ifnle", "56"),
         (3052, 1311, "getproperty", "_-13G"),
+        (3052, 643, "pushdouble", "57.0"),
+        (3052, 661, "initproperty", "_-no"),
+        (3052, 669, "initproperty", "_-I1w"),
+        (3052, 698, "pushdouble", "170.0"),
+        (3052, 721, "pushbyte", "66"),
+        (3052, 766, "pushbyte", "-66"),
+        (2993, 312, "getproperty", "_-no"),
+        (2993, 328, "pushbyte", "16"),
+        (2993, 350, "pushbyte", "0"),
+        (2993, 370, "pushdouble", "-41.0"),
+        (2993, 380, "initproperty", "_-no"),
         (3052, 1315, "pushdouble", "0.5"),
         (3052, 1319, "subtract", ""),
         (3052, 1391, "add", ""),
