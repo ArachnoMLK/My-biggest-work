@@ -69,5 +69,15 @@ class Jump(unittest.TestCase):
         self.assertEqual(squat_on_landing(3, 500, False), 500)
 
 
+
+class DashJump(unittest.TestCase):
+    def test_marks_and_follow(self):
+        from bh.jump import dash_jump_follow, dash_jump_marks
+        self.assertEqual(dash_jump_marks(100, 80.0), (True, 100, 66.0))
+        self.assertEqual(dash_jump_marks(100, -70.0), (True, 100, -66.0))
+        self.assertEqual(dash_jump_follow(115, True, 100, -60.0, 0.0), (True, -60.0, 0.0))
+        self.assertEqual(dash_jump_follow(116, True, 100, -60.0, 0.0), (False, 0.0, -41.0))
+
+
 if __name__ == "__main__":
     unittest.main()
