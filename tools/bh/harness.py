@@ -496,7 +496,9 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         ws = None
         if m.ground.sx == m.ground.ex:
             ws = WallState(t, f.wn, False, r51_before, f.g1t, f.y1l, f84q=GRAVITY, gravity=g_term)
-            r51 = wall_contact(grid, team, m.x, m.y, m.ground, f.p5s, f.v1d, ws)[4]
+            wc = wall_contact(grid, team, m.x, m.y, m.ground, f.p5s, f.v1d, ws)
+            r51 = wc[4]
+            f.g1t, f.y1l = wc[5], wc[6]                         # `_-G1T`, `_-y1L` (the wall hold) were dropped
             if r51 is not None:
                 f.r51 = r51
                 events.append(("wall", r51))
