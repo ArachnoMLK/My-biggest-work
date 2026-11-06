@@ -342,11 +342,13 @@ def fire_impulse(f, power, step):
     """`_-l4X._-a5A` #47, run by `_-R63` when a step fires: FireImpulseX (`_-84C`)[step] (entry 0 past the end)
     **sets** `_-v1D`, negated when `_-L0`; FireImpulseY (`_-ol`)[step] sets `_-P5S`, unless that y is > 0 under
     `_-I2g & 2` within `_-t2b` ticks of the start; each unless unset. [H] glue: no charge factor (`_-V3`), the
-    FireImpulseMaxX branch (@249-387) and the `_-I2g` gate not modelled, the cells read as plain int lists."""
+    FireImpulseMaxX branch (@249-387) and the `_-I2g` gate not modelled; the lists are power_data's per-step
+    expansion (`_-42F`: ranges '~', '!' unset)."""
+    steps = f.power.get("steps") if f.power is not None else None
     for col, attr in (("FireImpulseX", "v1d"), ("FireImpulseY", "p5s")):
-        vals = _int_list(power.get(col))
         if not power.get(col):
             continue
+        vals = (steps or {}).get(col) or _int_list(power.get(col))   # `_-84C` / `_-ol`: per step (`_-42F`)
         v = vals[step] if step < len(vals) else vals[0]
         if attr == "v1d" and f.power is not None:
             f.power["fx_set"] = v != UNSET                      # `_-759` (#47 @451-460)
