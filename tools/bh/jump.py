@@ -17,7 +17,8 @@ LANDING_DELAY_MS = 64      # #2984 @13505: a pending jump is pushed back by 64 m
 XB_GROUND, XB_WALL, XB_AIR = 1, 2, 3   # @444 / @475 / @490: the pending kind `_-Xb`
 TAIL_SLOWDOWN = 4          # @1143 / @1173: `_-M3V` and |vx| > 4 -> |vx| -= 4
 TAIL_BOOST_K = 0.5         # @1315: `_-84` += `_-13G` x 0.5
-BOOST_13G = 30.0           # `_-13G` = `Entity._-32g` (Entity.<init> #2887 @149; 30.0 in #15351 @30045)
+BOOST_13G = 30.0           # `_-13G` default (Entity.<init> #2887 @149; 30.0 in #15351 @30045); `Entity._-p1E`
+                           # #3049 @719-729 then copies the stance stat JumpXImpulse into it (stats.py)
 WALL_IMPULSE = 53.0        # `Entity._-S4O` (#15351 @30055), x k at @1623
 WALL_PUSH = 48.0           # @1629 (local 11): added to `_-84`, away from the wall
 WALL_AWAY_K = 0.9          # @1805 / @1893: the push is x 0.9 when the held side points away from it
@@ -281,5 +282,8 @@ ANCHORS = {ABC_1100: {
         (15351, 30058, "initproperty", "_-S4O"),
         (2887, 146, "getproperty", "_-32g"),
         (2887, 149, "initproperty", "_-13G"),
+        (3049, 725, "getproperty", "_-13G"),
+        (3049, 729, "initproperty", "_-13G"),
+        (3052, 1527, "getproperty", "_-13G"),
     ],
 }}
