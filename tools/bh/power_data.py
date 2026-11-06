@@ -121,8 +121,32 @@ COLUMNS = ("VariableImpulse", "FixedImpulse", "AoERadiusX", "AoERadiusY", "Cente
            "BaseDamage", "ImpulseOffsetX", "ImpulseOffsetY", "FixedStunTime")
 # FireImpulseX -> `_-84C`, FireImpulseY -> `_-ol` (#6483 @5244-5344: split ',', then `_-a3P(cells, '!',
 # '2147483647')`, i.e. "!" = unset), expanded per step by `_-42F` like the columns above (@12022-12068).
-FIRE_COLUMNS = ("FireImpulseX", "FireImpulseY")
+FIRE_COLUMNS = ("FireImpulseX", "FireImpulseY", "FireImpulseMaxX")   # FireImpulseMaxX -> `_-L3` (@5183-5234)
 UNSET = 2147483647
+
+
+def momentum(v1d, facing_left):
+    """`_-l4X.<init>` #39 @760-880: `_-qm` = min(|vx| / 60, 1) when the owner moves the way it faces
+    (`(vx < 0) == _-L0`), else 0."""
+    if (v1d < 0) != facing_left:
+        return 0.0
+    return min(abs(v1d) / 60.0, 1.0)
+
+
+def fire_x(base, max_v, l27, v2f, qm, charge=1.0):
+    """`_-l4X._-a5A` #47 @204-392: the FireImpulseX of a step before the facing sign. With `_-l27` (a
+    FireImpulseMaxX or ImpulseOffsetMaxX cell) and a FireImpulseMaxX list: without ImpulseMaxOnDCOnly (`_-V2F`)
+    base + (max - base) x `_-qm`, with it max once `_-qm` >= 1; then x the charge factor (1 + 0.5 x `_-a6i` /
+    `_-I6c` under `_-V3`, 1 otherwise). None (unset) stays None."""
+    if base is None or base == UNSET:
+        return None
+    v = base
+    if l27 and max_v is not None:
+        if not v2f:
+            v = (max_v - v) * qm + v
+        elif qm >= 1:
+            v = max_v
+    return v * charge
 
 
 def power_steps(row):
@@ -177,6 +201,27 @@ ANCHORS = {ABC_1100: {
         (6483, 12381, "callproperty", "_-42F, 6"),
         (6483, 12388, "initproperty", "_-D6M"),
         (6483, 12686, "callpropvoid", "_-v5o, 4"),
+    ],
+    "FireImpulseMaxX: _-l27 + _-L3 (_-A3R); _-qm = min(|vx| / 60, 1) toward the facing (#39); _-a5A lerp by _-qm, or max under _-V2F when _-qm >= 1": [
+        (6483, 5183, "pushstring", "'FireImpulseMaxX'"),
+        (6483, 5193, "initproperty", "_-l27"),
+        (6483, 6647, "pushstring", "'ImpulseMaxOnDCOnly'"),
+        (6483, 6664, "initproperty", "_-V2F"),
+        (6483, 6673, "pushstring", "'ImpulseOffsetMaxX'"),
+        (6483, 10791, "initproperty", "_-L3"),
+        (6483, 12086, "getproperty", "_-L3"),
+        (6483, 12094, "callpropvoid", "_-42F, 6"),
+        (39, 784, "lessthan", ""),
+        (39, 830, "callproperty", "abs, 1"),
+        (39, 853, "pushdouble", "60.0"),
+        (39, 868, "pushbyte", "1"),
+        (47, 74, "pushdouble", "0.5"),
+        (47, 221, "getproperty", "_-l27"),
+        (47, 237, "getproperty", "_-L3"),
+        (47, 335, "getproperty", "_-V2F"),
+        (47, 352, "getproperty", "_-qm"),
+        (47, 376, "pushbyte", "1"),
+        (47, 390, "multiply", ""),
     ],
     "_-A3R FireImpulseX / Y: split ',', '!' -> '2147483647' (_-a3P), then _-42F per step into _-84C / _-ol": [
         (6483, 5244, "pushstring", "'FireImpulseX'"),

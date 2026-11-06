@@ -55,5 +55,15 @@ class FireImpulse(unittest.TestCase):
         self.assertIsNone(s["q24"])
 
 
+    def test_momentum_and_max(self):
+        from bh.power_data import fire_x, momentum, UNSET
+        self.assertEqual((momentum(30.0, False), momentum(90.0, False), momentum(30.0, True), momentum(-30.0, True)),
+                         (0.5, 1.0, 0.0, 0.5))
+        self.assertEqual(fire_x(10, 30, True, False, 0.5), 20)
+        self.assertEqual(fire_x(10, 30, True, True, 0.5), 10)
+        self.assertEqual(fire_x(10, 30, True, True, 1.0), 30)
+        self.assertEqual(fire_x(10, None, True, False, 0.5), 10)
+        self.assertIsNone(fire_x(UNSET, 30, True, False, 0.5))
+
 if __name__ == "__main__":
     unittest.main()
