@@ -7,19 +7,18 @@ items.py (`_-p5k._-8i`: velocity, map sweep, impact), the pick-up chain (entity_
 else `mBaseWeapon2`, and `_-56C` += 1. `_-56C` starts at R % 2 (`_-F5N.<init>`, match_start.r_at_match_start).
 
 The glue is [H]: the settings -> rates mapping skips `_-L5u`; I is seeded like R (`seed_from_header`, both come
-from `_-h3U._-669`); the `_-56C` draws are taken in replay entity order; the 150 x 150 box is centred on the
-fighter point and the nearest item wins (the score of `_-N5R` is not transcribed); a press while armed throws the
+from `_-h3U._-669`); the `_-56C` draws are taken in replay entity order; the item choice is pickup.choose
+(`_-N5R`) with a2 true, the fighter point = the harness (x, y) and the item centre = its (x, y); a press while armed throws the
 weapon away (no thrown item is simulated); a KO loses the weapon (the respawned fighter starts unarmed); held
 weapons count for the weapon lane; `_-a3s()` is false for every item; items move in phase 4 after the spawns.
 """
 import csv
 import io
 
-from . import items
+from . import items, pickup
 from .item_spawns import ItemManager, parse_level_spawns
 from .prng import Well512, seed_from_header
 
-PICK_UP_HALF = 75.0           # 150 x 150 (`_-N5R` #1733 @186-188), centred [H]
 UNARMED = "Unarmed"
 
 
@@ -37,7 +36,8 @@ def item_types(csv_text):
         it = items.item_type(cells)
         flag = lambda c: (cells.get(c) or "").strip().lower() == "true"
         it.update(id=int(cells.get("ItemID") or 0), name=name, E2E=flag("WeaponCrate"), F4E=flag("TestFeature"),
-                  B24=flag("RemoveDuringSuddenDeath"))
+                  B24=flag("RemoveDuringSuddenDeath"), r5R=flag("Spawnable"),
+                  p5R=flag("DisablePickup") or name == "ThrowBow", w2s=float(cells.get("Width") or 0))
         out[name] = it
     return out
 
@@ -81,20 +81,14 @@ class World:
             i["ground"] = ground
             i["rest"] = ground is not None and i["lu"] == 0 and i["vy"] == 0
 
-    def pick_up(self, x, y):
-        """The nearest live item in the 150 x 150 box around (x, y), removed from the map, or None."""
-        best = None
-        for i in self.live:
-            dx, dy = i["x"] - x, i["y"] - y
-            if abs(dx) <= PICK_UP_HALF and abs(dy) <= PICK_UP_HALF:
-                d = dx * dx + dy * dy
-                if best is None or d < best[0]:
-                    best = (d, i)
+    def pick_up(self, t, me, x, y, hero):
+        """`_-N5R` (pickup.choose, a2 true: no QuickAttack [H]) over the live items; the chosen one leaves the map."""
+        best = pickup.choose(self.live, t, me, x, y, hero or {})
         if best is None:
             return None
-        self.live.remove(best[1])
+        self.live.remove(best)
         self.picked += 1
-        return best[1]["type"]
+        return best["type"]
 
     def crate_weapon(self, k, hero):
         """`_-u30` @440-512: the base weapon a crate gives fighter k (`_-56C` parity), and `_-56C` += 1."""

@@ -11,9 +11,9 @@ from bh.item_spawns import RATE_DEFAULTS  # noqa: E402
 from bh.smoke import map_grid  # noqa: E402
 
 CSV = ("itemTypes\n"
-       "ItemName,ItemID,Weapon,WeaponCrate,TestFeature,RemoveDuringSuddenDeath,Height\n"
-       "Crate,3,TRUE,TRUE,FALSE,FALSE,40\n"
-       "Bomb,4,FALSE,FALSE,FALSE,FALSE,20\n")
+       "ItemName,ItemID,Weapon,WeaponCrate,TestFeature,RemoveDuringSuddenDeath,Height,Width,Spawnable\n"
+       "Crate,3,TRUE,TRUE,FALSE,FALSE,40,40,TRUE\n"
+       "Bomb,4,FALSE,FALSE,FALSE,FALSE,20,20,TRUE\n")
 LEVEL = '<L><ItemInitSpawn X="0" Y="-200"/><ItemSpawn X="-50" Y="-300" W="100"/></L>'
 FLOOR = ('<L><HardCollision X1="-500" Y1="0" X2="500" Y2="0"/><HardCollision X1="500" Y1="0" X2="500" Y2="100"/>'
          '<HardCollision X1="500" Y1="100" X2="-500" Y2="100"/><HardCollision X1="-500" Y1="100" X2="-500" Y2="0"/></L>')
@@ -42,8 +42,8 @@ class ItemWorld(unittest.TestCase):
         for k in range(200):
             w.tick(132 + 16 * k, 16, [None, None])
         self.assertLessEqual(abs(w.live[0]["y"]), 1.5)   # rests on the floor (y = 0, 1.01 back-off)
-        self.assertIsNone(w.pick_up(300, 0))
-        self.assertEqual(w.pick_up(40, -10)["name"], "Crate")
+        self.assertIsNone(w.pick_up(0, 1, 300, 0, {}))
+        self.assertEqual(w.pick_up(0, 1, 40, -10, {})["name"], "Crate")
         self.assertEqual(w.live, [])
 
     def test_crate_weapon_parity(self):

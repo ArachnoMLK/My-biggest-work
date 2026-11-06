@@ -681,7 +681,7 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                         done["PickUpThrow"] = fresh["PickUpThrow"]
                         p.setdefault("items", []).append((t, "throw"))
                     else:                                       # `_-LY` -> `_-N5R` -> `_-u30` -> `_-s1u`
-                        it = world.pick_up(f.x, f.y)
+                        it = world.pick_up(t, p["e"]["id"], f.x, f.y, f.moves["hero"])
                         if it is not None:
                             name = world.crate_weapon(k_of[id(p["e"])], f.moves["hero"]) if it.get("E2E") else it["name"]
                             slots = (weapon_slots or {}).get(name)
