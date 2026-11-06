@@ -1137,6 +1137,18 @@ ItemSpawn rects (84 more inside 28 DynamicItemSpawn blocks), 103 ItemInitSpawn, 
 drop draws I only for its position. [H] left: `_-s3D._-8W()` = player count, `_-a3s()`, the name -> ItemType
 resolution of the lists (`_-w2j._-L3T`), and what the crate becomes when picked up.
 
+### 10.5 Which item a pick-up takes: `_-F5N._-N5R` #1733 ([`tools/bh/pickup.py`](../tools/bh/pickup.py))
+
+| Step | Bytecode | Status |
+|---|---|---|
+| `_-LY(t, a2)`: `_-I2Q` = t when a2 and `_-I2Q` + 240 < t; refused when `IsMoveLocked` or a power runs; `_-N5R(t, a2, a2 && _-I2Q + 240 > t)` | #1701 @25-118 | [V]; [H] a2 = no QuickAttack press |
+| Candidates `_-E1V._-91X(t, owner, x, y, 150, 150, 2, out)`: item boxes (centre `_-S1I` / `_-f66`, half Width / Height, + 100 in item state 3) overlapping x ± 150, y ± 150 around the fighter point, not taken, `_-86Q(t)` (states 0-2 / 4: not DisablePickup / ThrowBow; state 3: a crate, or `_-b37` + `_-E4u` <= t; states 5-9 never). So the box is 300 x 300, not 150 x 150 | #4914 @40-530, #15243 | [V] `pickup.candidates`, `in_box`, `pickable` |
+| Skips: claimed by another fighter (`_-b4Y`), `_-25z` refuses, state 3 without `_-u4s`, a thrown item (state 1) under a3, a Weapon that is not Spawnable and not one of the legend's base weapons, `_-M5k` owner bit, dropped by this fighter < 64 ms ago | #1733 @629-919 | [V] `pickup.choose`; [H] `_-25z`, `_-u4s` taken as true |
+| Priority: thrown 2, state 3 4, own claimed weapon 5, else `_-G35` (Brawlball 1, WaterBomb 3, BouncyBomb 7, CTF flags 1, OddBall 1, WeaponCrate 6, others 8); >= 6 is skipped when (without a2) an opponent is in the 150 x 150 box ahead (offset 150 x (0.4, + 0.7 with `_-81n()`, else + 0.6 with input bit 2), mirrored when `_-141()`) | #1733 @234-507, @923-1035; #4974 @3610-3790 | [V] `type_priority`, `choose` |
+| Lowest priority wins, then the smaller squared distance `Entity._-u` (fighter point to item centre), the first one on ties | #1733 @1043-1145, #3126 | [V] |
+
+So the "direction weights" of §10 belong to the opponent check, not to the item score (correction).
+
 ## 11. Still open
 
 - Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
