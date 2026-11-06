@@ -375,5 +375,21 @@ class PowerCooldown(unittest.TestCase):
         self.assertTrue(harness.cooldown_allows(f, 1160, rows["A"]))
 
 
+class ChargeRelease(unittest.TestCase):
+    def test_smash_releases_into_its_combo(self):
+        rows = {"S": {"PowerName": "S", "PowerID": "21", "TargetMethod": "Smash", "CastTime": "0,81",
+                      "FixedMinChargeTime": "3", "ComboName": "SC"},
+                "SC": {"PowerName": "SC", "PowerID": "22", "TargetMethod": "SmashRelease", "CastTime": "2"}}
+        f, grid = harness.Fighter(0.0, 0.0), smoke.map_grid(FLAT)
+        f.moves = {"hero": {}, "powers": rows}
+        harness.start_power(f, 1600, rows["S"])
+        evs = []
+        for k in range(1, 8):
+            evs += harness.tick(f, 1600 + 16 * k, grid, keys=64 if k < 2 else 0)
+        rel = [e for e in evs if e[0] == "release"]
+        self.assertEqual(rel[0][2], 4)                     # released early, ends once past 3 ticks
+        self.assertIn(("combo", "SC"), evs)
+
+
 if __name__ == "__main__":
     unittest.main()

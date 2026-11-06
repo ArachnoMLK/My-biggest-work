@@ -45,7 +45,7 @@ from .horizontal import (acceleration, apply_acceleration, apply_friction, frict
 from .input_buffer import attack_slot, buffered_presses, state_at
 from .power_data import recover_times, fire_x, momentum, power_steps
 from .power_pick import Cooldowns, cooldown_ms as power_cooldown_ms, origin_row, power_name, redirect
-from .power_timeline import END_REASONS, Timeline, ends_now, tick_index
+from .power_timeline import charge_released, min_charge, smash_release, END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
 from .jump import (BOOST_13G, dash_jump_follow, dash_jump_marks, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
@@ -477,6 +477,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     if keys & 2 and not f.prev_keys & 2:                        # #6313 @3966-4007: `_-76H` = t on a fresh Drop
         f.h76 = t
     drop_held = bool(keys & 2)
+    raw_keys = keys
     f.prev_keys = keys
     if t < f.stun_until:                                        # `_-5q()`: no input acts in hitstun [H]
         left = right = jump_press = dodge_press = light_press = heavy_press = False
@@ -497,6 +498,19 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         if ends_now(reason, tick_index(t) - f.power.get("start", tick_index(t)), mct):
             events.append(("end", f.power["name"], END_REASONS[reason]))
             power_ended(f, t)
+    if f.power is not None and f.power.get("g4i") == 8:         # a charged power (Smash, `_-e4g`)
+        if charge_released(raw_keys, _true(f.power.get("row", {}).get("IsThrow"))):   # #6313 @3821-3913
+            f.power["released"] = True                          # `_-43C`
+        l5m, _ = min_charge(f.power.get("row", {}).get("FixedMinChargeTime"))
+        ch = smash_release(tick_index(t), f.power["start"], l5m, f.power["tl"].running, f.power.get("released"))
+        if ch is not None:                                      # `_-G5P` #82: the charge ends, then the combo
+            events.append(("release", f.power["name"], ch))
+            nxt = combo_next(f.power)
+            power_ended(f, t)
+            rows = (f.moves or {}).get("powers") or {}
+            if nxt and rows.get(nxt) is not None and start_power(f, t, rows[nxt]):
+                f.power["charge"] = ch                          # `_-a6i` [H: not used by the combo yet]
+                events.append(("combo", nxt))
     if f.power is not None:                                     # `_-Kc._-25` before `_-8i` (state 0)
         step = f.power["tl"].update(tick_index(t))
         if step is not None:

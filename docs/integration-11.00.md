@@ -412,3 +412,11 @@ cooldown (#30 `power_pick.Cooldowns`, 2301 anchors). On replay 186 this is what 
 light ends in BaseSideMiss, whose end arms BaseSide's cooldown, so the light pressed at 10.304 s is refused and
 the side heavy pressed at 10.336 s starts (charge visible at ~10.37 s). Aggregate unchanged (life 10.7 s).
 Next gap seen: charged powers (heavies) have no release in the harness (the charge-up runs its full CastTime).
+**Charged powers (6 Nov).** [V] 493 powers are charge-ups (TargetMethod Smash, `_-e4g`); the harness never released
+them, so every heavy ran its whole charge (81 ticks for the unarmed side heavy) and never hit. #6313 @3821-3913
+flags the release (`_-e3f` → `_-64U` → `_-43C`) once HeavyAttack (64; 64|512|128 for IsThrow) is not held;
+`_-R63` @255-347 calls `_-G5P` #82 once FixedMinChargeTime (`_-l5m`) ticks have passed, which ends the charge
+(`_-a6i` = charge ticks) and the ComboName release power starts (#30 `power_timeline.smash_release`, 2326 anchors).
+Replay 186: MAM's side heavy is released at 10.528 s and its hit step fires at 10.640 s (clip: the 18-damage hit at
+~10.69 s). Aggregate: life 10.6 s (248 early / 2 within 1 s / 1 exact / 1 late / 1 late within 1 s / 1 none).
+Not modelled yet: the charge factor of the release (`_-a6i` / `_-I6c` on damage, impulse and `_-Q1n`).
