@@ -34,7 +34,7 @@ from .air_move import WallState, air_move, gravity_applies, ground_reset, ground
 from .dodge import (LEFT as LEFT_BIT, RIGHT as RIGHT_BIT, DROP as DROP_BIT, dash, dash_start, dash_update, attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
                     gates, is_dodge_locked, k64, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x,
                     speed_y, standard_flag, timers)
-from .hitdetect import (area_center, capsules_touch, frame_window, hit_capsule, hurtbox_capsule, row_values,
+from .hitdetect import (area_center, capsules_touch, deals_damage, frame_window, hit_capsule, hurtbox_capsule, row_values,
                         target_method)
 from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_decay, knockback_force
 from .horizontal import (acceleration, apply_acceleration, apply_friction, friction_value, max_speed,
@@ -800,6 +800,10 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 if f is None or f.power is None or f.power.get("fired") is None:
                     continue
                 step, f.power["fired"] = f.power["fired"], None
+                st = f.power["steps"]                           # `_-R63` #46 @2286-2325: test only when `_-T49()`
+                if not (deals_damage(0, 0, st.get("BaseDamage"), step, st.get("D6M", 0))   # (`hitdetect.deals_damage`)
+                        or _true(f.power.get("row", {}).get("AllowHitOnZeroDamage"))):     # or `_-B40` [H: `_-538`,
+                    continue                                    # `_-w4x` 0, `_-I4F` false]
                 for q in players:
                     v = q["f"]
                     if q is p or v is None or q["e"]["id"] in f.power["hit"]:
