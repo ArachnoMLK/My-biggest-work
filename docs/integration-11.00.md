@@ -439,3 +439,10 @@ turned into a 0.3 s FastSide glide off the stage). Aggregate: life 9.9 s (247 ea
 Seen next on replay 186 (clip vs harness, relative to the stage edge): from 7.5 to 8.5 s the harness MAM moves
 ~650 units right (air max speed with Right held after BaseAirSideMiss), the clip ~50-100; and it rises ~490
 units, the clip ~330. Open.
+**The jump guard `_-H5F` (6 Nov).** [V] `Entity.Jump` returns at once when `_-H5F(t, third)` #3065 holds (@36-59):
+states other than 0 / 5; IsMoveLocked (or `_-u4F`, `_-Xb`, `_-cr`, `_-C54`) unless the third argument (the squat
+release `_-A2X` passes it after `_-I5A` = 0); `_-f6R` > t; airborne with no air jump left and no wall; within 176 ms
+(`_-Y35`) of `_-I5A`; within 256 ms (`_-R6Q`) of both `_-I5A` and `_-46I`. The harness had no guard, so a jump
+pressed during an attack's recovery fired at once. Replay 186: MAM's jump press at 7.568 s (inside BaseSideMiss)
+is now refused, the press at 7.712 s jumps, and MAM lands at 8.688 s — the clip shows the landing at ~8.67 s.
+Aggregate: life 10.6 s (247 early / 1 within 1 s / 6 late). [H] `_-u4F`, `_-cr`, `_-C54` false.

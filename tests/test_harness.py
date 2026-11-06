@@ -40,10 +40,10 @@ class Harness(unittest.TestCase):
         self.assertAlmostEqual(f.y, 500.0 - 1.01)
 
     def test_air_jumps_counted(self):
-        presses = {80, 100, 110, 120}
+        presses = {80, 100, 113, 126, 140}                           # 113: within `_-Y35` (176 ms) of the jump at 102
         f, tr = landed(lambda i: (False, False, i in presses), 300)
         kinds = [e[1] for _, e in f.events if e[0] in ("press", "release")]
-        self.assertEqual(kinds, ["squat", "ground", "squat", "air", "squat", "air", "squat", None])
+        self.assertEqual(kinds, ["squat", "ground", "squat", "air", None, "squat", "air", None])   # `_-H5F`
         self.assertEqual(f.air_used, 0)                                 # reset on landing [H]
 
     def test_walk_right(self):

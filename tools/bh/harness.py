@@ -135,8 +135,31 @@ def _vmax(f):
     return max_speed(f.stats["RunSpeed"], f.stats["AirRunSpeed"], f.ground is None, w47=f.w47)
 
 
+JUMP_RELOCK_MS = 176       # `Entity._-Y35` (script157.<init> #3173 @829)
+JUMP_HIT_LOCK_MS = 256     # `Entity._-R6Q` (#3173 @819)
+
+
+def jump_blocked(f, t, third_arg=False):
+    """`Entity._-H5F(t, third_arg)` #3065, the guard at the top of `Entity.Jump` (@36-59): true in states other
+    than 0 / 5; with (IsMoveLocked, `_-u4F()`, `_-Xb` != 0, `_-Kc._-cr` or `_-C54(t)`) unless third_arg; while
+    `_-f6R` > t; airborne with no air jump left (`_-P5Y()` >= `_-56T()`) and no wall (`_-r51` == 0); while t <=
+    `_-I5A` + 176; while t <= `_-I5A` + 256 and t <= `_-46I` + 256. [H] glue: `_-u4F`, `_-cr`, `_-C54` false."""
+    if (move_locked(f, t) or f.xb != 0) and not third_arg:
+        return True
+    if f.f6r > t:
+        return True
+    if f.ground is None and f.air_used >= f.air_allowed and f.r51 == 0:
+        return True
+    if t <= f.i5a + JUMP_RELOCK_MS:
+        return True
+    return t <= f.i5a + JUMP_HIT_LOCK_MS and t <= f.i46 + JUMP_HIT_LOCK_MS
+
+
 def jump(f, t, left, right, third_arg=False):
-    """`Entity.Jump(t, false, third_arg)` without a power. Returns the branch taken."""
+    """`Entity.Jump(t, false, third_arg)`: the `_-H5F` guard (`jump_blocked`), then the branches. Returns the
+    branch taken, or None."""
+    if jump_blocked(f, t, third_arg):
+        return None
     dash = dash_window(t, f.dash_timer, f.ground, f.xb)
     if squat_gate(t, False, third_arg, None, f.lock_start, dash, 0):
         f.xb, f.i5a = squat_start(t, f.ground, f.r51)
