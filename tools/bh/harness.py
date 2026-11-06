@@ -438,13 +438,16 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
     vmax = _vmax(f)
     if t < f.stun_until and f.v1d * f.v1d + f.p5s * f.p5s >= 2500.0:   # @713-760: `_-V12` instead of friction
         f.v1d, f.p5s, f.j1m, f.d4x = knockback_decay(f.v1d, f.p5s, f.j1m, f.d4x, f.stats.get("Recovery", 4.0))
-    elif not f.e6p:                                             # friction only when !`_-E6P()` [H: local 8]
+    elif not f.e6p or (f.dodge is not None and not moves(f.dodge.get("kind", 0), f.dodge.get("where", 0))):
+        # @764-798: friction when !`_-E6P()` or `_-H6t()` #3063 (dodging with a Neutral ground-only type)
+        spot = f.e6p
         pw = None
         if f.power is not None:                                 # [H] `_-o3I._-7E` false
             keep = str(f.power.get("row", {}).get("KeepGroundFriction", "")).upper() == "TRUE"
             pw = {"7E": False, "y25": keep}
         fr = friction_value(t, airborne, f.stats["Friction"], f.stats["AirFriction"], f.dash_timer, power=pw,
-                            hitstun=t < f.stun_until, vx=f.v1d)
+                            hitstun=t < f.stun_until, surface=(keys & (MOVE_LEFT | MOVE_RIGHT)) if spot else None,
+                            vx=f.v1d)                           # @1059-1238: 9 / 3.25 by the held side (`_-66U`)
         f.v1d = apply_friction(f.v1d, fr)
     j4z = f.power is not None and f.power.get("fx_set") and not f.power["tl"].running   # `_-Kc._-J4Z` (#1745 @231-266)
     if left != right and not j4z:                               # @2054-2066: no acceleration under `_-J4Z`
