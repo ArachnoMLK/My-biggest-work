@@ -168,7 +168,7 @@ def jump(f, t, left, right, third_arg=False):
 
 def dodge(f, t, dir, rows):
     """`Entity.Dodge(t, dir)` (dodge.py) on the harness fighter: `gates`, `pick`, then the commit writes. Returns
-    the DodgeName or None. [H] glue: no power, no move lock, no area / `_-C54` lock, `_-x2C` = 0, no chase dodge
+    the DodgeName or None. [H] glue: no area / `_-C54` lock, `_-x2C` = 0, no chase dodge
     (`_-26R` false), no dash (`Dash` false: a refused ground side dodge does nothing), `_-VE` = 0, `_-M3h` false,
     the power multipliers `_-Kc._-u5j` / `_-04K` = 1, Set "Default", the `_-6K` counter not kept."""
     airborne = f.ground is None
@@ -187,7 +187,7 @@ def dodge(f, t, dir, rows):
             return "dash"
 
     def locked(flag):
-        return is_dodge_locked(move_locked(f, t), f.u5e, flag, f.e6p, False, f.r51, False, f.xb, False, 0)
+        return is_dodge_locked(move_locked(f, t), f.u5e, flag, f.e6p, f.power is not None, f.r51, False, f.xb, False, 0)
 
     g = gates(t, dir, c, f.i46, airborne, locked(False), locked(c), f.h2b, f.w14, f.y1f, False, f.o5c, False,
               False, not airborne, 0, f.lock_start, f.facing_left, None)

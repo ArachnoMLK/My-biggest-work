@@ -433,3 +433,9 @@ starting the heavy (the clip shows the heavy: open, likely an earlier state diff
 update before the inputs; now inputs → power update → physics, so a press seen on the tick a power ends waits one
 tick, and a power started by a press gets its first update on the same tick. Aggregate: life 10.0 s (247 early /
 2 within 1 s / 4 late / 1 late within 1 s).
+**Dodge during a power (6 Nov).** [V] `IsDodgeLocked` #3075 is true while a power runs (`_-Kc._-o3I`); the
+harness passed false there, so a fighter could air-dodge in the middle of an attack (replay 186: MAM's up heavy
+turned into a 0.3 s FastSide glide off the stage). Aggregate: life 9.9 s (247 early / 2 within 1 s / 5 late).
+Seen next on replay 186 (clip vs harness, relative to the stage edge): from 7.5 to 8.5 s the harness MAM moves
+~650 units right (air max speed with Right held after BaseAirSideMiss), the clip ~50-100; and it rises ~490
+units, the clip ~330. Open.
