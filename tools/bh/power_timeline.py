@@ -111,7 +111,68 @@ def schedule(cast_times, start_tick, ticks):
     return out
 
 
+# --- charged powers (TargetMethod Smash, `_-e4g` = `_-g4i` == 8, #6483 @13186-13197) ---
+HEAVY = 64                  # the HeavyAttack bit held during a charge (#6313 @3888-3908)
+THROW_HOLD = 64 | 512 | 128  # held bits for a charge with `_-X6L` (IsThrow) (#6313 @3850-3879)
+
+
+def min_charge(cell):
+    """FixedMinChargeTime as #6483 @5420-5520 reads it: split ','; part 0 -> `_-l5m` (Std.parseInt), part 1 (when
+    present) -> `_-5e`. Returns (`_-l5m`, `_-5e`), None -> 0."""
+    from .power_data import parse_int
+    parts = (cell or "").split(",") if cell else []
+    l5m = (parse_int(parts[0]) or 0) if parts else 0
+    e5 = (parse_int(parts[1]) or 0) if len(parts) > 1 else 0
+    return l5m, e5
+
+
+def charge_released(keys, is_throw=False):
+    """#6313 @3821-3913: with a running charged power (`_-e4g`), `_-F5N._-e3f()` -> `_-l4X._-64U` sets `_-43C`
+    when the heavy key (64) is no longer held; for an IsThrow power (`_-X6L`) when none of 64 | 512 | 128 is."""
+    return not keys & (THROW_HOLD if is_throw else HEAVY)
+
+
+def smash_release(tick, k4b, l5m, running, released, forced=False):
+    """`_-R63` @255-347 then `_-l4X._-G5P` #82 for a charged power: called when the step is not running (`_-d38`
+    false) and tick - `_-k4b` > `_-l5m`; with `_-43C` (released) the charge ends now: `_-p2G`, `_-d38`, `_-E5S` =
+    tick + FixedRecoverTime + floor(RecoverTime x `_-01d`), `_-m2j` (end) and `_-a6i` = tick - `_-k4b` (the charge
+    ticks, at least 0). Returns the charge ticks when it ends, else None. [H] `forced` stands for the `_-I2g & 2`
+    branch (release forced after `_-l5m` + 10 ticks); the `_-eN` / `_-C69` terms are left out."""
+    if running or tick - k4b <= l5m:
+        return None
+    if not released and not (forced and tick > k4b + l5m + 10):
+        return None
+    return max(tick - k4b, 0)
+
+
 ANCHORS = {ABC_1100: {
+    "charge: #6313 releases a Smash (_-e4g) when 64 (or 64|512|128 with _-X6L) is not held -> _-e3f -> _-64U sets _-43C; _-R63 calls _-G5P after _-l5m; _-G5P ends it, _-a6i = ticks": [
+        (6313, 3833, "getproperty", "_-e4g"),
+        (6313, 3842, "getproperty", "_-X6L"),
+        (6313, 3858, "pushbyte", "64"),
+        (6313, 3861, "pushint", "512"),
+        (6313, 3866, "pushint", "128"),
+        (6313, 3879, "callpropvoid", "_-e3f, 0"),
+        (6313, 3896, "pushbyte", "64"),
+        (6313, 3908, "callpropvoid", "_-e3f, 0"),
+        (1713, 26, "callpropvoid", "_-64U, 0"),
+        (64, 6, "initproperty", "_-43C"),
+        (46, 249, "getproperty", "_-l5m"),
+        (46, 278, "greaterthan", ""),
+        (46, 347, "callpropvoid", "_-G5P, 1"),
+        (82, 11, "getproperty", "_-e4g"),
+        (82, 22, "getproperty", "_-43C"),
+        (82, 247, "pushbyte", "10"),
+        (82, 272, "initproperty", "_-d38"),
+        (82, 323, "initproperty", "_-E5S"),
+        (82, 347, "callpropvoid", "_-m2j, 1"),
+        (82, 384, "initproperty", "_-a6i"),
+        (6483, 5422, "pushstring", "'FixedMinChargeTime'"),
+        (6483, 5493, "initproperty", "_-5e"),
+        (6483, 5520, "initproperty", "_-l5m"),
+        (6483, 13193, "pushbyte", "8"),
+        (6483, 13197, "initproperty", "_-e4g"),
+    ],
     "_-R63 step timeline: tick = round((t - t % 16) / 16); fire when !_-d38 and tick >= _-82O; then _-X2G += 1, _-82O += max(CastTime[_-X2G], 1)": [
         (46, 189, "pushbyte", "16"),
         (46, 191, "modulo", ""),
