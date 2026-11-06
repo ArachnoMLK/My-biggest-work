@@ -126,7 +126,112 @@ def redirect(power, lookup, test_set=False, exhausted=False, gc=False, b3a=0, vx
     return power
 
 
+# --- per-power cooldowns: `_-F5N._-BC` #1747 (armed at a power's end), `_-S4J` #1748 (two slots), `_-O5u` #1744 ---
+SIG_FLAGS = 512 | 64        # `PowerType._-I45` bits of a legend signature (`PowerType._-z24` #6491 @147-168)
+SIG_LOCK_MS = 160           # #1747 @172-180: `_-y3G` = t + 160 after a signature
+
+
+def _int_cell(row, col, default=0):
+    v = (row or {}).get(col)
+    if v in (None, ""):
+        return default
+    try:
+        return int(float(v))
+    except ValueError:
+        return default
+
+
+def origin_row(row, rows):
+    """`PowerType._-N` (`_-H1V()` #6469) as `PowerType._-W6P` #6495 sets it: the OriginPower row (`_-c5M`), or the
+    row itself without one, with 'VARIABLE' (then `_-a37`; `_-F5N._-H1V` #1723 picks `_-66R[_-e28]` [H: not
+    modelled]) or with an unknown name."""
+    name = (row or {}).get("OriginPower") or ""
+    if not name or name == "VARIABLE":
+        return row
+    return rows.get(name) or row
+
+
+def cooldown_ms(row, origin, on_hit):
+    """`_-F5N._-BC(t, power, on_hit, secondary)` #1747: the cooldown armed when a power ends, in ms. The power's
+    OnHitCooldownTime (`_-eQ`) after a hit, else CooldownTime (`_-46C`); when that is 0, the origin's; x 16
+    (@186-195). An empty OnHitCooldownTime is CooldownTime (`_-eQ` == -1 -> `_-46C`, #6483 @10924-10945)."""
+    def cd(r):
+        base = _int_cell(r, "CooldownTime")
+        return _int_cell(r, "OnHitCooldownTime", base) if on_hit else base
+    v = cd(row)
+    if v == 0 and cd(origin) != 0:
+        v = cd(origin)
+    return v * 16
+
+
+class Cooldowns:
+    """The two cooldown slots of `_-F5N`: (`_-b24`, `_-S32`) and (`mPowerIdOnCooldown2`,
+    `mCurrCooldownTimestamp2`). Ids are the origin's PowerID (`_-H4O`)."""
+
+    def __init__(self):
+        self.id1, self.until1 = None, 0
+        self.id2, self.until2 = None, 0
+        self.y3g = 0                                     # `_-y3G`: signature lock
+
+    def arm(self, t, power_id, ms, sig=False, secondary=False):
+        """`_-BC` tail and `_-S4J(t, origin, ms)` #1748: slot 1 when the id is already there or slot 1 has run
+        out, else slot 2; a signature (flags 512|64) of a non-secondary power also sets `_-y3G` = t + 160."""
+        if ms == 0:
+            return
+        if sig and not secondary:
+            self.y3g = t + SIG_LOCK_MS
+        if power_id == self.id1 or t >= self.until1:
+            self.until1, self.id1 = t + ms, power_id
+        else:
+            self.until2, self.id2 = t + ms, power_id
+
+    def allows(self, t, power_id, sig=False):
+        """`_-O5u(power, t)` #1744 @197-320: false for a signature while t < `_-y3G`, or while the power's id is
+        on cooldown in either slot. [H] the start of #1744 (a running power with `_-82f`, the origin swap by
+        `_-M1g` / `_-E2S` / `_-w3H` names) is left to the caller."""
+        if sig and t < self.y3g:
+            return False
+        if power_id == self.id1 and t < self.until1:
+            return False
+        if power_id == self.id2 and t < self.until2:
+            return False
+        return True
+
+
 ANCHORS = {ABC_1100: {
+    "cooldowns: _-h1T arms _-BC at a power's end; _-BC on-hit _-eQ else _-46C, origin's when 0, x 16, _-y3G = t + 160 for sigs; _-S4J two slots; _-O5u refuses": [
+        (1742, 227, "callproperty", "_-R63, 1"),
+        (1742, 482, "getproperty", "_-OD"),
+        (1742, 741, "callpropvoid", "_-BC, 4"),
+        (1747, 25, "callproperty", "_-H1V, 1"),
+        (1747, 43, "getproperty", "_-eQ"),
+        (1747, 51, "getproperty", "_-46C"),
+        (1747, 176, "pushuint", "160"),
+        (1747, 180, "initproperty", "_-y3G"),
+        (1747, 191, "pushbyte", "16"),
+        (1747, 195, "callpropvoid", "_-S4J, 3"),
+        (1748, 11, "getproperty", "_-b24"),
+        (1748, 41, "initproperty", "_-S32"),
+        (1748, 67, "initproperty", "mCurrCooldownTimestamp2"),
+        (1748, 77, "initproperty", "mPowerIdOnCooldown2"),
+        (1744, 251, "getproperty", "_-H4O"),
+        (1744, 278, "getproperty", "_-S32"),
+        (1744, 308, "getproperty", "mCurrCooldownTimestamp2"),
+        (1744, 239, "getproperty", "_-y3G"),
+        (6469, 6, "getproperty", "_-N"),
+        (6495, 25, "pushstring", "'VARIABLE'"),
+        (6495, 62, "initproperty", "_-N"),
+        (6483, 4177, "pushstring", "'CooldownTime'"),
+        (6483, 4194, "initproperty", "_-46C"),
+        (6483, 7781, "pushstring", "'OnHitCooldownTime'"),
+        (6483, 7799, "initproperty", "_-eQ"),
+        (6483, 7955, "pushstring", "'OriginPower'"),
+        (6483, 7976, "initproperty", "_-c5M"),
+        (6483, 8244, "pushstring", "'PowerID'"),
+        (6483, 8262, "initproperty", "_-H4O"),
+        (6483, 10929, "pushbyte", "-1"),
+        (6483, 10945, "initproperty", "_-eQ"),
+    ],
     "_-F5N._-42t slot -> power: emote slots 13-20; slot 11 mSpecialPower1 / 2 by mBaseWeapon; ZOMBIE slot 8; _-Z6M[slot]; 7 / 8 _Forward / _Down": [
         (1700, 46, "getlocal_3", ""),
         (1700, 52, "getlocal", "6"),
