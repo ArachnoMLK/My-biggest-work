@@ -183,4 +183,15 @@ ANCHORS = {ABC_1100: {
         (6493, 27, "callproperty", "getReserved, 1"),
         (6493, 41, "getproperty", "h"),
     ],
+    "Exhausted _-UT: ExhaustedVersion -> _-M1g + _-8u (_-A3R); _-h1T sets _-UT for a _-8u power unless _-P5D; _-C3x (ground refresh) clears it": [
+        (6483, 4519, "pushstring", "'ExhaustedVersion'"),
+        (6483, 4540, "initproperty", "_-M1g"),
+        (6483, 4546, "initproperty", "_-8u"),
+        (1742, 505, "getproperty", "_-P5D"),
+        (1742, 560, "getproperty", "_-8u"),
+        (1742, 581, "initproperty", "_-UT"),
+        (1712, 116, "initproperty", "_-UT"),
+        (1712, 127, "callpropvoid", "_-k1j, 1"),
+        (2984, 414, "getproperty", "_-x2C"),
+    ],
 }}
