@@ -453,3 +453,10 @@ and no `_-t5z`, turns the fighter that way (@525-585, `_-CV(_-q2o(keys & 4))`); 
 used the current keys and the current facing. Replay 186: P1's side air pressed with Left at 7.712 s now pushes
 left; P1 is at x ≈ 965 at 8.35 s (clip ≈ 1046, scale from P2 and the stage edge) and lands at 1175 at 8.69 s
 (clip ≈ 1221), instead of 1357 / 1652. Aggregate: life 10.9 s (248 early / 1 within 1 s / 5 late).
+**Incoming items (6 Nov).** [V] `_-E1V._-p1K` #4888 creates every spawned item in state 4 (its optional
+parameter 5 defaults to uint pool #33 = 4); `_-p5k._-8i` returns at once in state 4 (no motion) and `_-N5M`
+#15191 @591-651 turns it to state 2 at its spawn time `_-b37` + `_-Z4f` (1536 − 368 = 1168 ms), after which it
+falls (#30 `items.incoming`, 2359 anchors). This is the "comet" seen in the clip: on replay 186 the first crate
+now lands at ~8.2 s and the second at ~11.9 s (clip: ~8.2 and ~12.05). In the clip P2 takes the first one
+(PickUpThrow at 7.952 s); the harness P2 is still too far right, so P1 takes it at 10.32 s. Aggregate: life
+10.8 s (247 early / 1 within 1 s / 4 late / 2 late within 1 s).

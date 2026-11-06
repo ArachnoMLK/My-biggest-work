@@ -68,11 +68,15 @@ class World:
         self.mgr.tick(t, n4k, w, g, [i["type"]["id"] for i in self.live])
         for s in self.mgr.spawned:
             self.live.append({"type": s["type"], "x": s["x"], "y": s["y"], "lu": 0.0, "vy": 0.0, "ground": None,
-                              "state": 0})
+                              "state": items.SPAWN_STATE, "b37": t})   # `_-p1K` default state 4, `_-b37` = t
             self.spawned += 1
         self.mgr.spawned = []
         for i in self.live:
             it = i["type"]
+            if i["state"] == items.SPAWN_STATE:                 # `_-N5M` @591-651, then `_-8i` returns in state 4
+                i["state"] = items.incoming(i["state"], i.get("b37", t), t)
+                if i["state"] == items.SPAWN_STATE:
+                    continue
             i["lu"], i["vy"], mv = items.velocity(i["lu"], i["vy"], 0.0, 0.0, i["ground"], it,
                                                   thrown=bool(i.get("dropped_by")), o2o=False)
             i["x"], i["y"], ground, _ = items.sweep(self.grid, 0, i["x"], i["y"], mv, 3, it["S2O"])
