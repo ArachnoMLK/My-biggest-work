@@ -611,16 +611,21 @@ def ko_reset(f):
 
 def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id, cells=None, lives=3,
          lives_mode=True, team_type=0, standalone=False, ticks=6000, dodge_rows=None, moves_by_id=None,
-         hurtbox=None):
+         hurtbox=None, world=None, weapon_slots=None):
     """Both fighters of a plain 1v1 replay in lockstep from the match-start step. Per tick, in `_-5r` order:
     phase 5 (`_-k5H`: the drone first, then movement in states 0 / 5, which clears `_-44x`), then phase 6
     (`_-eR`: a ring-out mask -> KO commit at t, lives - 1, then `Respawn`: state 7 when eliminated, else the
     next point of the shared `_-G5X` counter and the drone). Returns {entity id: {"kos": [t], "let_go": [t]}}.
-    [H] the glue of `match_start` and replay_setup.py; no hits; inputs only feed the movement."""
+    [H] the glue of `match_start` and replay_setup.py; no hits; inputs only feed the movement.
+    `world` (item_world.World) adds phase 4 item spawns / falls and PickUpThrow pick-ups (`weapon_slots`:
+    power_pick.item_slots, the moves of the weapon a crate gives)."""
     n4k = time_base(step_times(0, STEP_MS))
     t0 = match_start_step(n4k)
-    rng, _ = r_at_match_start(seed, len(entities))
+    rng, c56 = r_at_match_start(seed, len(entities))
     placed, g5x = one_v_one(rng, fighter_order(entities), points)
+    if world is not None and not world.c56:
+        world.c56 = list(c56)                               # `_-56C`, in replay entity order [H]
+    k_of = {id(e): i for i, e in enumerate(entities)}
     counters = list(g5x)
     rules = scoring_rules(cells or {}, n4k=n4k)
     players = []
@@ -628,11 +633,14 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
         body = {"x": 0.0, "y": 0.0, "state": 3, "vy": 0.0, "spawned": SPAWNED_AT_MATCH_START}
         d = Drone(body)
         d.place(t0, None if point is None else (point["x"], point["y"]), standalone, REPLAY_W35, False, camera)
-        players.append({"e": e, "body": body, "drone": d, "f": None, "lives": lives, "kos": [], "let_go": []})
+        players.append({"e": e, "body": body, "drone": d, "f": None, "lives": lives, "kos": [], "let_go": [],
+                        "weapon": None})
     by_order = {id(e): i for i, e in enumerate(fighter_order(entities))}
     players.sort(key=lambda p: by_order[id(p["e"])])
     for k in range(ticks):
         t = t0 + STEP_MS * k
+        if world is not None:                               # phase 4: `_-E1V._-O3d` [H: items move here too]
+            world.tick(t, n4k, [p["weapon"] for p in players])
         for p in players:                                   # phase 5
             body, d = p["body"], p["drone"]
             if d.phase != IDLE:
@@ -641,6 +649,7 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                     st = stats_by_id.get(p["e"]["id"])
                     p["f"] = Fighter(body["x"], body["y"], p5s=body["vy"], stats=dict(st) if st else dict(DEFAULT_STATS),
                                      moves=(moves_by_id or {}).get(p["e"]["id"]))
+                    p["weapon"] = None                      # [H] a respawned fighter is unarmed
                     p["let_go"].append(t)
             if body["state"] in (0, 5) and p["f"] is not None:
                 body["spawned"] = SPAWNED_IN_PLAY
@@ -651,7 +660,7 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                         or t <= f.f6r)                          # before `_-f6R`; else 5
                 bp = buffered_presses(records, t, 9 if wide else 5) or {}   # [H] the `_-P50` / `_-M3V` cases
                 done = p.setdefault("handled", {})
-                fresh = {a: bp[a] for a in ("Jump", "DodgeDash", "LightAttack", "HeavyAttack")
+                fresh = {a: bp[a] for a in ("Jump", "DodgeDash", "LightAttack", "HeavyAttack", "PickUpThrow")
                          if a in bp and bp[a] > done.get(a, -1)}
                 ev = tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT), "Jump" in fresh, 0,
                           bounds, "DodgeDash" in fresh, keys, dodge_rows, "LightAttack" in fresh,
@@ -665,6 +674,22 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                     elif e[0] == "attack" and attacks:
                         a = attacks.pop(0)
                         done[a] = fresh[a]
+                if world is not None and "PickUpThrow" in fresh and f.moves and not move_locked(f) and f.power is None:
+                    if p["weapon"] is not None:                 # [H] a throw: the weapon leaves, no thrown item
+                        p["weapon"] = None
+                        f.moves = dict(f.moves, weapon=(weapon_slots or {}).get("Unarmed", f.moves["weapon"]))
+                        done["PickUpThrow"] = fresh["PickUpThrow"]
+                        p.setdefault("items", []).append((t, "throw"))
+                    else:                                       # `_-LY` -> `_-N5R` -> `_-u30` -> `_-s1u`
+                        it = world.pick_up(f.x, f.y)
+                        if it is not None:
+                            name = world.crate_weapon(k_of[id(p["e"])], f.moves["hero"]) if it.get("E2E") else it["name"]
+                            slots = (weapon_slots or {}).get(name)
+                            if slots is not None:
+                                f.moves = dict(f.moves, weapon=slots)
+                                p["weapon"] = world.types.get(name) or {"G3X": True, "name": name}
+                            done["PickUpThrow"] = fresh["PickUpThrow"]
+                            p.setdefault("items", []).append((t, name))
         if hurtbox is not None:                             # b4: queued hits of the fired steps [H]
             for p in players:
                 f = p["f"]
@@ -698,4 +723,5 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                              camera)
         if all(p["body"]["state"] == 7 for p in players):
             break
-    return {p["e"]["id"]: {"kos": p["kos"], "let_go": p["let_go"], "hits": p.get("hits", [])} for p in players}
+    return {p["e"]["id"]: {"kos": p["kos"], "let_go": p["let_go"], "hits": p.get("hits", []),
+                           "items": p.get("items", [])} for p in players}

@@ -15,7 +15,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
-from . import dodge, harness, power_pick, stats
+from . import dodge, harness, item_spawns, item_world, power_pick, stats
 from .level_bounds import camera_bounds, level_kills
 from .respawn_points import parse_respawns
 from .smoke import map_grid
@@ -93,6 +93,11 @@ class Swz:
         self.heroes = power_pick.hero_powers(_read(os.path.join(game, "HeroTypes.xml")))
         path = os.path.join(game, "itemTypes.csv")
         self.items = power_pick.item_slots(_read(path)) if os.path.exists(path) else {}
+        self.item_types = item_world.item_types(_read(path)) if os.path.exists(path) else {}
+        path = os.path.join(game, "ItemSpawnRateTypes.xml")
+        self.rates = item_spawns.parse_rates(_read(path)) if os.path.exists(path) else {}
+        path = os.path.join(game, "ItemSpawnRuleSetTypes.xml")
+        self.rule_sets = item_spawns.parse_rule_sets(_read(path)) if os.path.exists(path) else {}
         self.hurtbox = default_hurtbox(os.path.join(game, "hurtboxTypes.csv"))
         path = os.path.join(game, "powerTypes.csv")
         self.powers = power_pick.power_rows(_read(path)) if os.path.exists(path) else {}
@@ -127,7 +132,12 @@ def setup(rep, swz):
         if st is None:
             raise ValueError("unknown stance")
         fighter_stats[e["id"]] = st
-    return {"grid": map_grid(desc), "points": parse_respawns(desc), "cam": cam, "kill": swz.kills[name],
+    grid = map_grid(desc)
+    world = None
+    if swz.rule_sets and swz.item_types:
+        world = item_world.World(rep["random_seed"], rep["settings"], swz.rates, swz.rule_sets, swz.item_types, desc,
+                                 grid, players=len(rep["entities"]))
+    return {"grid": grid, "world": world, "points": parse_respawns(desc), "cam": cam, "kill": swz.kills[name],
             "drone_camera": (cam[0], cam[1], cam[2] - cam[0]), "stats": fighter_stats,
             "cells": swz.scoring.get(rep["settings"]["scoring_type_id"], {}),
             "moves": {e["id"]: {"hero": swz.heroes.get(e["heroes"][0]["hero_id"]), "weapon": swz.items.get(UNARMED),
@@ -135,7 +145,7 @@ def setup(rep, swz):
                       for e in rep["entities"] if swz.heroes.get(e["heroes"][0]["hero_id"]) and swz.items.get(UNARMED)}}
 
 
-def run(rep, swz, ticks=6000):
+def run(rep, swz, ticks=6000, items=True):
     """Both fighters in lockstep (`harness.play`) with their own inputs: {entity id: {"kos", "let_go"}} (times
     in ms). Lives from the settings' `starting_lives` [H: `_-V` and `_-d3Y._-81d` are not traced to them]."""
     s = setup(rep, swz)
@@ -143,4 +153,4 @@ def run(rep, swz, ticks=6000):
     return harness.play(rep["entities"], rep["random_seed"], s["points"], s["drone_camera"], s["grid"],
                         (s["cam"], s["kill"]), s["stats"], rep["inputs"], s["cells"], lives=lives,
                         lives_mode=lives > 0, ticks=ticks, dodge_rows=swz.dodge_rows, moves_by_id=s["moves"],
-                        hurtbox=swz.hurtbox)
+                        hurtbox=swz.hurtbox, world=s["world"] if items else None, weapon_slots=swz.items)
