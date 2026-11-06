@@ -65,5 +65,13 @@ class FireImpulse(unittest.TestCase):
         self.assertEqual(fire_x(10, None, True, False, 0.5), 10)
         self.assertIsNone(fire_x(UNSET, 30, True, False, 0.5))
 
+class RecoverTimes(unittest.TestCase):
+    def test_at_split(self):
+        from bh.power_data import recover_times
+        self.assertEqual(recover_times({"FixedRecoverTime": "2", "RecoverTime": "18@14"}), (2, 18))
+        self.assertEqual(recover_times({"FixedRecoverTime": "7@end3"}), (7, 0))
+        self.assertEqual(recover_times({}), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
