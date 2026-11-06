@@ -379,6 +379,39 @@ def dash(t, dir, y1u, w4c, grounded, held, held_left, facing_left, ve, v22, r3l,
     return w
 
 
+# `Entity._-d1u` #2993 (called by `_-8i` @2664-2669, right after `_-t1A`): a pending dash (`_-P50`, set by
+# `Dash`) starts at `_-v3x` + this delay by kind `_-L3a`; a running one (`_-M3V`) ends 320 ms after `_-26T`.
+DASH_DELAY_MS = {1: 16, 2: 96, 3: 16, 4: 128, 5: 64, 6: 16, 7: 64}
+DASH_RUN_MS = 320
+DASH_START_SPEED, DASH_START_SPEED_TURN, DASH_START_SPEED_K4 = 78.0, 65.0, 68.0   # `_-C1h` #3118 @36-61
+
+
+def dash_update(t, p50, v3x, l3a, m3v, t26):
+    """`Entity._-d1u` #2993 @6-305: "start" when `_-P50` and t >= `_-v3x` + DASH_DELAY_MS[`_-L3a`] (then `_-C1h(t)`),
+    "end" when not `_-P50`, `_-M3V` and t >= `_-26T` + 320 (then, with no power, `_-CV(_-r35())` and `_-t5z` =
+    false; always `_-M3V` = false), else None. The `_-no` / `_-I1w` jump branch (@309-380) is not transcribed."""
+    if p50:
+        return "start" if t >= v3x + DASH_DELAY_MS.get(l3a, 0) else None
+    if m3v and t >= t26 + DASH_RUN_MS:
+        return "end"
+    return None
+
+
+def dash_start(t, l3a, facing_left, mode_speed=None):
+    """`Entity._-C1h(t)` #3118: speed 78, 65 for a turn (`_-L3a` 3 / 7), 68 for kind 4 (mode overrides `_-M4S` /
+    `_-sZ._-ob` not transcribed: `mode_speed`); `_-P50` = false, `_-M3V` = true, `_-26T` = t, `_-v1D` = `_-P5S` = 0,
+    `_-84` = the speed, positive when `_-r35()` (facing left) equals the turn flag, else negative; `_-w47` = not a
+    turn; then `_-Kc._-33h` with `PowerType._-m5I` (turn) or `_-p5x` (a secondary power, not modelled)."""
+    turn = l3a in (3, 7)
+    s = DASH_START_SPEED_TURN if turn else DASH_START_SPEED
+    if l3a == 4:
+        s = DASH_START_SPEED_K4
+    if mode_speed is not None:
+        s = mode_speed
+    return {"_-P50": False, "_-M3V": True, "_-26T": t, "_-v1D": 0.0, "_-P5S": 0.0,
+            "_-84": s if facing_left == turn else -s, "_-w47": not turn}
+
+
 def cancel_flags(t, in_dodge, f2b, light, heavy, taunt, pickup, dodge_press, h2b, chase_ok, move_no_chain, o5c,
                  cancel_start, cancel_limit):
     """`_-i4Z._-51o` #6313 @1989-2342 (input buffer, PR #28): the dodge-cancel flags (local 32, 33, 34).
@@ -601,6 +634,37 @@ def cooldown_ms(cooldown, cooldown_ground, air_or_wall):
 
 
 ANCHORS = {ABC_1100: {
+    "Dash run: _-8i @2669 calls _-d1u; _-d1u starts it at _-v3x + 16/96/16/128/64/16/64 by _-L3a (_-C1h), ends it at _-26T + 320; _-C1h speed 78 / 65 turn / 68 kind 4, v = 0, _-84 = +-speed by _-r35 == turn, _-w47 = !turn": [
+        (2984, 2669, "callpropvoid", "_-d1u, 1"),
+        (2993, 9, "getproperty", "_-P50"),
+        (2993, 41, "pushbyte", "16"),
+        (2993, 67, "pushbyte", "96"),
+        (2993, 119, "pushuint", "128"),
+        (2993, 144, "pushbyte", "64"),
+        (2993, 214, "callpropvoid", "_-C1h, 1"),
+        (2993, 242, "pushuint", "320"),
+        (2993, 305, "initproperty", "_-M3V"),
+        (3118, 36, "pushdouble", "65.0"),
+        (3118, 42, "pushdouble", "78.0"),
+        (3118, 61, "pushdouble", "68.0"),
+        (3118, 191, "initproperty", "_-P50"),
+        (3118, 199, "initproperty", "_-M3V"),
+        (3118, 208, "initproperty", "_-26T"),
+        (3118, 251, "callproperty", "_-r35, 0"),
+        (3118, 287, "callpropvoid", "_-N5C::_-E1t, 2"),
+        (3118, 297, "initproperty", "_-w47"),
+    ],
+    "Facing: Entity._-1L #2986 after _-51o turns with the held side (66U & 4 -> _-CV(true), & 8 -> _-CV(false)), free @348-436 or move-locked by a power @198-344 (_-t5z: the power's _-L0)": [
+        (2986, 34, "callpropvoid", "_-51o, 1"),
+        (2986, 222, "callproperty", "_-65i, 0"),
+        (2986, 237, "getproperty", "_-t5z"),
+        (2986, 259, "getproperty", "_-L0"),
+        (2986, 301, "callpropvoid", "_-CV, 1"),
+        (2986, 368, "pushbyte", "4"),
+        (2986, 385, "callpropvoid", "_-CV, 1"),
+        (2986, 406, "pushbyte", "8"),
+        (2986, 423, "callpropvoid", "_-CV, 1"),
+    ],
     "Friction while dodging: _-8i @764-798 runs it when !_-E6P() or _-H6t(); _-H6t #3063 = dodging with a Neutral (_-h2L 0) ground-only (_-6H 1) type; then 9.0 / 3.25 by the held side _-66U": [
         (2984, 768, "getproperty", "_-83l"),
         (2984, 782, "callproperty", "_-E6P, 0"),
