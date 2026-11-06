@@ -57,9 +57,10 @@ def cast_steps(cell):
             at = parts[0].split("@")
             if len(at) > 1:
                 d = parse_int(at[0])
+        r = r or 0                                       # a null parseInt pushed into Vector.<int> is 0
         count = 1 + math.ceil(r / 1)
         entries.append((len(a2), count))
-        a2.append(d)
+        a2.append(d or 0)
         a2.extend([0] * (count - 1))
     return a2, entries
 
