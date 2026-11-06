@@ -81,3 +81,17 @@ class DashJump(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Guard(unittest.TestCase):
+    def test_h5f(self):
+        from bh.jump import jump_guard
+        base = dict(state=0, locked=False, third_arg=False, f6r=0, airborne=False, air_used=0, air_allowed=2,
+                    r51=0, i5a=0, i46=0)
+        self.assertFalse(jump_guard(1000, **base))
+        self.assertTrue(jump_guard(1000, **dict(base, locked=True)))
+        self.assertFalse(jump_guard(1000, **dict(base, locked=True, third_arg=True)))
+        self.assertTrue(jump_guard(1000, **dict(base, i5a=900)))
+        self.assertTrue(jump_guard(1000, **dict(base, airborne=True, air_used=2)))
+        self.assertFalse(jump_guard(1000, **dict(base, airborne=True, air_used=2, r51=1)))
+        self.assertTrue(jump_guard(1000, **dict(base, state=3)))
