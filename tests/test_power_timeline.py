@@ -56,5 +56,19 @@ class Ending(unittest.TestCase):
         self.assertTrue(ends_now(1, 10, 10))
 
 
+class Charge(unittest.TestCase):
+    def test_release(self):
+        from bh.power_timeline import charge_released, min_charge, smash_release
+        self.assertEqual(min_charge("11"), (11, 0))
+        self.assertEqual(min_charge("8,20"), (8, 20))
+        self.assertTrue(charge_released(8))
+        self.assertFalse(charge_released(64 | 8))
+        self.assertFalse(charge_released(512, is_throw=True))
+        self.assertIsNone(smash_release(110, 100, 11, False, True))     # not past the minimum yet
+        self.assertEqual(smash_release(112, 100, 11, False, True), 12)
+        self.assertIsNone(smash_release(150, 100, 11, False, False))    # still held
+        self.assertIsNone(smash_release(150, 100, 11, True, True))      # a step is running
+
+
 if __name__ == "__main__":
     unittest.main()
