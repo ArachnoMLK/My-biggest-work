@@ -264,5 +264,20 @@ class Dodge(unittest.TestCase):
         self.assertEqual(cooldown_ms(10, 4, False), 64)
 
 
+
+class DashRun(unittest.TestCase):
+    def test_update_and_start(self):
+        from bh.dodge import dash_start, dash_update
+        self.assertIsNone(dash_update(1015, True, 1000, 1, False, 0))
+        self.assertEqual(dash_update(1016, True, 1000, 1, False, 0), "start")
+        self.assertEqual(dash_update(1127, True, 1000, 4, False, 0), None)
+        self.assertEqual(dash_update(1320, False, 0, 1, True, 1000), "end")
+        s = dash_start(500, 1, False)
+        self.assertEqual((s["_-84"], s["_-w47"], s["_-26T"], s["_-M3V"]), (78.0, True, 500, True))   # facing right
+        self.assertEqual(dash_start(500, 1, True)["_-84"], -78.0)       # facing left
+        self.assertEqual(dash_start(500, 3, True)["_-84"], 65.0)        # turn: the other way, slower
+        self.assertEqual(dash_start(500, 4, False)["_-84"], 68.0)
+
+
 if __name__ == "__main__":
     unittest.main()
