@@ -1151,7 +1151,7 @@ So the "direction weights" of §10 belong to the opponent check, not to the item
 
 ### 10.6 FireImpulseX / Y per step (`power_data.FIRE_COLUMNS`)
 
-`PowerType.static._-A3R` #6483 splits FireImpulseX / FireImpulseY on ',' and replaces '!' by '2147483647' (`_-a3P`, @5244-5344; '!' = unset), then expands them per step with `_-42F` (@12022-12068) into `_-84C` / `_-ol`, like VariableImpulse / FixedImpulse: so the 'a~b~c' ranges, 'a|b' alternation and 'tN' totals apply. [V] Local aggregate: 3,768 powers build, 2,492 have a FireImpulse cell, 1,083 of them use '~' (a plain int read loses them).
+`PowerType.static._-A3R` #6483 splits FireImpulseX / FireImpulseY on ',' and replaces '!' by '2147483647' (`_-a3P`, @5244-5344; '!' = unset), then expands them per step with `_-42F` (@12022-12068) into `_-84C` / `_-ol`, like VariableImpulse / FixedImpulse: so the 'a~b~c' ranges, 'a|b' alternation and 'tN' totals apply. [V] Local aggregate: 3,768 powers build, 2,492 have a FireImpulse cell, 1,083 of them use '~' (a plain int read loses them). FireImpulseMaxX (`_-L3`, with `_-l27`) moves the x impulse toward its max by the momentum `_-qm` = min(|vx| / 60, 1) toward the facing at the power start (`_-l4X.<init>` #39 @760-880), or sets the max once `_-qm` >= 1 under ImpulseMaxOnDCOnly (`_-a5A` #47 @204-392) [V] (`power_data.momentum`, `fire_x`). The gate that drops a downward FireImpulseY (> 0) within IgnoreForcedFallTime (`_-t2b`) ticks needs `_-I2g & 2`, whose only writer `_-l4X._-Q54` #70 has no reference in the ABC (`abc-find _-Q54 --member`: 0 methods), so it never applies [V by absence; H: untyped dynamic calls].
 
 ## 11. Still open
 
