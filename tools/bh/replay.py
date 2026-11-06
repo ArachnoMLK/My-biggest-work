@@ -13,8 +13,10 @@ KEY = bytes([107, 16, 222, 60, 68, 75, 209, 70, 160, 16, 82, 193, 178, 49, 211, 
              6, 115, 194, 81, 75, 176, 201, 140, 120, 4, 17, 122, 239, 116, 62, 70, 57, 160, 199, 166])
 PATCHES = {261: "10.02", 262: "10.03", 263: "10.04", 264: "10.05", 265: "10.06", 266: "10.07",
            267: "10.08", 268: "10.09", 269: "10.10", 270: "10.11", 271: "11.00"}
-# Input bits, as named by BrawlhallaReplayLibrary (ReplayInputFlags). Bit 0 = lowest bit of the 14-bit field.
-INPUT_BITS = ["AimUp", "Drop", "MoveLeft", "MoveRight", "Jump", "PrioritiseNeutralOverSide", "HeavyAttack",
+# Input bits. Bit 0 = lowest bit of the 14-bit field. Names follow the game's command table on 11.00
+# (docs/input-commands-11.00.md): value 1 is Up (command JumpAimUp), value 32 is the dedicated Aim Up
+# command. BrawlhallaReplayLibrary calls them AimUp and PrioritiseNeutralOverSide.
+INPUT_BITS = ["Up", "Drop", "MoveLeft", "MoveRight", "Jump", "AimUp", "HeavyAttack",
               "LightAttack", "DodgeDash", "PickUpThrow", "TauntUp", "TauntRight", "TauntDown", "TauntLeft"]
 # The 15 u32 of the game settings (ReplayGameSettings).
 SETTINGS = ["flags", "max_players", "duration", "round_duration", "starting_lives", "scoring_type_id",
