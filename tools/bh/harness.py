@@ -55,7 +55,7 @@ from .step import clamp, fold_impulse, speed_cap
 
 DEFAULT_STATS = {"RunSpeed": 9.0, "AirRunSpeed": 7.0, "Friction": 2.5, "AirFriction": 1.2,
                  "Acceleration": 3.0, "AirAcceleration": 2.0}   # synthetic defaults; real ones from stats.py
-AIR_JUMPS = 2       # [H] `_-56T()`: not read yet
+AIR_JUMPS = 2       # `Entity._-56T()` #3095 returns 2 [V]
 MOVE_LEFT, MOVE_RIGHT, JUMP = 4, 8, 16   # replay.INPUT_BITS: bit i = 1 << i
 FALL_CAP_DROP = 85.0                      # movement-11.00.md: `Entity._-8i` @5127-5170 with the Drop bit
 DODGE_DASH, DIR_MASK = 256, 15            # the dodge key; Dodge's dir = keys & 15 (#6313 @2427)
