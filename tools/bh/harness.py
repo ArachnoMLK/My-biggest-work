@@ -107,6 +107,7 @@ class Fighter:
     j1m: float = 0.0          # `_-J1m`, x overshoot of the impulse fold
     d4x: float = 0.0          # `_-d4x`, y overshoot
     stun_until: int = 0       # end of the hitstun (`_-5q()` until then) [H]
+    ut: bool = False          # `_-Kc._-UT`, exhausted: set by a power with an ExhaustedVersion, cleared by `_-C3x`
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -414,7 +415,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
             rows = (f.moves or {}).get("powers")
             if name is not None and rows:
-                power = redirect(rows.get(name), rows.get, gc=gc, vx=f.v1d, facing_left=f.facing_left)
+                power = redirect(rows.get(name), rows.get, exhausted=f.ut, gc=gc, vx=f.v1d, facing_left=f.facing_left)
                 name = power["PowerName"] if power else None
                 if power is not None and f.power is None:       # [H] no chain / cancel into a running power
                     steps = power_steps(power)
@@ -427,6 +428,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                         f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
                         f.power["end_tick"] = end_tick(power, tick_index(t))
                         f.lock_start = t                        # `_-532` = t: `Entity._-c1r` at the move start
+                        if power.get("ExhaustedVersion"):       # `_-h1T` #1742 @540-581 (`_-8u`, not `_-P5D`) [H: at the start]
+                            f.ut = True
             events.append(("attack", slot, gc, name, not busy))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
@@ -493,6 +496,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         if g.normal is not None and (g.normal[1] >= 0 or steep(g)):   # @13029-13127
             f.ground = None
     f.wn = f.ground is None                                     # @13169
+    if f.ground is not None and t >= f.stun_until:              # `_-8i` refresh on a line -> `_-C3x` #1712 @112-116
+        f.ut = False
     landed = was_airborne and f.ground is not None
     if landed:
         f.t322 = t
