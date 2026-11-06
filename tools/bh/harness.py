@@ -44,7 +44,7 @@ from .horizontal import (acceleration, apply_acceleration, apply_friction, frict
                          reversal_factor)
 from .input_buffer import attack_slot, buffered_presses, state_at
 from .power_data import recover_times, fire_x, momentum, power_steps
-from .power_pick import power_name, redirect
+from .power_pick import Cooldowns, cooldown_ms as power_cooldown_ms, origin_row, power_name, redirect
 from .power_timeline import END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
@@ -114,6 +114,7 @@ class Fighter:
     h76: int = -100000        # `_-R5q._-76H`: time of the last fresh Drop press (#6313 @3966-4007)
     b5: int = -100000         # `_-R5q._-B5`: the last pick-up / throw handled (#6313 @2630, @2711)
     prev_keys: int = 0        # the previous tick's `_-66U` (#6313 local 7)
+    cd: object = None         # `_-F5N` cooldown slots (power_pick.Cooldowns), made on first use
     u55: bool = False         # `_-u55`: set by the drone drop (SpawnBot._-m1O #11857 @461-526), cleared on a
                               # ground line (`_-8i` #2984 @13288-13335); `IsMoveLocked` #3061 @128-137 tests it
     no: bool = False          # `_-no`, a dash jump waits for its follow-up
@@ -405,6 +406,39 @@ def fire_impulse(f, power, step):
         setattr(f, attr, float(v))
 
 
+def _sig(f, row):
+    hero = (f.moves or {}).get("hero") or {}
+    name = (row or {}).get("PowerName")
+    return bool(name) and any(k.startswith("mSpecialPower") and v == name for k, v in hero.items())
+
+
+def power_ended(f, t):
+    """`_-F5N._-h1T` #1742 when `_-R63` reports the end: `_-BC(t, power, _-OD, _-SQ)` #1747 arms the cooldown of
+    the power's origin (OnHitCooldownTime after a hit, else CooldownTime; the origin's when 0), then the power is
+    dropped. [H] glue: the gate (owner and (`_-82f` or not `_-h2w` and not in hitstun)) is taken as true; `_-OD`
+    = the power hit someone; signatures are the hero's mSpecialPower* names."""
+    pw = f.power
+    f.power = None
+    if pw is None:
+        return
+    row = pw.get("row") or {}
+    rows = (f.moves or {}).get("powers") or {}
+    org = origin_row(row, rows)
+    ms = power_cooldown_ms(row, org, bool(pw.get("hit")))
+    if ms:
+        if f.cd is None:
+            f.cd = Cooldowns()
+        f.cd.arm(t, (org or row).get("PowerID") or (org or row).get("PowerName"), ms, sig=_sig(f, org))
+
+
+def cooldown_allows(f, t, row):
+    """`_-O5u(power, t)` #1744 for a requested power (power_pick.Cooldowns.allows). [H] glue: the origin swap by
+    `_-M1g` / `_-E2S` / `_-w3H` is left out (the id is the requested power's own PowerID)."""
+    if f.cd is None:
+        return True
+    return f.cd.allows(t, row.get("PowerID") or row.get("PowerName"), sig=_sig(f, row))
+
+
 def start_power(f, t, power):
     """A power starts on the harness fighter (`new _-l4X`, `_-l4X.<init>` #39, the first update's cast impulse).
     Returns True when it started (a CastTime is needed)."""
@@ -462,7 +496,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             mct = 0
         if ends_now(reason, tick_index(t) - f.power.get("start", tick_index(t)), mct):
             events.append(("end", f.power["name"], END_REASONS[reason]))
-            f.power = None
+            power_ended(f, t)
     if f.power is not None:                                     # `_-Kc._-25` before `_-8i` (state 0)
         step = f.power["tl"].update(tick_index(t))
         if step is not None:
@@ -474,7 +508,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                 f.power["move_lock"] = False
             if tick_index(t) >= f.power.get("end_tick", 0):     # `_-E5S` (#59 @253-289) [H: other end rules]
                 nxt = combo_next(f.power)
-                f.power = None
+                power_ended(f, t)
                 rows = (f.moves or {}).get("powers") or {}
                 if nxt and rows.get(nxt) is not None and start_power(f, t, rows[nxt]):
                     events.append(("combo", nxt))
@@ -497,6 +531,8 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             if name is not None and rows:
                 power = redirect(rows.get(name), rows.get, exhausted=f.ut, gc=gc, vx=f.v1d, facing_left=f.facing_left)
                 name = power["PowerName"] if power else None
+                if power is not None and not busy and not cooldown_allows(f, t, power):   # `_-O5u` #1744
+                    busy = True
                 if power is not None and not busy:              # [H] no chain / cancel into a running power
                     start_power(f, t, power)
             events.append(("attack", slot, gc, name, not busy))

@@ -405,3 +405,10 @@ else RecoverMod (#59 @214-289, #39 @265-379; SigRecoverMod only for legend signa
 1 late within 1 s / 1 none). On replay 186 MAM's missed side light now recovers until ~10.32 s instead of 10.13 s;
 the clip still shows no second side light at ~10.34 s but the side heavy charge (open [H]: why the light press at
 10.304 does not fire).
+**Per-power cooldowns (6 Nov).** [V] `_-F5N._-h1T` #1742 calls `_-BC` #1747 when a power ends: the cooldown of
+its origin (OriginPower `_-N`, #6495) is armed for OnHitCooldownTime after a hit, else CooldownTime (the origin's
+when 0), × 16 ms, in one of two slots (`_-S4J` #1748); `_-O5u` #1744 refuses a power whose PowerID is on
+cooldown (#30 `power_pick.Cooldowns`, 2301 anchors). On replay 186 this is what the clip shows: MAM's missed side
+light ends in BaseSideMiss, whose end arms BaseSide's cooldown, so the light pressed at 10.304 s is refused and
+the side heavy pressed at 10.336 s starts (charge visible at ~10.37 s). Aggregate unchanged (life 10.7 s).
+Next gap seen: charged powers (heavies) have no release in the harness (the charge-up runs its full CastTime).

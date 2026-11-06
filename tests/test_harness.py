@@ -362,5 +362,18 @@ class RecoverEnd(unittest.TestCase):
                                           {"RecoverMod": 0.5, "AirRecoverMod": 0.25}), 638)
 
 
+class PowerCooldown(unittest.TestCase):
+    def test_miss_recovery_arms_the_origin(self):
+        f = harness.Fighter(0.0, 0.0)
+        rows = {"A": {"PowerName": "A", "PowerID": "20", "CooldownTime": "10"},
+                "AMiss": {"PowerName": "AMiss", "OriginPower": "A"}}
+        f.moves = {"hero": {}, "powers": rows}
+        f.power = {"row": rows["AMiss"], "hit": set()}
+        harness.power_ended(f, 1000)
+        self.assertIsNone(f.power)
+        self.assertFalse(harness.cooldown_allows(f, 1150, rows["A"]))
+        self.assertTrue(harness.cooldown_allows(f, 1160, rows["A"]))
+
+
 if __name__ == "__main__":
     unittest.main()
