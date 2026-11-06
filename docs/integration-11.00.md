@@ -377,19 +377,19 @@ Then the power's gravity cancel as `_-o4b` #45 sets it (while the step is held: 
 #59 @515-592; else CancelGravity): identical aggregate.
 
 **Video oracle, 6 Nov (owner's Medal clip of the in-game replay player, local only).** [V by frame reading] The clip
-runs about **0.45 s behind the replay clock** (replay time = clip time + 0.45): CLO's dash and dash jump (inputs at
+runs about **0.45 s behind the replay clock** (replay time = clip time + 0.45): P2's dash and dash jump (inputs at
 6768 / 6816 ms) show at clip 6.33 / 6.36 s, the match timer flips at clip 6.55 / 7.55 s (start at replay 6.0 s),
-and CLO's first KO shows at clip 40.8 s (replay 41.2 s). The earlier comparison that assumed clip = replay time was
-off by that much. With the offset, the first real hit on replay 186 is MAM's unarmed side heavy
+and P2's first KO shows at clip 40.8 s (replay 41.2 s). The earlier comparison that assumed clip = replay time was
+off by that much. With the offset, the first real hit on replay 186 is P1's unarmed side heavy
 (`BaseSmashSideCombo`, 18 damage) at replay ~10.69 s, not a side light; no damage before.
 Three rules found from that clip and wired (transcribed on #30 in `air_move.py`, 2259 anchors):
 - **`_-u55` drop lock**: the drone drop (`SpawnBot._-m1O` #11857 @489 / @516) sets `_-u55` (= `_-44x` in state 0,
   true in state 5); `IsMoveLocked` #3061 tests it and `_-8i` @13288-13335 clears it on a ground line. The harness
-  let MAM drift ~150 units right while falling at the match start; the clip shows a straight fall.
+  let P1 drift ~150 units right while falling at the match start; the clip shows a straight fall.
 - **Apex gravity** `Entity._-71A` #3171 (3.25 − |vy| × 3.25 / 48 for |vy| ≤ 48, × 0.384, out of hitstun).
 - **Fast fall** (`_-61h` / `_-rA`, `_-G1a` from `_-1L`): 48-80 ms after a Drop press in the air (P5S ≥ −38, no
   power), a rise is cut to 0 and 12 × 0.384 is added each falling tick; plus the 85 cap and the ease back to 70
-  (− 6 × 0.384) of @5604-5853. CLO's dash-jump hop now lands at ~7.06 s (clip: ~7.04 s), it stayed in the air
+  (− 6 × 0.384) of @5604-5853. P2's dash-jump hop now lands at ~7.06 s (clip: ~7.04 s), it stayed in the air
   ~0.6 s longer before.
 Aggregate (own script, first KO of the real victim, 254 1v1 11.00 replays): before 243 early / 5 early within
 1 s / 2 late within 1 s / 4 none, harness life median 12.5 s; after 248 early / 2 early within 1 s / 2 late /
@@ -402,13 +402,13 @@ The end tick also takes the fighter's recover factor: `_-E5S` = floor(`_-k4b` + 
 `_-01d`) under `_-s5C` = not (ComboOverrideIfHit and not EndOnHit), `_-01d` = AirRecoverMod for an IsAirPower,
 else RecoverMod (#59 @214-289, #39 @265-379; SigRecoverMod only for legend signatures, flags 512|64 from
 `PowerType._-z24` #6491). Aggregate: life 10.2 → **10.7 s** (246 early / 2 early within 1 s / 1 exact / 3 late /
-1 late within 1 s / 1 none). On replay 186 MAM's missed side light now recovers until ~10.32 s instead of 10.13 s;
+1 late within 1 s / 1 none). On replay 186 P1's missed side light now recovers until ~10.32 s instead of 10.13 s;
 the clip still shows no second side light at ~10.34 s but the side heavy charge (open [H]: why the light press at
 10.304 does not fire).
 **Per-power cooldowns (6 Nov).** [V] `_-F5N._-h1T` #1742 calls `_-BC` #1747 when a power ends: the cooldown of
 its origin (OriginPower `_-N`, #6495) is armed for OnHitCooldownTime after a hit, else CooldownTime (the origin's
 when 0), × 16 ms, in one of two slots (`_-S4J` #1748); `_-O5u` #1744 refuses a power whose PowerID is on
-cooldown (#30 `power_pick.Cooldowns`, 2301 anchors). On replay 186 this is what the clip shows: MAM's missed side
+cooldown (#30 `power_pick.Cooldowns`, 2301 anchors). On replay 186 this is what the clip shows: P1's missed side
 light ends in BaseSideMiss, whose end arms BaseSide's cooldown, so the light pressed at 10.304 s is refused and
 the side heavy pressed at 10.336 s starts (charge visible at ~10.37 s). Aggregate unchanged (life 10.7 s).
 Next gap seen: charged powers (heavies) have no release in the harness (the charge-up runs its full CastTime).
@@ -417,7 +417,7 @@ them, so every heavy ran its whole charge (81 ticks for the unarmed side heavy) 
 flags the release (`_-e3f` → `_-64U` → `_-43C`) once HeavyAttack (64; 64|512|128 for IsThrow) is not held;
 `_-R63` @255-347 calls `_-G5P` #82 once FixedMinChargeTime (`_-l5m`) ticks have passed, which ends the charge
 (`_-a6i` = charge ticks) and the ComboName release power starts (#30 `power_timeline.smash_release`, 2326 anchors).
-Replay 186: MAM's side heavy is released at 10.528 s and its hit step fires at 10.640 s (clip: the 18-damage hit at
+Replay 186: P1's side heavy is released at 10.528 s and its hit step fires at 10.640 s (clip: the 18-damage hit at
 ~10.69 s). Aggregate: life 10.6 s (248 early / 2 within 1 s / 1 exact / 1 late / 1 late within 1 s / 1 none).
 Not modelled yet: the charge factor of the release (`_-a6i` / `_-I6c` on damage, impulse and `_-Q1n`).
 **IsMoveLocked and the action pass (6 Nov).** [V] `move_locked(f, t)` now follows `Entity.IsMoveLocked` #3061:
@@ -426,7 +426,7 @@ dash within 112 ms); [H] `_-cr`, `_-P4K`, `_-H6I` left out. #6313 computes local
 before the dodge; a Dodge that ran sets locals 14 / 15 (@2442-2455), so no jump (@2567 / @3445 need local 14
 false) and no attack (@2763-2798 / @2968-3003 need local 15 false unless the gravity cancel, local 32) on the same
 pass; a started attack sets local 15 (@2932). Also: a CastTime part without a number is 0 (#30). Aggregate:
-life 10.6 → 10.2 s (248 early / 2 within 1 s / 4 late). On replay 186 MAM now dashes at 10.336 s instead of
+life 10.6 → 10.2 s (248 early / 2 within 1 s / 4 late). On replay 186 P1 now dashes at 10.336 s instead of
 starting the heavy (the clip shows the heavy: open, likely an earlier state difference).
 **Order inside a fighter's step (6 Nov).** [V] `Entity._-k5H` #2991 calls `_-1L` (@75, which runs the input pass
 `_-51o` first) before the power update `_-Kc._-25` (@522) and the physics `_-8i` (@585). The harness ran the power
@@ -434,22 +434,22 @@ update before the inputs; now inputs → power update → physics, so a press se
 tick, and a power started by a press gets its first update on the same tick. Aggregate: life 10.0 s (247 early /
 2 within 1 s / 4 late / 1 late within 1 s).
 **Dodge during a power (6 Nov).** [V] `IsDodgeLocked` #3075 is true while a power runs (`_-Kc._-o3I`); the
-harness passed false there, so a fighter could air-dodge in the middle of an attack (replay 186: MAM's up heavy
+harness passed false there, so a fighter could air-dodge in the middle of an attack (replay 186: P1's up heavy
 turned into a 0.3 s FastSide glide off the stage). Aggregate: life 9.9 s (247 early / 2 within 1 s / 5 late).
-Seen next on replay 186 (clip vs harness, relative to the stage edge): from 7.5 to 8.5 s the harness MAM moves
+Seen next on replay 186 (clip vs harness, relative to the stage edge): from 7.5 to 8.5 s the harness P1 moves
 ~650 units right (air max speed with Right held after BaseAirSideMiss), the clip ~50-100; and it rises ~490
 units, the clip ~330. Open.
 **The jump guard `_-H5F` (6 Nov).** [V] `Entity.Jump` returns at once when `_-H5F(t, third)` #3065 holds (@36-59):
 states other than 0 / 5; IsMoveLocked (or `_-u4F`, `_-Xb`, `_-cr`, `_-C54`) unless the third argument (the squat
 release `_-A2X` passes it after `_-I5A` = 0); `_-f6R` > t; airborne with no air jump left and no wall; within 176 ms
 (`_-Y35`) of `_-I5A`; within 256 ms (`_-R6Q`) of both `_-I5A` and `_-46I`. The harness had no guard, so a jump
-pressed during an attack's recovery fired at once. Replay 186: MAM's jump press at 7.568 s (inside BaseSideMiss)
-is now refused, the press at 7.712 s jumps, and MAM lands at 8.688 s — the clip shows the landing at ~8.67 s.
+pressed during an attack's recovery fired at once. Replay 186: P1's jump press at 7.568 s (inside BaseSideMiss)
+is now refused, the press at 7.712 s jumps, and P1 lands at 8.688 s — the clip shows the landing at ~8.67 s.
 Aggregate: life 10.6 s (247 early / 1 within 1 s / 6 late). [H] `_-u4F`, `_-cr`, `_-C54` false.
 **Attack direction from the press (6 Nov).** [V] #6313 keeps the key word of the tick a light / heavy press was
 seen (locals 19 / 21) and `_-rU` #6334 reads its direction (@93-99: local 13 = keys & 15) and, with a side in it
 and no `_-t5z`, turns the fighter that way (@525-585, `_-CV(_-q2o(keys & 4))`); the power keeps that facing as
 `_-L0` (`_-l4X.<init>` #39 @120-131), which its cast / fire impulses (#91, #47 @394) and areas use. The harness
-used the current keys and the current facing. Replay 186: MAM's side air pressed with Left at 7.712 s now pushes
-left; MAM is at x ≈ 965 at 8.35 s (clip ≈ 1046, scale from CLO and the stage edge) and lands at 1175 at 8.69 s
+used the current keys and the current facing. Replay 186: P1's side air pressed with Left at 7.712 s now pushes
+left; P1 is at x ≈ 965 at 8.35 s (clip ≈ 1046, scale from P2 and the stage edge) and lands at 1175 at 8.69 s
 (clip ≈ 1221), instead of 1357 / 1652. Aggregate: life 10.9 s (248 early / 1 within 1 s / 5 late).
