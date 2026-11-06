@@ -122,7 +122,7 @@ class Harness(unittest.TestCase):
                                                  "weapon": {"id": "Unarmed", "slots": [None, "UJab"] + [None] * 19}})
         ev = harness.tick(f, 1000, smoke.map_grid(FLAT), light_press=True, keys=0)
         self.assertEqual(ev[0][0], "attack")
-        self.assertEqual(len(ev[0]), 4)
+        self.assertEqual(len(ev[0]), 5)
         f.moves["weapon"]["slots"] = ["J"] * 21
         f.moves["powers"] = {"J": {"PowerName": "J", "MomentumVersion": "JM"}, "JM": {"PowerName": "JM"}}
         f.v1d = 70.0

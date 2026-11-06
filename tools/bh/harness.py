@@ -387,6 +387,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         events.append(("press", jump(f, t, left, right)))
     for press, heavy in ((light_press, False), (heavy_press, True)):
         if press:
+            busy = f.power is not None                          # a running power keeps the press buffered [H]
             slot, gc = attack(f, t, keys, heavy)
             name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
             rows = (f.moves or {}).get("powers")
@@ -404,7 +405,7 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                         f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
                         f.power["end_tick"] = end_tick(power, tick_index(t))
                         f.lock_start = t                        # `_-532` = t: `Entity._-c1r` at the move start
-            events.append(("attack", slot, gc, name))
+            events.append(("attack", slot, gc, name, not busy))
     f.p5s, _ = ground_reset(f.ground, False, 0, False, f.p5s)
     airborne = f.ground is None
     vmax = _vmax(f)
@@ -673,7 +674,8 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                         done["DodgeDash"] = fresh["DodgeDash"]  # `_-C51` = t (#6313 @2389-2504)
                     elif e[0] == "attack" and attacks:
                         a = attacks.pop(0)
-                        done[a] = fresh[a]
+                        if e[4]:                                # refused while a power runs: retried [H]
+                            done[a] = fresh[a]
                 if world is not None and "PickUpThrow" in fresh and f.moves and not move_locked(f) and f.power is None:
                     if p["weapon"] is not None:                 # a throw (`_-M4Q`) [H: a tap, no hit]
                         world.throw(t, p["e"]["id"], p["weapon"], f, keys & DIR_MASK)
