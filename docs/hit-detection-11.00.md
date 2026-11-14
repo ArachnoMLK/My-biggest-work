@@ -1153,6 +1153,47 @@ So the "direction weights" of §10 belong to the opponent check, not to the item
 
 `PowerType.static._-A3R` #6483 splits FireImpulseX / FireImpulseY on ',' and replaces '!' by '2147483647' (`_-a3P`, @5244-5344; '!' = unset), then expands them per step with `_-42F` (@12022-12068) into `_-84C` / `_-ol`, like VariableImpulse / FixedImpulse: so the 'a~b~c' ranges, 'a|b' alternation and 'tN' totals apply. [V] Local aggregate: 3,768 powers build, 2,492 have a FireImpulse cell, 1,083 of them use '~' (a plain int read loses them). FireImpulseMaxX (`_-L3`, with `_-l27`) moves the x impulse toward its max by the momentum `_-qm` = min(|vx| / 60, 1) toward the facing at the power start (`_-l4X.<init>` #39 @760-880), or sets the max once `_-qm` >= 1 under ImpulseMaxOnDCOnly (`_-a5A` #47 @204-392) [V] (`power_data.momentum`, `fire_x`). The gate that drops a downward FireImpulseY (> 0) within IgnoreForcedFallTime (`_-t2b`) ticks needs `_-I2g & 2`, whose only writer `_-l4X._-Q54` #70 has no reference in the ABC (`abc-find _-Q54 --member`: 0 methods), so it never applies [V by absence; H: untyped dynamic calls].
 
+### 10.7 Ground look-ahead and landing lock ([`tools/bh/ground_snap.py`](../tools/bh/ground_snap.py))
+
+Three callers do not only test the ground line `_-96f`: they first probe the map and, when a line is close
+enough, put the fighter on it. So a dash or an attack pressed a few ticks before the landing is the ground one.
+
+| Step | Bytecode | Status |
+|---|---|---|
+| `_-w4A(t, attack, dir)`: only while `_-P5S` > 0. Reach = `_-P5S` x `_-D4i` (7 x `_-Vj`: seven ticks of fall), x `_-q1p` (5 x `_-Vj`) under `_-61h()` (fast fall); at most `_-L1Z` = 60, or `_-F38` = 100 with the second argument | #3012 @2-131; #15351 @30098-30125; #3173 @1903-1915 | [V] `fall_reach` |
+| A ray straight down from the feet over that reach, hard lines only (`_-X2e(..., 1, 0)`); if none, half the reach against soft lines (mask 2), unless the second argument with Drop in `dir` and t >= `_-76H` + 64; a steep line (`_-S1A`) gives null | #3012 @137-447 | [V] `fall_probe` |
+| `_-y1U(t, attack, dir)`: with a line, `_-P5S` = 0, `_-x1M(x, hit y - 1.01)`, `_-96f` = the line, true. `_-wn()` is not written here | #3005 | [V] `fall_snap` |
+| `_-w4c(t, attack, light, dir)`: a ray straight **up** from the feet (`_-K61` 30; `_-c4c` 50 with the third argument; `_-86j` 70 within `_-k5G` = 192 ms of the last drop through `_-w3i`), soft lines, options 1 \| 8; same writes. With the second argument, falling, Drop in `dir` and t >= `_-76H` + 64 it returns false (unless just dropped) | #3004; #3173 @1923-1952 | [V] `rise_snap`; [H] it catches a soft platform the feet have just passed |
+| `Entity.Dash`: local 3 = `_-y1U(t, false)`; else, with a side in `dir`, local 6 = `_-w4c(t, false, false, dir)`; both before the `_-96f` test, so a dash pressed in the air within reach is a ground dash (kind `_-L3a` 6 through local 18; see `dodge.dash`) | #3132 @130-191, @620-659 | [V] |
+| `_-i4Z._-rU` (attack pick): in the air, outside the dodge cancel and without the jump flag, `_-y1U(t, true, dir)` gives the ground slot (local 14); with Drop in `dir`, `_-w4c(t, true, arg 4 == 0, dir)` does the same; local 14 calls `_-C2N(false)`; when `_-C5S` then refuses the power, `_-P5S`, y and `_-96f` are put back | #6334 @105-200, @411-487, @606-619, @729-799 | [V]; [H] arg 4 == 0 is a light attack |
+| `Entity.Jump`, squat path only: within 192 ms of `_-w3i`, `_-w4c(t, false, false, keys)`, then `_-y1U(t, false)` if `_-96f` is still null. Otherwise Jump does not probe | #3052 @324-388 | [V] `jump_snap` |
+| `_-26u._-L3f` (a hit, outside hitstun, within 192 ms of `_-w3i`) calls `_-w4c(t, false)` on the victim; `_-F5N._-A3Q` #1746 calls `_-w4c` too | #1670 @25-68 | [V] the call; not transcribed |
+
+**Landing lock.** `Jump` sets the flag `_-C1J` (`_-C2N(true)`, read by `_-96p()`) on its jump path, for every
+kind of jump (#3052 @507-512). In `_-8i`, after the move, local 37 = `_-wn()` before `_-v2J(_-96f == null)`
+updates it (@13130-13169); on the ground afterwards (@13427-13519): on the landing step (local 37) `_-322` = t
+and, with `_-96p()`, `_-t4D` = t (a pending jump `_-Xb` gets `_-I5A` + 64); then `_-C2N(false)` on every grounded
+step. `_-C54(t)` #3067 is true while t < `_-t4D` + 64, on the ground, off a wall. It is read by `_-H5F` (no
+jump), `IsDodgeLocked`, `_-350` (no dash) and local 15 of `_-i4Z._-51o` #6313 (no dodge, no attack on that
+pass). So after a landing that follows a jump, the next jump, dash, dodge or attack waits 64 ms; presses stay
+in the buffer meanwhile. [V] `landing_marks`, `landing_lock`. A fighter put on the ground by `_-y1U` at input
+time still has `_-wn()` set, so the `_-8i` of the same tick is its landing step. The attack probe clears the
+flag first (`_-C2N(false)`), so an attack started through the probe is followed by no lock [V]. `_-D1o` #3165
+spawns the cosmetic power `PowerType._-65Q` ('LandingRecoverCloud') at t == `_-t4D` [V].
+
+**Dash gate.** `_-350(t)` #3076, tested by `Dodge` before `Dash` (`dodge.dash_blocked`): `IsMoveLocked`, a
+pending dash `_-P50`, `_-26T` + 112 > t, `_-3E` + 112 > t (the end of the last move, written by `_-c1r` #3025;
+only without `_-Kc._-h2w` and when `_-Kc._-e28` differs from `PowerType._-W5C(_-N1k)._-H4O` [H]), a running
+power, `_-r51`, `_-Xb`, `_-C54(t)`; else, with a last DodgeType, `_-H2b` + `_-Uy` + ToDashDelay (`_-z3W`) x 16
+> t [V]. `dodge.dash_try` says where `Dodge` reaches that test (local 13 or 14 with a side or Drop). The
+DodgeType columns FromDashDelay (`_-06r`) and FromBackDashDelay (`_-H64`) are loaded by #2768 and read nowhere
+else in this ABC [V] (`abc-find --member`).
+
+Seen on one local replay through the owner's screen recording of the in-game replay player (nothing of it is
+stored): the hop height per recorded frame matches the transcribed dash-jump arc within 2 units up to the last
+airborne frame, the fighter is on the ground on the tick of its dodge press (the probe), and its next dash
+jump shows 4 ticks after the buffered jump press (the lock). [H] one case, frame timing +- 1 tick.
+
 ## 11. Still open
 
 - Platform rotation (`_-o2k` is computed but not applied to lines here), when `_-p4E._-d4u` runs inside a tick,
