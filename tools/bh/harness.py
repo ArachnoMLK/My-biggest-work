@@ -34,9 +34,10 @@ import math
 
 from .air_move import (WallState, air_move, drop_held_flag, fall_cap, fall_step, fast_fall, gravity_applies, ground_reset,
                        ground_walk, respond, steep, wall_contact)
-from .dodge import (LEFT as LEFT_BIT, RIGHT as RIGHT_BIT, DROP as DROP_BIT, dash, dash_start, dash_update, attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
+from .dodge import (LEFT as LEFT_BIT, RIGHT as RIGHT_BIT, DROP as DROP_BIT, dash, dash_blocked, dash_start, dash_try, dash_update, attack_air_offset, c2e, cancel_flags, clears_velocity, cooldown_ms, dodge_over, exit_velocity, facing, flags_51c, formula_mult,
                     gates, is_dodge_locked, k64, landed_cooldown, moves, neutral_push, pick, push, side_latch, speed_x,
                     speed_y, standard_flag, timers)
+from .ground_snap import fall_snap, jump_snap, landing_lock, landing_marks, rise_snap
 from .hitdetect import (area_center, capsules_touch, deals_damage, frame_window, hit_capsule, hurtbox_capsule, row_values,
                         target_method)
 from .knockback import final_magnitude, hit_damage, hitstun_ms, knockback_decay, knockback_force
@@ -48,7 +49,7 @@ from .power_pick import Cooldowns, cooldown_ms as power_cooldown_ms, origin_row,
 from .power_timeline import charge_released, min_charge, smash_release, END_REASONS, Timeline, ends_now, tick_index
 from .ko import ko_mask
 from .respawn_points import candidates
-from .jump import (jump_guard, BOOST_13G, dash_jump_follow, dash_jump_marks, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate, squat_on_landing,
+from .jump import (jump_guard, BOOST_13G, dash_jump_follow, dash_jump_marks, air_jump, dash_window, ground_jump, ground_tail, squat_due, squat_gate,
                    squat_start, wall_jump)
 from .entity_states import respawn_index
 from .match_start import STEP_MS, fighter_order, match_start_step, one_v_one, r_at_match_start, step_times, time_base
@@ -127,6 +128,9 @@ class Fighter:
     k1k: int = 0              # `_-K1k`
     w47: bool = False         # `_-w47`, ground max speed x 1.16
     ut: bool = False          # `_-Kc._-UT`, exhausted: set by a power with an ExhaustedVersion, cleared by `_-C3x`
+    t4d: int = 0              # `_-t4D`: the last landing after a jump (`_-8i` @13467); `_-C54` locks 64 ms after it
+    jumped: bool = False      # `_-96p()` (`_-C1J`): set by `Jump` (`_-C2N(true)`), cleared on the ground
+    w3i: int = 0              # `_-w3i`: the last drop through a soft platform (`_-8i` @1857) [H: never set here]
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
 
@@ -135,22 +139,39 @@ def _vmax(f):
     return max_speed(f.stats["RunSpeed"], f.stats["AirRunSpeed"], f.ground is None, w47=f.w47)
 
 
+def c54(f, t):
+    """`Entity._-C54(t)` #3067 (ground_snap.landing_lock): within 64 ms of a jumped landing, on the ground."""
+    return landing_lock(t, f.t4d, f.wn, f.r51)
+
+
 def jump_blocked(f, t, third_arg=False):
-    """`Entity._-H5F(t, third_arg)` #3065 for the harness fighter (`jump.jump_guard`). [H] glue: `_-u4F`, `_-cr`,
-    `_-C54` false; the harness fighter is in state 0 / 5 here."""
-    return jump_guard(t, 0, move_locked(f, t) or f.xb != 0, third_arg, f.f6r, f.ground is None, f.air_used,
+    """`Entity._-H5F(t, third_arg)` #3065 for the harness fighter (`jump.jump_guard`). [H] glue: `_-u4F`, `_-cr`
+    false; the harness fighter is in state 0 / 5 here."""
+    return jump_guard(t, 0, move_locked(f, t) or f.xb != 0 or c54(f, t), third_arg, f.f6r, f.wn, f.air_used,
                       f.air_allowed, f.r51, f.i5a, f.i46)
 
 
-def jump(f, t, left, right, third_arg=False):
+def _snap(f, r):
+    """The writes of `_-y1U` / `_-w4c` (ground_snap.py): `_-P5S` = 0, y, `_-96f`. `_-wn()` is left to `_-8i`."""
+    f.p5s = 0.0
+    f.y, f.ground = r
+
+
+def jump(f, t, left, right, third_arg=False, grid=None, team=0, keys=0):
     """`Entity.Jump(t, false, third_arg)`: the `_-H5F` guard (`jump_blocked`), then the branches. Returns the
     branch taken, or None."""
     if jump_blocked(f, t, third_arg):
         return None
     dash = dash_window(t, f.dash_timer, f.ground, f.xb)
-    if squat_gate(t, False, third_arg, None, f.lock_start, dash, 0):
+    if squat_gate(t, False, third_arg, f.power, f.lock_start, dash, f.l3a):
+        if grid is not None:                                    # #3052 @324-388: after a drop through
+            r = jump_snap(grid, team, t, f.x, f.y, f.p5s, f.ff, f.w3i, keys, f.h76)
+            if r is not None:
+                _snap(f, r)
         f.xb, f.i5a = squat_start(t, f.ground, f.r51)
         return "squat"
+    f.jumped = True                                             # #3052 @507-512: `_-C2N(true)`
+    f.w3i = 0
     f.i5a = t                                                   # @540: `_-I5A` = t on the jump path
     f.ff = False                                                # #3052 @524-535: `_-w3i` = 0, `_-rA(false)`
     side = left or right
@@ -176,31 +197,59 @@ def jump(f, t, left, right, third_arg=False):
     return None
 
 
-def dodge(f, t, dir, rows):
-    """`Entity.Dodge(t, dir)` (dodge.py) on the harness fighter: `gates`, `pick`, then the commit writes. Returns
-    the DodgeName or None. [H] glue: no area / `_-C54` lock, `_-x2C` = 0, no chase dodge
-    (`_-26R` false), no dash (`Dash` false: a refused ground side dodge does nothing), `_-VE` = 0, `_-M3h` false,
-    the power multipliers `_-Kc._-u5j` / `_-04K` = 1, Set "Default", the `_-6K` counter not kept."""
-    airborne = f.ground is None
-    c = c2e(t, dir, f.lock_start, False, not airborne)
-    if not airborne and dir & (LEFT_BIT | RIGHT_BIT | DROP_BIT):   # `gates`: a ground side / Drop dodge tries `Dash`
-        w = dash(t, dir, False, False, True, dir, bool(dir & LEFT_BIT), f.facing_left, 0, 0, 0, f.t5z, f.m3v,
-                 f.k1k, f.lock_start, f.e3, False, f.v1d, f.p5s, f.l3a, f.dash_timer, f.w47)
-        if w is not None:                                   # [H] `_-y1U` / `_-w4c` false, no tap history, `_-350` false
-            f.l3a, f.facing_left, f.v3x = w["_-L3a"], w["dir_left"], w["_-v3x"]
-            f.p50, f.m3v, f.t5z = True, False, True
-            f.k1k = w.get("_-K1k", f.k1k)
-            f.w47 = w.get("_-w47", f.w47)
-            if f.no and f.p5s < -41.0:                          # `_-Q3q` #3079 from Dash
-                f.p5s = -41.0
-            f.no = False
-            return "dash"
+def try_dash(f, t, dir, grid, team):
+    """`Entity.Dash(t, dir)` #3132 on the harness fighter: the ground probes first (ground_snap.py: `_-y1U(t,
+    false)`, else with a side `_-w4c(t, false, false, dir)`), which may put the fighter on a line; then, on a
+    line, `dodge.dash`. Returns True when the dash is pending (`_-P50`). [H] glue: `_-M3h` false, no tap
+    history."""
+    vy = f.p5s                                                  # local 7, read before the probes (@110-128)
+    y1u = w4c = False
+    if grid is not None:
+        r = fall_snap(grid, team, t, f.x, f.y, f.p5s, f.ff)
+        if r is not None:
+            y1u = True
+        elif dir & (LEFT_BIT | RIGHT_BIT):
+            r = rise_snap(grid, team, t, f.x, f.y, f.p5s, f.w3i, False, False, dir, f.h76)
+            w4c = r is not None
+        if r is not None:
+            _snap(f, r)
+    if f.ground is None:
+        return False
+    w = dash(t, dir, y1u, w4c, True, dir, bool(dir & LEFT_BIT), f.facing_left, 0, 0, 0, f.t5z, f.m3v,
+             f.k1k, f.lock_start, f.e3, False, f.v1d, vy, f.l3a, f.dash_timer, f.w47)
+    if w is None:
+        return False
+    f.l3a, f.facing_left, f.v3x = w["_-L3a"], w["dir_left"], w["_-v3x"]
+    f.p50, f.m3v, f.t5z = True, False, True
+    f.k1k = w.get("_-K1k", f.k1k)
+    f.w47 = w.get("_-w47", f.w47)
+    if f.no and f.p5s < -41.0:                                  # `_-Q3q` #3079 from Dash
+        f.p5s = -41.0
+    f.no = False
+    return True
+
+
+def dodge(f, t, dir, rows, grid=None, team=0):
+    """`Entity.Dodge(t, dir)` (dodge.py) on the harness fighter: the dash try (`dash_try`, `_-350` =
+    `dash_blocked`, `try_dash`), `gates`, `pick`, then the commit writes. Returns the DodgeName, "dash", or None.
+    [H] glue: no area lock, `_-x2C` = 0, no chase dodge (`_-26R` false), `_-VE` = 0, `_-M3h` false, the power
+    multipliers `_-Kc._-u5j` / `_-04K` = 1, Set "Default", the `_-6K` counter not kept."""
+    airborne = f.wn                                             # `_-wn()`: Dodge @74, @600, @690, @1029
+    c = c2e(t, dir, f.lock_start, False, f.ground is not None)
+    lock = c54(f, t)
 
     def locked(flag):
-        return is_dodge_locked(move_locked(f, t), f.u5e, flag, f.e6p, f.power is not None, f.r51, False, f.xb, False, 0)
+        return is_dodge_locked(move_locked(f, t), f.u5e, flag, f.e6p, f.power is not None, f.r51, False, f.xb, lock, 0)
 
-    g = gates(t, dir, c, f.i46, airborne, locked(False), locked(c), f.h2b, f.w14, f.y1f, False, f.o5c, False,
-              False, not airborne, 0, f.lock_start, f.facing_left, None)
+    d350 = False
+    if dash_try(t, dir, c, f.i46, airborne, locked(False), locked(c), f.h2b, f.w14, False):
+        row = f.dodge                                           # `_-Q42`: the last DodgeType
+        d350 = dash_blocked(t, move_locked(f, t), f.p50, f.dash_timer, f.e3, f.power is not None, f.r51, f.xb,
+                            lock, f.h2b, f.uy, None if row is None else row.get("ToDashDelay", 0))
+        if not d350 and try_dash(f, t, dir, grid, team):
+            return "dash"
+    g = gates(t, dir, c, f.i46, airborne, locked(False), locked(c), f.h2b, f.w14, f.y1f, False, f.o5c, d350,
+              False, f.ground is not None, 0, f.lock_start, f.facing_left, None)
     if g is None:
         return None
     d = g["dir"]
@@ -266,6 +315,24 @@ def dodge_tick(f, t, a, held):
         f.l4a, f.g5e = side_latch(f.l4a, f.g5e, held)
 
 
+def attack_probe(f, t, keys, heavy, gc, grid, team):
+    """The ground probes of `_-i4Z._-rU` #6334 for a press that goes on: in the air (`_-wn()`) and outside the
+    cancel, `_-y1U(t, true, dir)` (@152-200); else, with Drop in dir, `_-w4c(t, true, arg 4 == 0, dir)`
+    (@411-487). A hit puts the fighter on the line and the slot is the ground one (local 14). Returns (slot,
+    snapped). [H] glue: arg 3 (the jump flag) false, arg 4 == 0 for a light attack, `_-O5C` not forced."""
+    d = keys & DIR_MASK
+    air = f.wn and not gc
+    snapped = False
+    if air and grid is not None:
+        r = fall_snap(grid, team, t, f.x, f.y, f.p5s, f.ff, True, d, f.h76)
+        if r is None and d & DROP_BIT:
+            r = rise_snap(grid, team, t, f.x, f.y, f.p5s, f.w3i, True, not heavy, d, f.h76)
+        if r is not None:
+            _snap(f, r)
+            air, snapped = False, True
+    return attack_slot(keys, heavy, air), snapped
+
+
 def attack(f, t, keys, heavy):
     """The move slot a fresh light / heavy press asks for (`_-i4Z._-rU` #6334): `dodge.cancel_flags` (in the
     cancel window of a dodge, local 33) then `dodge.attack_air_offset` (0 under the cancel: the gravity cancel)
@@ -277,7 +344,7 @@ def attack(f, t, keys, heavy):
         press = t
         _, gc, _ = cancel_flags(t, True, False, 0 if heavy else press, press if heavy else 0, 0, 0, 0, f.h2b, False,
                                 False, f.o5c, row.get("CancelStart", 0), row.get("CancelLimit", 0))
-    off, _ = attack_air_offset(f.ground is None, False, gc, False)
+    off, _ = attack_air_offset(f.wn, False, gc, False)
     return attack_slot(keys, heavy, off != 0), gc
 
 
@@ -508,15 +575,15 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         left = right = False
     # #6313 @520-629, @2357-2433: Dodge (and so Dash) runs only when !(IsMoveLocked || `_-Xb` != 0 || `_-C54(t)` ||
     # `_-f6R` > t || `_-e3e & _-m1t`) or under the dodge cancel (local 34) [H: `_-C54`, `_-m1t` and local 34 false]
-    l15 = move_locked(f, t) or f.xb != 0 or f.f6r > t           # #6313 @557-629 (local 15), before the dodge
+    l15 = move_locked(f, t) or f.xb != 0 or c54(f, t) or f.f6r > t   # #6313 @557-629 (local 15), before the dodge
     acted = False                                               # local 14: an action already taken this pass
     if dodge_press and dodge_rows and not l15:
-        name = dodge(f, t, keys & DIR_MASK, dodge_rows)
+        name = dodge(f, t, keys & DIR_MASK, dodge_rows, grid, team)
         if name is not None:
             events.append(("dodge", name))
             acted = l15 = True                                  # #6313 @2442-2455 after a Dodge that ran
     if jump_press and not acted:                                # Jump @2567 / @3445 needs local 14 false
-        events.append(("press", jump(f, t, left, right)))
+        events.append(("press", jump(f, t, left, right, grid=grid, team=team, keys=keys)))
     for press, heavy in ((light_press, False), (heavy_press, True)):
         if press:
             # #6313 keeps the key word of the press tick (locals 19 / 21) and `_-rU` #6334 reads its direction
@@ -527,8 +594,15 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             # `_-f6R` passed, no dodge this pass) or under the gravity cancel (local 32) [H: local 17]; a running
             # power keeps the press buffered [H]
             busy = f.power is not None or (l15 and not gc)
+            saved = None
+            if not busy and f.moves:                            # `_-rU` runs: its ground probes (ground_snap.py)
+                saved = (f.p5s, f.y, f.ground)                  # #6334 locals 9 / 11 / 12
+                slot, snapped = attack_probe(f, t, pk, heavy, gc, grid, team)
+                if not snapped:
+                    saved = None
             name = power_name(slot, f.moves["hero"], f.moves["weapon"]) if f.moves else None
             rows = (f.moves or {}).get("powers")
+            started = False
             if name is not None and rows:
                 if not busy and pk & (MOVE_LEFT | MOVE_RIGHT) and not f.t5z:
                     f.facing_left = bool(pk & MOVE_LEFT)        # #6334 @525-585: `_-CV(_-q2o(keys & 4))`
@@ -537,8 +611,13 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                 if power is not None and not busy and not cooldown_allows(f, t, power):   # `_-O5u` #1744
                     busy = True
                 if power is not None and not busy:              # [H] no chain / cancel into a running power
-                    start_power(f, t, power)
+                    started = start_power(f, t, power)
                     l15 = True                                  # #6313 @2932: local 15 set once `_-rU` ran
+            if saved is not None:
+                if started:
+                    f.jumped = False                            # #6334 @606-619: `_-C2N(false)` with local 14
+                else:                                           # @729-799: `_-C5S` false, the probe is undone
+                    f.p5s, f.y, f.ground = saved
             events.append(("attack", slot, gc, name, not busy))
     f.g1a = g1a_next(f, t, keys)
     if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
@@ -636,7 +715,6 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         f.j1m = over                                            # @2901 [H: the stored value is the full sum]
     f.v1d = clamp(f.v1d, cap)
     x_step = f.v1d * STEP
-    was_airborne = f.ground is None
     if f.ground is not None:
         w = ground_walk(grid, team, f.x, f.y, f.ground, x_step, 3)
         f.x, f.y, f.ground, x_step = w.x, w.y, w.ground, w.left
@@ -675,15 +753,15 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
         g = f.ground
         if g.normal is not None and (g.normal[1] >= 0 or steep(g)):   # @13029-13127
             f.ground = None
+    wn_before = f.wn                                            # local 37 (@13130-13139)
     f.wn = f.ground is None                                     # @13169
     if f.ground is not None and t >= f.stun_until:              # `_-8i` refresh on a line -> `_-C3x` #1712 @112-116
         f.ut = False
-    landed = was_airborne and f.ground is not None
+    landed = wn_before and f.ground is not None                # the landing step of `_-8i` @13427-13446
     if f.u55 and f.ground is not None:                          # `_-8i` @13288-13335: `_-u55` cleared on a line
         f.u55 = False
+    f.t322, f.t4d, f.i5a, f.jumped = landing_marks(t, wn_before, f.wn, f.jumped, f.xb, f.i5a, f.t322, f.t4d)
     if landed:
-        f.t322 = t
-        f.i5a = squat_on_landing(f.xb, f.i5a, True)
         f.air_used = 0                                          # [H] where `_-k1j(0)` runs is not read
         events.append(("land", f.y))
     if bounds is not None:
