@@ -597,6 +597,23 @@ def gates(t, dir, c2e, i46, airborne, locked, locked_chain, h2b, w14, y1f, r26, 
             "w14": w, "e28": e28, "clear_vx": clear_vx}
 
 
+def dash_try(t, dir, c2e, i46, airborne, locked, locked_chain, h2b, w14, r26):
+    """Whether `Entity.Dodge` #3125 reaches its dash try (@349-382): local 13 or local 14 of `gates`, with a
+    side or Drop in dir. `_-350(t)` (`dash_blocked`) and then `Dash(t, dir)` are only called in that case, so
+    the ground probe of `Dash` (ground_snap.py) only runs then. Same inputs as `gates`."""
+    l11 = i46 + HIT_LOCK_MS > t
+    l12 = airborne and i46 + HIT_LOCK_AIR_MS > t
+    if l11 or l12 or not dir & (LEFT | RIGHT | DROP):
+        return False
+    if dir in (LEFT | DROP, RIGHT | DROP):
+        return True
+    if not locked:
+        return not c2e
+    if c2e and h2b != w14 and h2b != 0 and not locked_chain:
+        return False
+    return not r26
+
+
 def formula_mult(formula, vx, k64, dir):
     """`_-h3i._-B15(t, formula, fighter)` #2771: the speed multiplier of a SpeedX / SpeedY formula.
 
