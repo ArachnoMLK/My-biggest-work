@@ -126,9 +126,9 @@ class DashGate(unittest.TestCase):
         self.assertFalse(dash_blocked(1000, **dict(free, t26=888)))                    # 888 + 112 > 1000 is false
         self.assertFalse(dash_blocked(1000, **dict(free, e3=900), e3_counts=False))
         # after a dodge: _-H2b + _-Uy + ToDashDelay x 16 > t
-        self.assertTrue(dash_blocked(1000, **free, h2b=600, uy=224, to_dash_delay=15))   # 600 + 224 + 240 = 1064
-        self.assertFalse(dash_blocked(1064, **free, h2b=600, uy=224, to_dash_delay=15))
-        self.assertFalse(dash_blocked(1000, **free, h2b=600, uy=224, to_dash_delay=None))
+        self.assertTrue(dash_blocked(1000, **free, h2b=600, uy=200, to_dash_delay=13))   # 600 + 200 + 208 = 1008
+        self.assertFalse(dash_blocked(1008, **free, h2b=600, uy=200, to_dash_delay=13))
+        self.assertFalse(dash_blocked(1000, **free, h2b=600, uy=200, to_dash_delay=None))
 
     def test_dash_try_matches_gates(self):
         # `gates` returns None for "not d350 and dash_ok" exactly where the dash try is reached; compare it with
