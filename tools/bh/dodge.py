@@ -508,6 +508,23 @@ def is_dodge_locked(move_locked, u5e, flag, e6p, power, r51, area, xb, c54, x2c)
     return x2c >= LOCK_X2C
 
 
+DASH_LOCK_MS = 112         # `Entity._-350` #3076 @45 / @120
+
+
+def dash_blocked(t, move_locked, p50, t26, e3, power, r51, xb, c54, h2b=0, uy=0, to_dash_delay=None,
+                 e3_counts=True):
+    """`Entity._-350(t)` #3076, tested by Dodge (@393-406) before `Dash`: true when `IsMoveLocked(t)`, a dash is
+    pending (`_-P50`), `_-26T` + 112 > t (the last dash start), `_-3E` + 112 > t (the end of the last move, set by
+    `_-c1r` #3025; only while `e3_counts`: not `_-Kc._-h2w` and `_-Kc._-e28` is not the id of
+    `PowerType._-W5C(_-N1k)` [H]), a power runs, on a wall (`_-r51`), a pending jump (`_-Xb`) or `_-C54(t)`
+    (ground_snap.landing_lock). Else, with a last DodgeType (`_-Q42` != 0), true while `_-H2b` + `_-Uy` +
+    ToDashDelay (`_-z3W`, frames x 16) > t. `to_dash_delay` is that row's ToDashDelay, or None without a row."""
+    if (move_locked or p50 or t26 + DASH_LOCK_MS > t or (e3_counts and e3 + DASH_LOCK_MS > t) or power
+            or r51 != 0 or xb != 0 or c54):
+        return True
+    return to_dash_delay is not None and h2b + uy + to_dash_delay * FRAME_MS > t
+
+
 def flags_51c(a, b, a1h, k6):
     """`Entity._-51c(a, b)` #3027: `_-E5I(a)` (so `_-u5E()` = a, the cooldown flag `_-l4c`), `_-Kc._-53P` = 0,
     `_-a1h` = false unless a, `_-6K` = 0 with b. `_-E6P()` is the other flag, `_-y1o`, written by `_-w5G`
@@ -634,6 +651,37 @@ def cooldown_ms(cooldown, cooldown_ground, air_or_wall):
 
 
 ANCHORS = {ABC_1100: {
+    "_-350 dash gate: IsMoveLocked, _-P50, _-26T + 112, (not _-h2w, _-e28 != _-W5C(_-N1k)._-H4O) _-3E + 112, power, _-r51, _-Xb, _-C54; then _-Q42 row: _-H2b + _-Uy + _-z3W (ToDashDelay) x 16 > t": [
+        (3076, 14, "callproperty", "IsMoveLocked, 1"),
+        (3076, 28, "getproperty", "_-P50"),
+        (3076, 41, "getproperty", "_-26T"),
+        (3076, 45, "pushbyte", "112"),
+        (3076, 51, "greaterthan", ""),
+        (3076, 66, "getproperty", "_-h2w"),
+        (3076, 70, "not", ""),
+        (3076, 82, "getproperty", "_-e28"),
+        (3076, 95, "callproperty", "_-W5C, 1"),
+        (3076, 103, "getproperty", "_-H4O"),
+        (3076, 106, "equals", ""),
+        (3076, 117, "getproperty", "_-3E"),
+        (3076, 120, "pushbyte", "112"),
+        (3076, 126, "greaterthan", ""),
+        (3076, 140, "getproperty", "_-o3I"),
+        (3076, 148, "equals", ""),
+        (3076, 160, "getproperty", "_-r51"),
+        (3076, 178, "getproperty", "_-Xb"),
+        (3076, 198, "callproperty", "_-C54, 1"),
+        (3076, 209, "pushtrue", ""),
+        (3076, 224, "getproperty", "_-Q42"),
+        (3076, 278, "getproperty", "_-H2b"),
+        (3076, 285, "getproperty", "_-Uy"),
+        (3076, 291, "getproperty", "_-z3W"),
+        (3076, 295, "pushbyte", "16"),
+        (3076, 302, "greaterthan", ""),
+        (3076, 308, "pushtrue", ""),
+        (2768, 1368, "pushstring", "'ToDashDelay'"),
+        (2768, 1388, "initproperty", "_-z3W"),
+    ],
     "Dash run: _-8i @2669 calls _-d1u; _-d1u starts it at _-v3x + 16/96/16/128/64/16/64 by _-L3a (_-C1h), ends it at _-26T + 320; _-C1h speed 78 / 65 turn / 68 kind 4, v = 0, _-84 = +-speed by _-r35 == turn, _-w47 = !turn": [
         (2984, 2669, "callpropvoid", "_-d1u, 1"),
         (2993, 9, "getproperty", "_-P50"),
