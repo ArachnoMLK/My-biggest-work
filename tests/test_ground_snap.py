@@ -6,7 +6,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh.dodge import dash_blocked  # noqa: E402
+from bh.dodge import dash_blocked, dash_try, gates  # noqa: E402
 from bh.ground_snap import (fall_probe, fall_reach, fall_snap, jump_snap, landing_lock, landing_marks,  # noqa: E402
                             rise_snap)
 from bh.raycast import Line  # noqa: E402
@@ -129,6 +129,26 @@ class DashGate(unittest.TestCase):
         self.assertTrue(dash_blocked(1000, **free, h2b=600, uy=224, to_dash_delay=15))   # 600 + 224 + 240 = 1064
         self.assertFalse(dash_blocked(1064, **free, h2b=600, uy=224, to_dash_delay=15))
         self.assertFalse(dash_blocked(1000, **free, h2b=600, uy=224, to_dash_delay=None))
+
+    def test_dash_try_matches_gates(self):
+        # `gates` returns None for "not d350 and dash_ok" exactly where the dash try is reached; compare it with
+        # a run where the dash is refused (d350), over a grid of inputs
+        import itertools
+        n = 0
+        for (dir, c, hit, air, locked, lchain, h2b, w14, r26) in itertools.product(
+                (0, 1, 2, 4, 6, 8, 10, 5), (False, True), (0, 950, 990), (False, True), (False, True),
+                (False, True), (0, 800), (0, 800), (False, True)):
+            args = (1000, dir, c, hit, air, locked, lchain, h2b, w14, 0, r26, 0)
+            tail = (False, 0, 0, False, None)                  # grounded false, `_-VE`, `_-532`, `_-n3h`, no chase
+            with_dash = gates(*args, False, True, *tail)
+            without = gates(*args, True, False, *tail)
+            want = dash_try(1000, dir, c, hit, air, locked, lchain, h2b, w14, r26)
+            if without is not None:                            # else `not go` hides the difference
+                self.assertEqual(with_dash is None, want, args)
+                n += 1
+            elif want:
+                self.assertIsNone(with_dash)
+        self.assertGreater(n, 100)
 
 
 if __name__ == "__main__":
