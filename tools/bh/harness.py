@@ -558,7 +558,7 @@ def combo_next(power):
 
 
 def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=None, dodge_press=False, keys=0,
-         dodge_rows=None, light_press=False, heavy_press=False, press_keys=None):
+         dodge_rows=None, light_press=False, heavy_press=False, press_keys=None, pickup=None):
     """One 16 ms tick at time t. `bounds` is (camera rectangle, kill dict) for the ring-out test, or None.
     `dodge_press` with `dodge_rows` (dodge.parse_types) tries `Entity.Dodge(t, keys & 15)` first (#6313 tries the
     dodge before the jump). Returns the list of events of this tick."""
@@ -584,6 +584,14 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
             acted = l15 = True                                  # #6313 @2442-2455 after a Dodge that ran
     if jump_press and not acted:                                # Jump @2567 / @3445 needs local 14 false
         events.append(("press", jump(f, t, left, right, grid=grid, team=team, keys=keys)))
+    if pickup is not None and not l15:
+        # #6313 @2580-2639: an unarmed fighter (`_-Kc._-O2R` null) with a PickUpThrow press in the window and
+        # local 15 false calls `_-Kc._-LY(t, no light press)`; `_-B5` = t whether or not an item was taken, and
+        # a pick-up sets local 15. This runs inside `_-1L`, before the Drop flag `_-G1a` is updated (below).
+        if pickup(f, t):
+            l15 = True
+            events.append(("pickup",))
+        f.b5 = t
     for press, heavy in ((light_press, False), (heavy_press, True)):
         if press:
             # #6313 keeps the key word of the press tick (locals 19 / 21) and `_-rU` #6334 reads its direction
@@ -960,10 +968,27 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                 done = p.setdefault("handled", {})
                 fresh = {a: bp[a] for a in ("Jump", "DodgeDash", "LightAttack", "HeavyAttack", "PickUpThrow")
                          if a in bp and bp[a] > done.get(a, -1)}
+                def take(f, t, p=p):                            # `_-LY` -> `_-N5R` -> `_-u30` -> `_-s1u`
+                    if f.power is not None or not f.moves:      # `_-LY` @60-96: IsMoveLocked (local 15) or a power
+                        return False
+                    it = world.pick_up(t, p["e"]["id"], f.x, f.y, f.moves["hero"])
+                    if it is None:
+                        return False
+                    name = world.crate_weapon(k_of[id(p["e"])], f.moves["hero"]) if it.get("E2E") else it["name"]
+                    slots = (weapon_slots or {}).get(name)
+                    if slots is not None:
+                        f.moves = dict(f.moves, weapon=slots)
+                        p["weapon"] = world.types.get(name) or {"G3X": True, "name": name}
+                    p.setdefault("handled", {})["PickUpThrow"] = p["_fresh"]["PickUpThrow"]
+                    p.setdefault("items", []).append((t, name))
+                    return True
+                p["_fresh"] = fresh
+                unarmed_pick = world is not None and "PickUpThrow" in fresh and p["weapon"] is None
                 ev = tick(p["f"], t, grid, bool(keys & MOVE_LEFT), bool(keys & MOVE_RIGHT), "Jump" in fresh, 0,
                           bounds, "DodgeDash" in fresh, keys, dodge_rows, "LightAttack" in fresh,
                           "HeavyAttack" in fresh,
-                          {a: state_at(records, fresh[a]) for a in ("LightAttack", "HeavyAttack") if a in fresh})
+                          {a: state_at(records, fresh[a]) for a in ("LightAttack", "HeavyAttack") if a in fresh},
+                          pickup=take if unarmed_pick else None)
                 attacks = [a for a in ("LightAttack", "HeavyAttack") if a in fresh]   # tick's order
                 for e in ev:                                    # a press is handled once its action ran [H]
                     if e[0] == "press" and e[1] is not None:
@@ -974,24 +999,15 @@ def play(entities, seed, points, camera, grid, bounds, stats_by_id, inputs_by_id
                         a = attacks.pop(0)
                         if e[4]:                                # refused while a power runs: retried [H]
                             done[a] = fresh[a]
-                if world is not None and "PickUpThrow" in fresh and f.moves and not move_locked(f, t) and f.power is None:
-                    f.b5 = t                                    # #6313 @2630 / @2711: `_-B5` = t with `_-LY`
-                    if p["weapon"] is not None:                 # a throw (`_-M4Q`) [H: a tap, no hit]
-                        world.throw(t, p["e"]["id"], p["weapon"], f, keys & DIR_MASK)
-                        p["weapon"] = None
-                        f.moves = dict(f.moves, weapon=(weapon_slots or {}).get("Unarmed", f.moves["weapon"]))
-                        done["PickUpThrow"] = fresh["PickUpThrow"]
-                        p.setdefault("items", []).append((t, "throw"))
-                    else:                                       # `_-LY` -> `_-N5R` -> `_-u30` -> `_-s1u`
-                        it = world.pick_up(t, p["e"]["id"], f.x, f.y, f.moves["hero"])
-                        if it is not None:
-                            name = world.crate_weapon(k_of[id(p["e"])], f.moves["hero"]) if it.get("E2E") else it["name"]
-                            slots = (weapon_slots or {}).get(name)
-                            if slots is not None:
-                                f.moves = dict(f.moves, weapon=slots)
-                                p["weapon"] = world.types.get(name) or {"G3X": True, "name": name}
-                            done["PickUpThrow"] = fresh["PickUpThrow"]
-                            p.setdefault("items", []).append((t, name))
+                picked = any(e[0] == "pickup" for e in ev)
+                if (world is not None and "PickUpThrow" in fresh and not unarmed_pick and not picked and f.moves
+                        and not move_locked(f, t) and f.power is None and p["weapon"] is not None):
+                    f.b5 = t                                    # [H] a throw (`_-M4Q`): a tap, no hit, after the step
+                    world.throw(t, p["e"]["id"], p["weapon"], f, keys & DIR_MASK)
+                    p["weapon"] = None
+                    f.moves = dict(f.moves, weapon=(weapon_slots or {}).get("Unarmed", f.moves["weapon"]))
+                    done["PickUpThrow"] = fresh["PickUpThrow"]
+                    p.setdefault("items", []).append((t, "throw"))
         if hurtbox is not None:                             # b4: queued hits of the fired steps [H]
             for p in players:
                 f = p["f"]
