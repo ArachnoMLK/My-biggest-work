@@ -124,6 +124,8 @@ their captured state and deterministic equivalence have not been tested.
   @1147. [H] These are promising boundary/KO paths. The exact ring-out test and its
   relationship to score updates remain unverified; do not label the second pass simply
   "KO after all hits".
+- [V] Update: the ring-out test is `_-h3U._-c5C` #3596, called from `Entity._-8i` in phase 5;
+  its mask is consumed by `_-eR` in phase 6. See [ko-11.00.md](ko-11.00.md) (`ko-verify`).
 - [V] Checkpoint restoration, controller sampling, post-match gates, and calls after the
   inner loop are present. This map does not establish that every call inside the loop
   affects simulation, or that everything outside it is presentation.
