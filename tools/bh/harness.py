@@ -288,15 +288,14 @@ def dodge_tick(f, t, a, held):
     """`Entity._-t1A(t, a)` (dodge.py), run by `_-8i` @2659 with a = the step's max speed: the landed cooldown, the
     cooldown end, then while dodging the push of each tick or, at the timer end, the exit speed."""
     row = f.dodge
-    if row is None:
-        return
     airborne = f.ground is None
-    f.y1f = landed_cooldown(f.y1f, airborne, f.r51, False, f.a1h, row.get("DodgeID", 0), t, f.i46,
-                            row.get("CooldownLanded", 0), f.uy, f.c1d)
-    if dodge_over(t, f.u5e, f.h2b, f.y1f, f.e3)[0]:
-        f.h2b = 0
+    if row is not None:                                         # @40-230 needs a DodgeType (`_-Q42` != 0)
+        f.y1f = landed_cooldown(f.y1f, airborne, f.r51, False, f.a1h, row.get("DodgeID", 0), t, f.i46,
+                                row.get("CooldownLanded", 0), f.uy, f.c1d)
+    if dodge_over(t, f.u5e, f.h2b, f.y1f, f.e3)[0]:            # @233-349 does not (the flag may come from
+        f.h2b = 0                                               # `_-c1r` at a power's end)
         f.u5e, f.a1h, _ = flags_51c(False, True, f.a1h, 0)
-    if not f.e6p:
+    if not f.e6p or row is None:
         return
     mv = moves(row.get("kind", 0), row.get("where", 0))
     if f.h2b + f.uy + f.c1d <= t:
