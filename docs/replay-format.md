@@ -46,11 +46,11 @@ per-entity formula. A mismatch means the format changed.
 
 - One record per **change** of the 14-bit key state, per entity.
 - **All timestamps are multiples of 16 ms** (42,636,188 records) **[V]** → the simulation tick is 16 ms.
-- Bits (low to high): `AimUp, Drop, MoveLeft, MoveRight, Jump, PrioritiseNeutralOverSide,
-  HeavyAttack, LightAttack, DodgeDash, PickUpThrow, TauntUp, TauntRight, TauntDown, TauntLeft`.
-- **Naming conflict** [H]: brawlhalla-sim proves on 10.09 that value 32 is *Aim Up* (paired with value 1 = Up), where
-  BrawlhallaReplayLibrary names value 1 `AimUp` and value 32 `PrioritiseNeutralOverSide`. See
-  [`prior-art-brawlhalla-sim.md`](prior-art-brawlhalla-sim.md#inputs--a-naming-conflict-to-resolve).
+- Bits (low to high): `Up, Drop, MoveLeft, MoveRight, Jump, AimUp, HeavyAttack, LightAttack,
+  DodgeDash, PickUpThrow, TauntUp, TauntRight, TauntDown, TauntLeft`.
+- Value 1 = **Up** and value 32 = **Aim Up** **[V]** from the game's command table
+  ([`input-commands-11.00.md`](input-commands-11.00.md), `bht.py commands-verify`), as brawlhalla-sim
+  found on 10.09. BrawlhallaReplayLibrary names them `AimUp` and `PrioritiseNeutralOverSide`.
 - The game consumes edges (pressed this tick and not the previous one): `(current XOR previous)
   AND current` on 10.09 per brawlhalla-sim **[V] by them**.
 
