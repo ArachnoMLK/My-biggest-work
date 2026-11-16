@@ -15,7 +15,9 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bh import abc as abcmod  # noqa: E402
+from bh import knockback as knockbackmod  # noqa: E402
 from bh import movement as movementmod  # noqa: E402
+from bh import powertypes as powertypesmod  # noqa: E402
 from bh import prng as prngmod  # noqa: E402
 from bh import prng_order as prngordermod  # noqa: E402
 from bh import render as rendermod  # noqa: E402
@@ -257,6 +259,51 @@ def cmd_prng_order_verify(a):
     print("static bytecode evidence only: no execution, no runtime oracle (docs/prng-order-11.00.md)")
 
 
+def cmd_knockback_verify(a):
+    """Check the pinned shape of the damage / knockback formula (#1674, #1675); exit 1 on mismatch, 2 on unknown ABC."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha not in knockbackmod.ANCHORS:
+        print(f"no knockback anchors for ABC {sha[:8]}... (known: {', '.join(k[:8] for k in knockbackmod.ANCHORS)})")
+        sys.exit(2)
+    bad = knockbackmod.verify(abcmod.Abc(data), sha)
+    for line in bad:
+        print(f"  MISMATCH {line}")
+    print(f"ABC {sha[:8]}...  anchors {knockbackmod.count(sha)}  mismatches {len(bad)}")
+    if bad:
+        sys.exit(1)
+    for group in knockbackmod.ANCHORS[sha]:
+        print(f"  ok  {group}")
+    print("static bytecode evidence only: no execution, no runtime oracle (docs/knockback-11.00.md)")
+
+
+def cmd_power_columns(a):
+    """Print the powerTypes column -> PowerType field map rebuilt from the ABC (#6483); no game data is read."""
+    p = a.abc or os.path.join(WORK, "abc", "main.abc")
+    if not os.path.exists(p):
+        sys.exit("run `abc-extract` first (or pass --abc)")
+    with open(p, "rb") as f:
+        data = f.read()
+    sha = hashlib.sha256(data).hexdigest()
+    if sha != movementmod.ABC_1100:
+        print(f"the parser id #{powertypesmod.PARSER} is pinned to patch 11.00 (ABC {movementmod.ABC_1100[:8]}...)")
+        sys.exit(2)
+    cmap = powertypesmod.column_map(abcmod.Abc(data))
+    if a.markdown:
+        print("| Column | Fields |")
+        print("|---|---|")
+        for col in sorted(cmap):
+            print(f"| {col} | {', '.join('`' + x + '`' for x in cmap[col]) or '—'} |")
+    else:
+        for col in sorted(cmap):
+            print(f"{col:28} {' '.join(cmap[col]) or '-'}")
+    print(f"{len(cmap)} columns", file=sys.stderr)
+
+
 def cmd_swz_key(a):
     """Find the .swz key: try every uint of the main ABC, else brute-force keys ending with --suffix."""
     data = open(os.path.join(a.game, "Init.swz"), "rb").read()
@@ -462,6 +509,8 @@ def main():
                            "default": [0, 1, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 123456789]})
     add("prng-verify", cmd_prng_verify, abc, seeds, (["--draws"], {"type": _bounded_int(1, 100000), "default": 256}))
     add("prng-order-verify", cmd_prng_order_verify, abc)
+    add("knockback-verify", cmd_knockback_verify, abc)
+    add("power-columns", cmd_power_columns, abc, (["--markdown"], {"action": "store_true"}))
     add("replay", cmd_replay, (["file"], {}), (["--limit"], {"type": int, "default": 20}), (["--json"], {"action": "store_true"}))
     add("render-summary", cmd_render_summary, (["file"], {}), (["--out"], {"help": "SVG path (default work/render/)"}))
     add("corpus", cmd_corpus, (["--dir"], {"default": DEFAULT_REPLAYS, "help": "replay folder (env BRAWLHALLA_REPLAYS)"}),
