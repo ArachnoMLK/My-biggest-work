@@ -10,7 +10,7 @@ import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from bh import abc, movement, render, replay, swf, swz  # noqa: E402
+from bh import abc, anm, collision, commands, movement, render, replay, stats, swf, swz  # noqa: E402
 
 GAME = os.environ.get("BRAWLHALLA_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\Brawlhalla")
 REPLAYS = os.environ.get("BRAWLHALLA_REPLAYS", os.path.join(os.path.expanduser("~"), "BrawlhallaReplays"))
@@ -108,6 +108,38 @@ class Pure(unittest.TestCase):
         with self.assertRaises((EOFError, replay.FormatError)):
             replay.parse(picked[0][1])
 
+    def test_fighter_stats_from_stance(self):
+        st = stats.parse_stat_types('<StatTypes><StatType StatName="Template"><RunSpeed>1</RunSpeed></StatType>'
+                                    '<StatType StatName="Speed2"><RunSpeed>40</RunSpeed></StatType>'
+                                    '<StatType StatName="Dexterity1"><RecoverMod>4</RecoverMod></StatType></StatTypes>')
+        self.assertNotIn("Template", st)
+        stances = stats.parse_stances('<RuneTypes><RuneType><HeroName>A</HeroName><RuneIndex>0</RuneIndex>'
+                                      '<Speed>2</Speed><Dexterity>1</Dexterity></RuneType>'
+                                      '<RuneType><RuneIndex>1</RuneIndex><Speed>9</Speed></RuneType></RuneTypes>')
+        self.assertEqual(sorted(stances), [("A", 0), ("A", 1)])  # HeroName carries over
+        out = stats.fighter_stats(stances[("A", 0)], st)
+        self.assertEqual((out["RunSpeed"], out["RecoverMod"], out["Friction"]), (40.0, 0.25, 2.5))
+        self.assertEqual(stats.fighter_stats(stances[("A", 1)], st)["RunSpeed"], 30.0)  # Speed9 absent: default
+
+    def test_anm_delta_coded_bones(self):
+        import struct, zlib
+        utf = lambda t: struct.pack("<H", len(t)) + t.encode()
+        b0 = struct.pack("<h", 7) + bytes([1, 0, 1, 1, 0]) + struct.pack("<ff", 3.0, 4.0) + bytes([0])  # identity
+        b1 = struct.pack("<h", 8) + bytes([0, 1, 1]) + bytes([1, 5]) + bytes([128])  # copies, frame 5, alpha
+        f0 = struct.pack("<h", 0) + bytes([0, 0]) + struct.pack("<h", 2) + bytes([0]) + b0 + bytes([0]) + b1
+        f1 = struct.pack("<h", 1) + bytes([1]) + struct.pack("<dd", 1.0, 2.0) + bytes([0]) + struct.pack("<h", 2) + bytes([1, 1, 1, 0, 9])
+        frames = f0 + f1
+        an = utf("A") + struct.pack("<6I", 2, 0, 0, 0, 0, 0) + struct.pack("<II", 1, 42) + struct.pack("<I", len(frames)) + frames
+        payload = bytes([1]) + utf("k") + utf("x") + utf("y") + struct.pack("<I", 1) + an + bytes([0])
+        out = anm.parse(struct.pack("<I", len(payload)) + zlib.compress(payload))
+        a = out["k"]["animations"][0]
+        self.assertEqual((a["frame_count"], a["data"], a["frames_unread"]), (2, [42], 0))
+        f0b, f1b = a["frames"][0]["bones"], a["frames"][1]["bones"]
+        self.assertEqual(f0b[0]["matrix"], (1.0, 0.0, 0.0, 1.0))
+        self.assertEqual((f0b[1]["matrix"], f0b[1]["xy"], f0b[1]["frame"]), (f0b[0]["matrix"], (3.0, 4.0), 5))
+        self.assertAlmostEqual(f0b[1]["alpha"], 128 / 255)
+        self.assertEqual((a["frames"][1]["point_a"], f1b[0]["id"], f1b[1]["frame"]), ((1.0, 2.0), 7, 9))
+
 
 @unittest.skipUnless(HAVE_GAME, "Brawlhalla not installed")
 class Game(unittest.TestCase):
@@ -135,6 +167,24 @@ class Game(unittest.TestCase):
         if anchors is None:
             self.skipTest("no movement anchors for this patch")
         self.assertEqual(movement.check(anchors, lambda m: movement.listing(self.abc, m)), [])
+
+    def test_command_table_anchors_hold(self):
+        anchors = commands.ANCHORS.get(hashlib.sha256(self.abc_bytes).hexdigest())
+        if anchors is None:
+            self.skipTest("no command-table anchors for this patch")
+        self.assertEqual(commands.check(anchors, lambda m: commands.listing(self.abc, m)), [])
+
+    def test_stats_anchors_hold(self):
+        anchors = stats.ANCHORS.get(hashlib.sha256(self.abc_bytes).hexdigest())
+        if anchors is None:
+            self.skipTest("no stats anchors for this patch")
+        self.assertEqual(stats.check(anchors, lambda m: stats.listing(self.abc, m)), [])
+
+    def test_collision_anchors_hold(self):
+        anchors = collision.ANCHORS.get(hashlib.sha256(self.abc_bytes).hexdigest())
+        if anchors is None:
+            self.skipTest("no collision anchors for this patch")
+        self.assertEqual(collision.check(anchors, lambda m: collision.listing(self.abc, m)), [])
 
     def test_swz_key_is_in_uint_pool(self):
         data = read(os.path.join(GAME, "Init.swz"))
