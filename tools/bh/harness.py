@@ -130,6 +130,10 @@ class Fighter:
     ut: bool = False          # `_-Kc._-UT`, exhausted: set by a power with an ExhaustedVersion, cleared by `_-C3x`
     t4d: int = 0              # `_-t4D`: the last landing after a jump (`_-8i` @13467); `_-C54` locks 64 ms after it
     jumped: bool = False      # `_-96p()` (`_-C1J`): set by `Jump` (`_-C2N(true)`), cleared on the ground
+    ve: int = 0               # `_-VE`, `_-V22`, `_-r3L`: the last three turns of the held side (`_-1L` @1115-1150)
+    v22: int = 0
+    r3l: int = 0
+    cv: bool = False          # `_-141()` (`_-i3X`, written by `_-CV`): the held side is left
     w3i: int = 0              # `_-w3i`: the last drop through a soft platform (`_-8i` @1857) [H: never set here]
     stats: dict = field(default_factory=lambda: dict(DEFAULT_STATS))
     events: list = field(default_factory=list)
@@ -215,7 +219,7 @@ def try_dash(f, t, dir, grid, team):
             _snap(f, r)
     if f.ground is None:
         return False
-    w = dash(t, dir, y1u, w4c, True, dir, bool(dir & LEFT_BIT), f.facing_left, 0, 0, 0, f.t5z, f.m3v,
+    w = dash(t, dir, y1u, w4c, True, dir, bool(dir & LEFT_BIT), f.facing_left, f.ve, f.v22, f.r3l, f.t5z, f.m3v,
              f.k1k, f.lock_start, f.e3, False, f.v1d, vy, f.l3a, f.dash_timer, f.w47)
     if w is None:
         return False
@@ -223,6 +227,7 @@ def try_dash(f, t, dir, grid, team):
     f.p50, f.m3v, f.t5z = True, False, True
     f.k1k = w.get("_-K1k", f.k1k)
     f.w47 = w.get("_-w47", f.w47)
+    f.ve, f.v22, f.r3l = w.get("_-VE", f.ve), w.get("_-V22", f.v22), w.get("_-r3L", f.r3l)
     if f.no and f.p5s < -41.0:                                  # `_-Q3q` #3079 from Dash
         f.p5s = -41.0
     f.no = False
@@ -365,25 +370,31 @@ def end_tick(power, k4b, stats=None):
 
 
 def power_accel(f, left_held):
-    """`_-l4X._-x1E(t)` #68: AccelMult (`_-T1b`)[step] (entry 0 past the end) while the step is not running
-    (`_-d38`), else BackwardAccelMult (`_-x21`) when the facing `_-L0` differs from `_-141()` (left held), else 1.
-    [H] glue: the IsAirPower x 0.5 rule (@148-261) and the `_-H6I(t)` 0.4 rule (@262-292) are left out; a
-    missing BackwardAccelMult reads as 1."""
+    """`_-l4X._-x1E(t)` #68: AccelMult (`_-T1b`)[step] (entry 0 past the end) while the step is not held
+    (`_-d38`); else BackwardAccelMult (`_-x21`) when the power's facing `_-L0` differs from `_-141()` (the held
+    side). An IsAirPower power on a ground line (`_-96f`), held against `_-L0`, halves it unless
+    IgnoreGroundRestrict (`_-41F`) and the power hit (`_-OD`) (@148-261). [H] glue: the `_-H6I(t)` 0.4 rule
+    (@262-292, the slide charge of a ground signature) is left out; a missing BackwardAccelMult reads as 1."""
     row, tl = f.power.get("row", {}), f.power["tl"]
+    back = _l0(f) != left_held                                  # `_-L0` != `_-pr._-141()`
     vals = []
     for x in str(row.get("AccelMult") or "").split(","):
         try:
             vals.append(float(x))
         except ValueError:
             pass
+    m = 1.0
     if vals and not tl.running:
-        return vals[tl.step] if tl.step < len(vals) else vals[0]
-    if f.facing_left != left_held:
+        m = vals[tl.step] if tl.step < len(vals) else vals[0]
+    elif back:
         try:
-            return float(row.get("BackwardAccelMult") or 1.0)
+            m = float(row.get("BackwardAccelMult") or 1.0)
         except ValueError:
-            return 1.0
-    return 1.0
+            m = 1.0
+    if (_true(row.get("IsAirPower")) and not (_true(row.get("IgnoreGroundRestrict")) and f.power.get("hit"))
+            and f.ground is not None and back):
+        m = m * 0.5
+    return m
 
 
 def power_cancels_gravity(f, t):
@@ -509,6 +520,17 @@ def power_ended(f, t):
     f.power = None
     if pw is None:
         return
+    # #1742 @795-853: `_-c1r(t, hit, _-L0, IsThrow or _-h2w, _-I2g & 2)` (#3025): after a hit `_-532` = t and
+    # `_-3E` = 0, else `_-532` = 0 and `_-3E` = t (`_-350` then refuses a dash for 112 ms, `_-t1A` holds the
+    # dodge state), and without IsThrow `_-51c(true, true)` (the dodge cooldown flag `_-u5E`). [H] the gate
+    # (not `_-SQ`, not `_-K1W`) is taken as true; `_-M3h` (= `_-L0`) and `_-64H` are not kept.
+    row0 = pw.get("row") or {}
+    if pw.get("hit"):
+        f.lock_start, f.e3 = t, 0
+    else:
+        f.lock_start, f.e3 = 0, t
+        if not _true(row0.get("IsThrow")):
+            f.u5e, f.a1h, _ = flags_51c(True, True, f.a1h, 0)
     row = pw.get("row") or {}
     rows = (f.moves or {}).get("powers") or {}
     org = origin_row(row, rows)
@@ -541,7 +563,6 @@ def start_power(f, t, power):
     f.power["move_lock"] = not (_true(power.get("AllowMove")) or _true(power.get("AllowMoveForward")))
     f.power["recover_move"] = _true(power.get("AllowRecoverMove"))
     f.power["end_tick"] = end_tick(power, tick_index(t), f.stats)
-    f.lock_start = t                                            # `_-532` = t: `Entity._-c1r` at the move start
     if power.get("ExhaustedVersion"):                           # `_-h1T` #1742 @540-581 (`_-8u`, not `_-P5D`) [H: at the start]
         f.ut = True
     return True
@@ -628,11 +649,29 @@ def tick(f, t, grid, left=False, right=False, jump_press=False, team=0, bounds=N
                     f.p5s, f.y, f.ground = saved
             events.append(("attack", slot, gc, name, not busy))
     f.g1a = g1a_next(f, t, keys)
+    cv_before = f.cv                                            # `_-1L` @38-49: local 2 = `_-141()`
     if t >= f.stun_until:                                       # `Entity._-1L` #2986 after `_-51o`: held left
         if keys & MOVE_LEFT:                                    # faces left, else held right faces right
             f.facing_left = True                                # (@348-436 free, @229-344 move-locked by a
         elif keys & MOVE_RIGHT:                                 # power: the same unless `_-t5z` [H])
             f.facing_left = False
+        if keys & MOVE_LEFT:                                    # `_-CV` (@296-339, @380-423)
+            f.cv = True
+        elif keys & MOVE_RIGHT:
+            f.cv = False
+    locked_now = move_locked(f, t)
+    if locked_now:                                              # `_-81n()` (`_-o1T`, @91-140 / @348-436)
+        side_held = f.e6p and f.h2b != 0 and f.o5c != 0
+    else:
+        side_held = bool(keys & (MOVE_LEFT | MOVE_RIGHT))
+    if f.cv != cv_before and not f.t5z:                         # @1065-1163: a turn of the held side
+        if f.w47:
+            f.k1k = t
+        f.r3l, f.v22, f.ve = f.v22, f.ve, t
+        f.w47 = False
+    if f.w47 and (not side_held or f.wn or f.r51 != 0 or f.power is not None):   # `_-c6H` #3141 (@1215)
+        f.k1k = t
+        f.w47 = False
     # `Entity._-k5H` #2991: `_-1L` (@75: the inputs above) runs before the power update `_-Kc._-25` (@522)
     if f.power is not None and f.power.get("g4i") in (6, 9):   # `_-O5N` #56 read by `_-R63` @4061-4339
         g = f.ground
